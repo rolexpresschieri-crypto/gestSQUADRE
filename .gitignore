@@ -1,0 +1,13 @@
+# Flutter
+app_mobile/gest_squadre/.dart_tool/
+app_mobile/gest_squadre/build/
+app_mobile/gest_squadre/dart-defines.json
+
+# Next.js
+backend_toc/.next/
+backend_toc/node_modules/
+backend_toc/.env.local
+
+# IDE
+.idea/
+*.iml

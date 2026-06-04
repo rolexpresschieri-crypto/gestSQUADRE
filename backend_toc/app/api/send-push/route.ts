@@ -1,0 +1,148 @@
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+import { getFirebaseAdminMessaging } from "@/lib/firebase-admin-app";
+import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
+import { tocPushTextUpper } from "@/lib/toc-push-text";
+
+/** Firebase Admin richiede runtime Node (compatibile Vercel serverless). */
+export const runtime = "nodejs";
+
+/** Canale Android + suono sirena AllarmeApp (MainActivity.kt + res/raw/siren.mp3). */
+const ANDROID_ALARM_CHANNEL_ID = "gest_squadre_toc_alarm_v2";
+const ANDROID_ALARM_SOUND = "siren";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export async function POST(request: Request) {
+  const url =
+    process.env.SUPABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+  if (!url || !serviceKey) {
+    return NextResponse.json(
+      { error: "SUPABASE_SERVICE_ROLE_KEY o URL mancanti.", code: "CONFIG" },
+      { status: 501 },
+    );
+  }
+
+  const messaging = getFirebaseAdminMessaging();
+  if (!messaging) {
+    return NextResponse.json(
+      {
+        error: "Firebase Admin non configurato (FIREBASE_SERVICE_ACCOUNT_JSON).",
+        code: "FIREBASE_ADMIN_NOT_CONFIGURED",
+      },
+      { status: 501 },
+    );
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Body JSON non valido" }, { status: 400 });
+  }
+
+  const payload = body as {
+    session?: AdminSessionData | null;
+    sessionId?: string;
+    title?: string;
+    body?: string;
+    alarm?: boolean;
+  };
+
+  const adminSession = payload.session;
+  if (!adminSession?.code) {
+    return NextResponse.json({ error: "Sessione TOC assente" }, { status: 401 });
+  }
+
+  const role = normalizeAdminRole(adminSession.role);
+  if (role !== "admin" && role !== "viewer") {
+    return NextResponse.json({ error: "Ruolo non valido" }, { status: 403 });
+  }
+
+  const sessionId =
+    typeof payload.sessionId === "string" ? payload.sessionId.trim() : "";
+  if (!UUID_RE.test(sessionId)) {
+    return NextResponse.json({ error: "sessionId UUID obbligatorio" }, { status: 400 });
+  }
+
+  const useAlarm = payload.alarm !== false;
+
+  const titleRaw =
+    typeof payload.title === "string" && payload.title.trim()
+      ? payload.title.trim()
+      : useAlarm
+        ? "TOC — ALLARME"
+        : "TOC — gestSQUADRE";
+  const bodyRaw =
+    typeof payload.body === "string" && payload.body.trim()
+      ? payload.body.trim()
+      : useAlarm
+        ? "MESSAGGIO URGENTE DAL TACTICAL OPERATIONS CENTER."
+        : "MESSAGGIO DAL TACTICAL OPERATIONS CENTER.";
+  const title = tocPushTextUpper(titleRaw);
+  const bodyText = tocPushTextUpper(bodyRaw);
+
+  const admin = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: sessionRow, error: sessionErr } = await admin
+    .from("squad_sessions")
+    .select("id, is_online")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (sessionErr) {
+    return NextResponse.json({ error: sessionErr.message }, { status: 500 });
+  }
+  if (!sessionRow?.is_online) {
+    return NextResponse.json({ error: "Sessione non online" }, { status: 409 });
+  }
+
+  const { data: tokenRow, error: tokenErr } = await admin
+    .from("squad_fcm_tokens")
+    .select("fcm_token")
+    .eq("session_id", sessionId)
+    .maybeSingle();
+
+  if (tokenErr) {
+    return NextResponse.json({ error: tokenErr.message }, { status: 500 });
+  }
+
+  const token = tokenRow?.fcm_token as string | undefined;
+  if (!token) {
+    return NextResponse.json(
+      {
+        error: "Nessun token FCM per questa sessione.",
+        code: "NO_FCM_TOKEN",
+      },
+      { status: 404 },
+    );
+  }
+
+  try {
+    const messageId = await messaging.send({
+      token,
+      notification: { title, body: bodyText },
+      data: {
+        type: useAlarm ? "toc_alarm" : "toc_message",
+      },
+      android: {
+        priority: "high",
+        notification: {
+          channelId: useAlarm ? ANDROID_ALARM_CHANNEL_ID : "gest_squadre_alerts",
+          defaultVibrateTimings: true,
+          ...(useAlarm ? { sound: ANDROID_ALARM_SOUND } : {}),
+        },
+      },
+    });
+    return NextResponse.json({ ok: true, messageId, alarm: useAlarm });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Errore FCM";
+    return NextResponse.json({ error: msg, code: "FCM_SEND_FAILED" }, { status: 502 });
+  }
+}

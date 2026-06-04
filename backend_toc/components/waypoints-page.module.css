@@ -1,0 +1,217 @@
+.root {
+  min-height: 100vh;
+  background: #06080f;
+  color: #edf2ff;
+  display: flex;
+  flex-direction: column;
+}
+
+.topBar {
+  flex-shrink: 0;
+  padding: 12px 18px;
+  border-bottom: 1px solid #1e2a4a;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topBar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: #14295d;
+  color: #e8eeff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.scroll {
+  flex: 1;
+  overflow: auto;
+  padding: 16px 18px 28px;
+}
+
+.maxWidth {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.panel {
+  border: 1px solid #203667;
+  border-radius: 16px;
+  background: #0a1223;
+  overflow: hidden;
+}
+
+.panelHeader {
+  padding: 14px 18px;
+  border-bottom: 1px solid #203667;
+}
+
+.panelHeader h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+
+.panelHeader p {
+  margin: 0;
+  font-size: 13px;
+  color: #9baccc;
+  line-height: 1.4;
+}
+
+.messageBox {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #2b4278;
+  background: rgba(9, 16, 31, 0.9);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.registryForm {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.fieldGroup {
+  display: grid;
+  gap: 8px;
+}
+
+.fieldGroup label {
+  color: #9baccc;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fieldGroup input {
+  width: 100%;
+  border: 1px solid #2b4278;
+  border-radius: 12px;
+  background: #09101f;
+  color: #edf2ff;
+  padding: 12px 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mapAction,
+.ghostButton {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+}
+
+.mapAction {
+  background: #1171b7;
+  color: #fff;
+}
+
+.ghostButton {
+  background: transparent;
+  border: 1px solid #2b4278;
+  color: #dbe5ff;
+}
+
+.mapAction:disabled,
+.ghostButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.listBody {
+  display: grid;
+  gap: 12px;
+  padding: 0 18px 18px;
+  max-height: min(50vh, 560px);
+  overflow: auto;
+}
+
+.listItem {
+  border: 1px solid #203667;
+  background: #09101f;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.listRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.listCode {
+  font-size: 15px;
+  font-weight: 800;
+  color: #f6e39b;
+}
+
+.missionText {
+  color: #d5dcec;
+  font-size: 14px;
+}
+
+.inlineButton {
+  border: 0;
+  background: transparent;
+  color: #7fb2ff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.emptyState {
+  padding: 16px;
+  color: #9baccc;
+  font-size: 14px;
+}
+
+.toast {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(17, 113, 183, 0.25);
+  border: 1px solid #1171b7;
+}
+
+.loginHint {
+  max-width: 520px;
+  margin: 48px auto;
+  padding: 24px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(20, 41, 93, 0.35);
+}
+
+.loginHint a {
+  color: #90caf9;
+}

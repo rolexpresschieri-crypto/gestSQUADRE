@@ -1,0 +1,87 @@
+{
+  "project_info": {
+    "project_number": "250732909266",
+    "firebase_url": "https://allarme-app-2026-b9f74-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "allarme-app-2026-b9f74",
+    "storage_bucket": "allarme-app-2026-b9f74.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250732909266:android:917d9b0486397e7939d30b",
+        "android_client_info": {
+          "package_name": "com.RDS.allarme_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACHMCXgKkzzOh6mfiB6YfO9SznuGst8mQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250732909266:android:dd4f6870673da7d739d30b",
+        "android_client_info": {
+          "package_name": "com.allarmeapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACHMCXgKkzzOh6mfiB6YfO9SznuGst8mQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250732909266:android:e338fd154ee75aba39d30b",
+        "android_client_info": {
+          "package_name": "com.ansmi.gest_squadre"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACHMCXgKkzzOh6mfiB6YfO9SznuGst8mQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:250732909266:android:99348bb2ce5909c139d30b",
+        "android_client_info": {
+          "package_name": "com.example.toc_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyACHMCXgKkzzOh6mfiB6YfO9SznuGst8mQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
