@@ -6,9 +6,40 @@
   font-family: system-ui, sans-serif;
 }
 
+.loginLayout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(16px, 4vw, 48px);
+  min-height: calc(100vh - 32px);
+  padding: 24px 12px;
+  flex-wrap: wrap;
+}
+
+.loginLogoSide {
+  width: clamp(140px, 18vw, 220px);
+  height: auto;
+  max-height: min(28vh, 240px);
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .loginLayout {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .loginLogoSide {
+    width: min(200px, 55vw);
+  }
+}
+
 .loginCard {
   max-width: 400px;
-  margin: 80px auto;
+  width: 100%;
+  flex: 0 1 400px;
+  margin: 0;
   padding: 24px;
   background: rgba(0, 0, 0, 0.45);
   border: 2px solid #1a3066;
@@ -74,6 +105,11 @@
 
 .btnYellow {
   background: #e0be3a;
+  color: #000;
+}
+
+.btnResetSquads {
+  background: #ff8f00;
   color: #000;
 }
 

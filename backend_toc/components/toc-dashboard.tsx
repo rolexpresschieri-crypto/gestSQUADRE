@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -71,8 +72,10 @@ export default function TocDashboard() {
   } | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [waypoints, setWaypoints] = useState<SquadWaypoint[]>([]);
+  const [resetSquadsBusy, setResetSquadsBusy] = useState(false);
 
   const canManageWaypoints = session?.role === "admin";
+  const canResetSquads = session?.role === "admin";
 
   const alarmingSessionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -288,6 +291,51 @@ export default function TocDashboard() {
     setSession(null);
   }
 
+  async function resetStaleSquadSessions() {
+    if (!supabase || !canResetSquads) {
+      return;
+    }
+    const onlineCount = squads.length;
+    const extra =
+      onlineCount > 0
+        ? ` Attualmente risultano ${onlineCount} squadra/e online sulla mappa.`
+        : "";
+    if (
+      !window.confirm(
+        `Chiudere tutte le sessioni squadra ancora segnate come "online"?${extra} ` +
+          "Le squadre potranno rifare login sul cellulare.",
+      )
+    ) {
+      return;
+    }
+
+    setResetSquadsBusy(true);
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from("squad_sessions")
+      .update({
+        is_online: false,
+        logout_at: now,
+      })
+      .eq("is_online", true)
+      .select("id");
+
+    setResetSquadsBusy(false);
+
+    if (error) {
+      setStatusMessage(`Reset sessioni: ${error.message}`);
+      return;
+    }
+
+    const closed = data?.length ?? 0;
+    await loadSquads();
+    setStatusMessage(
+      closed > 0
+        ? `Reset OK: ${closed} sessione/i chiuse (squadre possono rifare login).`
+        : "Nessuna sessione fantasma da chiudere.",
+    );
+  }
+
   async function acknowledgeAlarm(alarmId: string) {
     if (!supabase || !session) {
       return;
@@ -391,24 +439,42 @@ export default function TocDashboard() {
   if (!session) {
     return (
       <main className={styles.screen}>
-        <form className={styles.loginCard} onSubmit={handleLogin}>
-          <h1>Login Tactical Operations Center</h1>
-          <input
-            placeholder="Codice TOC"
-            value={loginCode}
-            onChange={(e) => setLoginCode(e.target.value)}
+        <div className={styles.loginLayout}>
+          <Image
+            className={styles.loginLogoSide}
+            src="/logo_open_golf_2026.png"
+            alt=""
+            width={220}
+            height={220}
+            priority
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={loginPassword}
-            onChange={(e) => setLoginPassword(e.target.value)}
+          <form className={styles.loginCard} onSubmit={handleLogin}>
+            <h1>Login Tactical Operations Center</h1>
+            <input
+              placeholder="Codice TOC"
+              value={loginCode}
+              onChange={(e) => setLoginCode(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+            />
+            <button className={styles.loginBtn} type="submit">
+              Accedi
+            </button>
+            {statusMessage ? <p className={styles.message}>{statusMessage}</p> : null}
+          </form>
+          <Image
+            className={styles.loginLogoSide}
+            src="/logo_open_golf_2026.png"
+            alt=""
+            width={220}
+            height={220}
+            priority
           />
-          <button className={styles.loginBtn} type="submit">
-            Accedi
-          </button>
-          {statusMessage ? <p className={styles.message}>{statusMessage}</p> : null}
-        </form>
+        </div>
       </main>
     );
   }
@@ -426,6 +492,17 @@ export default function TocDashboard() {
           <button className={`${styles.btn} ${styles.btnPrimary}`} type="button" onClick={() => void loadSquads()}>
             Aggiorna
           </button>
+          {canResetSquads ? (
+            <button
+              className={`${styles.btn} ${styles.btnResetSquads}`}
+              type="button"
+              disabled={resetSquadsBusy}
+              title="Chiude sessioni squadra lasciate online (crash app, logout mancato)"
+              onClick={() => void resetStaleSquadSessions()}
+            >
+              {resetSquadsBusy ? "Reset…" : "Reset sessioni squadre"}
+            </button>
+          ) : null}
           <button
             className={`${styles.btn} ${styles.btnAlarm}`}
             type="button"
