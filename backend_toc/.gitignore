@@ -33,6 +33,10 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# Firebase service account (solo locale / Vercel env, mai in git)
+*-firebase-adminsdk-*.json
 
 # vercel
 .vercel

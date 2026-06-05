@@ -7,6 +7,7 @@ app_mobile/gest_squadre/dart-defines.json
 backend_toc/.next/
 backend_toc/node_modules/
 backend_toc/.env.local
+backend_toc/*-firebase-adminsdk-*.json
 
 # IDE
 .idea/

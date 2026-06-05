@@ -712,6 +712,27 @@ export default function TocDashboard() {
         </aside>
       </div>
 
+      <footer className={styles.dashboardFooter}>
+        <div className={styles.footerLogoWrap}>
+          <Image
+            className={styles.footerLogo}
+            src="/logo_open_golf_2026.png"
+            alt="83 Open d'Italia 2026 — DS Automobiles"
+            width={840}
+            height={200}
+          />
+        </div>
+        <div className={styles.footerLogoWrap}>
+          <Image
+            className={styles.footerLogo}
+            src="/logo_open_golf_2026.png"
+            alt="83 Open d'Italia 2026 — DS Automobiles"
+            width={840}
+            height={200}
+          />
+        </div>
+      </footer>
+
       {squadLogoutOpen ? (
         <div className={styles.modalBackdrop}>
           <div className={styles.modal}>
