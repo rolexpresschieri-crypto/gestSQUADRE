@@ -670,7 +670,8 @@ export default function TocDashboard() {
             )}
           </div>
           <h3>Squadre online</h3>
-          <ul className={styles.squadList}>
+          <div className={styles.squadListWrap}>
+            <ul className={styles.squadList}>
             {squads.length === 0 ? (
               <li className={styles.squadRowMuted}>Nessuna squadra online.</li>
             ) : (
@@ -708,7 +709,8 @@ export default function TocDashboard() {
                 );
               })
             )}
-          </ul>
+            </ul>
+          </div>
         </aside>
       </div>
 
