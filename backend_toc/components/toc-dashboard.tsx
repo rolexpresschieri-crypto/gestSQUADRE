@@ -498,7 +498,7 @@ export default function TocDashboard() {
 
   if (!session) {
     return (
-      <main className={styles.screen}>
+      <main className={`${styles.screen} ${styles.loginScreen}`}>
         <div className={styles.loginLayout}>
           <div className={styles.loginLogoWrap}>
             <Image
@@ -539,6 +539,7 @@ export default function TocDashboard() {
             />
           </div>
         </div>
+        <p className={styles.loginSignature}>by R. Ronco</p>
       </main>
     );
   }

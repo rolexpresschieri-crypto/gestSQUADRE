@@ -6,6 +6,10 @@
   font-family: system-ui, sans-serif;
 }
 
+.loginScreen {
+  position: relative;
+}
+
 .loginLayout {
   display: flex;
   align-items: center;
@@ -14,6 +18,23 @@
   min-height: calc(100vh - 32px);
   padding: 24px 12px;
   flex-wrap: wrap;
+}
+
+.loginSignature {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  margin: 0;
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.42);
+  border-radius: 8px;
+  color: #fff;
+  font-style: italic;
+  font-size: 18px;
+  font-weight: 400;
+  text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  z-index: 2;
 }
 
 .loginLogoWrap {
