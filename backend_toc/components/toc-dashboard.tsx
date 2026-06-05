@@ -69,6 +69,9 @@ export default function TocDashboard() {
     supabaseServiceRole: boolean;
     firebaseAdmin: boolean;
     fcmTokenRows?: number;
+    onlineSessions?: number;
+    onlineSessionsWithToken?: number;
+    supabaseProject?: string | null;
   } | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [waypoints, setWaypoints] = useState<SquadWaypoint[]>([]);
@@ -765,28 +768,64 @@ export default function TocDashboard() {
             </p>
             {pushHealth && !pushHealth.firebaseAdmin ? (
               <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
-                Push non disponibile: in <code>.env.local</code> manca{" "}
-                <strong>FIREBASE_SERVICE_ACCOUNT_JSON</strong> (JSON service account Firebase).
-                Riavvia <code>npm run dev</code> dopo la modifica.
+                Push non disponibile: manca il service account Firebase (
+                <strong>FIREBASE_SERVICE_ACCOUNT_PATH</strong> o{" "}
+                <strong>FIREBASE_SERVICE_ACCOUNT_JSON</strong>).
+                {typeof window !== "undefined" &&
+                window.location.hostname.includes("vercel.app") ? (
+                  <>
+                    {" "}
+                    Su Vercel: <strong>Settings</strong> →{" "}
+                    <strong>Environment Variables</strong> → incolla tutto il JSON in{" "}
+                    <code>FIREBASE_SERVICE_ACCOUNT_JSON</code> → <strong>Redeploy</strong>.
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    In <code>backend_toc/.env.local</code>: scarica la chiave da Firebase Console
+                    (progetto <code>allarme-app-2026-b9f74</code>) e imposta il percorso del file
+                    .json. Poi riavvia <code>npm run dev</code>. Verifica:{" "}
+                    <a href="/api/push-health" target="_blank" rel="noreferrer">
+                      /api/push-health
+                    </a>
+                    .
+                  </>
+                )}
               </p>
             ) : null}
             {pushHealth && pushHealth.firebaseAdmin ? (
               <p className={styles.pushHint}>
                 Server FCM: OK.
-                {pushHealth.fcmTokenRows === 0 ? (
+                {pushHealth.onlineSessions != null &&
+                pushHealth.onlineSessions > 0 &&
+                (pushHealth.onlineSessionsWithToken ?? 0) <
+                  pushHealth.onlineSessions ? (
                   <>
                     {" "}
                     <strong style={{ color: "#ff5252" }}>
-                      Tabella squad_fcm_tokens vuota: sul telefono registra l&apos;app Android{" "}
-                      <code>com.ansmi.gest_squadre</code> in Firebase, copia{" "}
-                      <code>google-services.json</code>, esegui{" "}
-                      <code>scripts/sync-firebase-dart-defines.ps1</code>, ricompila e rifai login
-                      squadra.
+                      {pushHealth.onlineSessions - (pushHealth.onlineSessionsWithToken ?? 0)}{" "}
+                      squadra/e online senza token push: ricompila APK (build-apk.bat), consenti
+                      notifiche, logout/login sul telefono.
                     </strong>
                   </>
                 ) : pushHealth.fcmTokenRows != null && pushHealth.fcmTokenRows > 0 ? (
-                  <> Token registrati in DB: {pushHealth.fcmTokenRows}.</>
-                ) : null}
+                  <>
+                    {" "}
+                    Token in DB: {pushHealth.fcmTokenRows}
+                    {pushHealth.onlineSessionsWithToken != null
+                      ? ` · online con push: ${pushHealth.onlineSessionsWithToken}/${pushHealth.onlineSessions ?? 0}`
+                      : null}
+                    .
+                  </>
+                ) : (
+                  <>
+                    {" "}
+                    <strong style={{ color: "#ff5252" }}>
+                      Nessun token in squad_fcm_tokens: ricompila APK, login squadra con notifiche
+                      attive.
+                    </strong>
+                  </>
+                )}
               </p>
             ) : null}
             <label className={styles.pushField}>

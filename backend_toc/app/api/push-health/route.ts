@@ -16,25 +16,62 @@ export async function GET() {
   const firebase = getFirebaseAdminDiagnostics();
 
   let fcmTokenRows = 0;
+  let onlineSessions = 0;
+  let onlineSessionsWithToken = 0;
+  let queryError: string | null = null;
+
   if (url && serviceKey && !serviceKey.includes("YOUR_")) {
     try {
       const admin = createClient(url, serviceKey, {
         auth: { persistSession: false, autoRefreshToken: false },
       });
-      const { count } = await admin
+      const { data: tokenRows, error: countErr } = await admin
         .from("squad_fcm_tokens")
-        .select("id", { count: "exact", head: true });
-      fcmTokenRows = count ?? 0;
-    } catch {
+        .select("session_id");
+      if (countErr) {
+        queryError = countErr.message;
+        fcmTokenRows = -1;
+      } else {
+        fcmTokenRows = tokenRows?.length ?? 0;
+      }
+
+      const { data: online, error: onlineErr } = await admin
+        .from("squad_sessions")
+        .select("id")
+        .eq("is_online", true);
+      if (onlineErr) {
+        queryError = queryError ?? onlineErr.message;
+      } else if (online) {
+        onlineSessions = online.length;
+        const ids = online.map((r) => r.id as string).filter(Boolean);
+        if (ids.length > 0) {
+          const { data: matched, error: tokenErr } = await admin
+            .from("squad_fcm_tokens")
+            .select("session_id")
+            .in("session_id", ids);
+          if (tokenErr) {
+            queryError = queryError ?? tokenErr.message;
+          } else {
+            onlineSessionsWithToken = matched?.length ?? 0;
+          }
+        }
+      }
+    } catch (e) {
+      queryError = e instanceof Error ? e.message : "query failed";
       fcmTokenRows = -1;
     }
   }
 
   return NextResponse.json({
+    apiVersion: 2,
     supabaseUrl: Boolean(url),
+    supabaseProject: url ? new URL(url).hostname.split(".")[0] : null,
     supabaseServiceRole: Boolean(serviceKey && !serviceKey.includes("YOUR_")),
     firebaseAdmin: Boolean(getFirebaseAdminMessaging()),
     fcmTokenRows,
+    onlineSessions,
+    onlineSessionsWithToken,
+    queryError,
     firebase: {
       ...firebase,
       hint: firebase.adminReady
