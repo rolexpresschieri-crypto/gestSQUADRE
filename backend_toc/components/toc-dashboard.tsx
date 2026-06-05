@@ -500,14 +500,16 @@ export default function TocDashboard() {
     return (
       <main className={styles.screen}>
         <div className={styles.loginLayout}>
-          <Image
-            className={styles.loginLogoSide}
-            src="/logo_open_golf_2026.png"
-            alt=""
-            width={320}
-            height={320}
-            priority
-          />
+          <div className={styles.loginLogoWrap}>
+            <Image
+              className={styles.loginLogoSide}
+              src="/logo_open_golf_2026.png"
+              alt="83 Open d'Italia 2026 — DS Automobiles"
+              width={840}
+              height={200}
+              priority
+            />
+          </div>
           <form className={styles.loginCard} onSubmit={handleLogin}>
             <h1>Login Tactical Operations Center</h1>
             <input
@@ -526,14 +528,16 @@ export default function TocDashboard() {
             </button>
             {statusMessage ? <p className={styles.message}>{statusMessage}</p> : null}
           </form>
-          <Image
-            className={styles.loginLogoSide}
-            src="/logo_open_golf_2026.png"
-            alt=""
-            width={320}
-            height={320}
-            priority
-          />
+          <div className={styles.loginLogoWrap}>
+            <Image
+              className={styles.loginLogoSide}
+              src="/logo_open_golf_2026.png"
+              alt="83 Open d'Italia 2026 — DS Automobiles"
+              width={840}
+              height={200}
+              priority
+            />
+          </div>
         </div>
       </main>
     );
