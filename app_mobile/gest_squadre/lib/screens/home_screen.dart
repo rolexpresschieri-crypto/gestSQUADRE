@@ -231,10 +231,9 @@ class HomeScreen extends StatelessWidget {
                                   backgroundColor: tacticalNavy,
                                   content: Text(
                                     'Dal telefono localhost non funziona. '
-                                    'Sul PC apri Chrome: https://localhost:3000 '
-                                    '(dopo npm run dev in backend_toc). '
-                                    'Oppure imposta TOC_BACKEND_URL con IP del PC '
-                                    '(es. https://192.168.1.10:3000) in dart-defines.json.'
+                                    'Usa TOC_BACKEND_URL su Vercel (es. https://gest-squadre.vercel.app) '
+                                    'in dart-defines.json. Per push TOC aggiungi anche FIREBASE_ANDROID_* '
+                                    'nello stesso file (vedi dart-defines.example.json).',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,

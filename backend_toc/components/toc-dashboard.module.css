@@ -17,9 +17,9 @@
 }
 
 .loginLogoSide {
-  width: clamp(140px, 18vw, 220px);
+  width: clamp(200px, 24vw, 320px);
   height: auto;
-  max-height: min(28vh, 240px);
+  max-height: min(38vh, 340px);
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -31,7 +31,8 @@
   }
 
   .loginLogoSide {
-    width: min(200px, 55vw);
+    width: min(260px, 68vw);
+    max-height: min(32vh, 280px);
   }
 }
 
@@ -263,6 +264,57 @@
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.squadRowMuted {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.btnLogoutSquad {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 6px;
+  border: 1px solid #000;
+  background: #ff8f00;
+  color: #000;
+  cursor: pointer;
+}
+
+.btnLogoutSquad:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.squadLogoutList {
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 12px 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+}
+
+.squadLogoutOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.squadLogoutOption:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.squadLogoutOption input {
+  flex-shrink: 0;
 }
 
 .squadBadge {

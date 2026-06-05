@@ -72,10 +72,13 @@ export default function TocDashboard() {
   } | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
   const [waypoints, setWaypoints] = useState<SquadWaypoint[]>([]);
-  const [resetSquadsBusy, setResetSquadsBusy] = useState(false);
+  const [squadLogoutOpen, setSquadLogoutOpen] = useState(false);
+  const [squadLogoutPickId, setSquadLogoutPickId] = useState<string | null>(null);
+  const [squadLogoutBusy, setSquadLogoutBusy] = useState(false);
+  const [onlineSessionsLogout, setOnlineSessionsLogout] = useState<LiveSquad[]>([]);
 
   const canManageWaypoints = session?.role === "admin";
-  const canResetSquads = session?.role === "admin";
+  const canForceSquadLogout = session?.role === "admin";
 
   const alarmingSessionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -122,6 +125,58 @@ export default function TocDashboard() {
     }
     setSquads(liveSquadsFromRows((data ?? []) as Record<string, unknown>[]));
     setStatusMessage(`${data?.length ?? 0} squadre online`);
+  }, [supabase]);
+
+  const loadOnlineSessionsForLogout = useCallback(async () => {
+    if (!supabase) {
+      setOnlineSessionsLogout([]);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("squad_sessions")
+      .select(
+        "id, event_id, squad_id, is_online, login_at, squads(squad_code, squad_name, map_color)",
+      )
+      .eq("is_online", true)
+      .order("login_at", { ascending: false });
+
+    if (error || !data) {
+      setOnlineSessionsLogout([]);
+      return;
+    }
+
+    const rows = data.map((row) => {
+      const squad = row.squads as
+        | { squad_code: string; squad_name: string; map_color: string | null }
+        | { squad_code: string; squad_name: string; map_color: string | null }[]
+        | null;
+      const s = Array.isArray(squad) ? squad[0] : squad;
+      return {
+        sessionId: row.id as string,
+        eventId: row.event_id as string,
+        squadId: row.squad_id as string,
+        squadCode: (s?.squad_code ?? "?").toUpperCase(),
+        squadName: s?.squad_name ?? "Squadra",
+        isOnline: true,
+        lastLatitude: null,
+        lastLongitude: null,
+        lastAccuracy: null,
+        lastFixAt: null,
+        mapColor: s?.map_color ?? "#079B42",
+      } satisfies LiveSquad;
+    });
+
+    rows.sort((a, b) => a.squadCode.localeCompare(b.squadCode, "it"));
+    setOnlineSessionsLogout(rows);
+    setSquadLogoutPickId((prev) => {
+      if (rows.length === 0) {
+        return null;
+      }
+      if (prev && rows.some((r) => r.sessionId === prev)) {
+        return prev;
+      }
+      return rows[0]!.sessionId;
+    });
   }, [supabase]);
 
   const loadAlarms = useCallback(async () => {
@@ -291,49 +346,54 @@ export default function TocDashboard() {
     setSession(null);
   }
 
-  async function resetStaleSquadSessions() {
-    if (!supabase || !canResetSquads) {
+  function openSquadLogoutModal() {
+    setSquadLogoutOpen(true);
+    void loadOnlineSessionsForLogout();
+  }
+
+  async function forceLogoutSquad(squad: LiveSquad) {
+    if (!supabase || !canForceSquadLogout) {
       return;
     }
-    const onlineCount = squads.length;
-    const extra =
-      onlineCount > 0
-        ? ` Attualmente risultano ${onlineCount} squadra/e online sulla mappa.`
-        : "";
     if (
       !window.confirm(
-        `Chiudere tutte le sessioni squadra ancora segnate come "online"?${extra} ` +
-          "Le squadre potranno rifare login sul cellulare.",
+        `Forzare logout per ${squad.squadCode} — ${squad.squadName}?\n` +
+          "La squadra potrà rifare login sul cellulare.",
       )
     ) {
       return;
     }
 
-    setResetSquadsBusy(true);
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
+    setSquadLogoutBusy(true);
+    const { error } = await supabase
       .from("squad_sessions")
       .update({
         is_online: false,
-        logout_at: now,
+        logout_at: new Date().toISOString(),
       })
-      .eq("is_online", true)
-      .select("id");
+      .eq("id", squad.sessionId);
 
-    setResetSquadsBusy(false);
+    setSquadLogoutBusy(false);
 
     if (error) {
-      setStatusMessage(`Reset sessioni: ${error.message}`);
+      setStatusMessage(`Logout squadra: ${error.message}`);
       return;
     }
 
-    const closed = data?.length ?? 0;
     await loadSquads();
-    setStatusMessage(
-      closed > 0
-        ? `Reset OK: ${closed} sessione/i chiuse (squadre possono rifare login).`
-        : "Nessuna sessione fantasma da chiudere.",
-    );
+    await loadOnlineSessionsForLogout();
+    if (selectedSessionId === squad.sessionId) {
+      setSelectedSessionId(null);
+    }
+    setStatusMessage(`Logout forzato: ${squad.squadCode} — ${squad.squadName}.`);
+  }
+
+  async function confirmSquadLogoutFromModal() {
+    const picked = onlineSessionsLogout.find((s) => s.sessionId === squadLogoutPickId);
+    if (!picked) {
+      return;
+    }
+    await forceLogoutSquad(picked);
   }
 
   async function acknowledgeAlarm(alarmId: string) {
@@ -444,8 +504,8 @@ export default function TocDashboard() {
             className={styles.loginLogoSide}
             src="/logo_open_golf_2026.png"
             alt=""
-            width={220}
-            height={220}
+            width={320}
+            height={320}
             priority
           />
           <form className={styles.loginCard} onSubmit={handleLogin}>
@@ -470,8 +530,8 @@ export default function TocDashboard() {
             className={styles.loginLogoSide}
             src="/logo_open_golf_2026.png"
             alt=""
-            width={220}
-            height={220}
+            width={320}
+            height={320}
             priority
           />
         </div>
@@ -492,15 +552,14 @@ export default function TocDashboard() {
           <button className={`${styles.btn} ${styles.btnPrimary}`} type="button" onClick={() => void loadSquads()}>
             Aggiorna
           </button>
-          {canResetSquads ? (
+          {canForceSquadLogout ? (
             <button
               className={`${styles.btn} ${styles.btnResetSquads}`}
               type="button"
-              disabled={resetSquadsBusy}
-              title="Chiude sessioni squadra lasciate online (crash app, logout mancato)"
-              onClick={() => void resetStaleSquadSessions()}
+              title="Scegli quale squadra chiudere (logout forzato da TOC)"
+              onClick={openSquadLogoutModal}
             >
-              {resetSquadsBusy ? "Reset…" : "Reset sessioni squadre"}
+              Logout squadra…
             </button>
           ) : null}
           <button
@@ -604,25 +663,93 @@ export default function TocDashboard() {
           </div>
           <h3>Squadre online</h3>
           <ul className={styles.squadList}>
-            {squads.map((s) => {
-              const alarming = alarmingSessionIds.has(s.sessionId);
-              return (
-                <li key={s.sessionId} className={styles.squadRow}>
-                  <span
-                    className={
-                      alarming ? `${styles.squadBadge} ${styles.squadBadgeAlarm}` : styles.squadBadge
-                    }
-                  />
-                  <span className={alarming ? styles.squadLabelAlarm : styles.squadLabel}>
-                    {alarming ? "ALLARME — " : ""}
-                    {s.squadCode} — {s.squadName}
-                  </span>
-                </li>
-              );
-            })}
+            {squads.length === 0 ? (
+              <li className={styles.squadRowMuted}>Nessuna squadra online.</li>
+            ) : (
+              squads.map((s) => {
+                const alarming = alarmingSessionIds.has(s.sessionId);
+                return (
+                  <li key={s.sessionId} className={styles.squadRow}>
+                    <span
+                      className={
+                        alarming
+                          ? `${styles.squadBadge} ${styles.squadBadgeAlarm}`
+                          : styles.squadBadge
+                      }
+                    />
+                    <span
+                      className={
+                        alarming ? styles.squadLabelAlarm : styles.squadLabel
+                      }
+                    >
+                      {alarming ? "ALLARME — " : ""}
+                      {s.squadCode} — {s.squadName}
+                    </span>
+                    {canForceSquadLogout ? (
+                      <button
+                        type="button"
+                        className={styles.btnLogoutSquad}
+                        disabled={squadLogoutBusy}
+                        title="Forza logout solo per questa squadra"
+                        onClick={() => void forceLogoutSquad(s)}
+                      >
+                        Logout
+                      </button>
+                    ) : null}
+                  </li>
+                );
+              })
+            )}
           </ul>
         </aside>
       </div>
+
+      {squadLogoutOpen ? (
+        <div className={styles.modalBackdrop}>
+          <div className={styles.modal}>
+            <h2>Logout squadra (TOC)</h2>
+            <p className={styles.pushHint}>
+              Scegli la squadra da disconnettere se ha dimenticato il logout sul cellulare.
+            </p>
+            {onlineSessionsLogout.length === 0 ? (
+              <p className={styles.pushHint}>Nessuna sessione online da chiudere.</p>
+            ) : (
+              <div className={styles.squadLogoutList}>
+                {onlineSessionsLogout.map((s) => (
+                  <label key={s.sessionId} className={styles.squadLogoutOption}>
+                    <input
+                      type="radio"
+                      name="squad-logout-pick"
+                      checked={squadLogoutPickId === s.sessionId}
+                      onChange={() => setSquadLogoutPickId(s.sessionId)}
+                    />
+                    <span>
+                      <strong>{s.squadCode}</strong> — {s.squadName}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+            <div className={styles.actions} style={{ marginTop: 12 }}>
+              <button
+                className={`${styles.btn} ${styles.btnResetSquads}`}
+                type="button"
+                disabled={squadLogoutBusy || onlineSessionsLogout.length === 0}
+                onClick={() => void confirmSquadLogoutFromModal()}
+              >
+                {squadLogoutBusy ? "Logout…" : "Forza logout squadra selezionata"}
+              </button>
+              <button
+                className={styles.btn}
+                type="button"
+                onClick={() => setSquadLogoutOpen(false)}
+              >
+                Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {pushOpen ? (
         <div className={styles.modalBackdrop}>
