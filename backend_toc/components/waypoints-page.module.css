@@ -232,9 +232,9 @@
 }
 
 .iconPicker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
 }
 
 .iconOption {
@@ -250,7 +250,7 @@
   font-size: 12px;
   font-weight: 600;
   color: #ddd;
-  min-width: 96px;
+  min-width: 0;
 }
 
 .iconOption input {
