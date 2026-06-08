@@ -25,17 +25,16 @@ import {
   waypointSourceLabel,
   type SquadWaypoint,
 } from "@/lib/waypoints";
+import { waypointIconMapUrl } from "@/lib/waypoint-icons";
 
 const defaultCenter: LatLngExpression = [45.0703, 7.6869];
 
-/** Icona buca sulla mappa (PNG senza sfondo) */
-const BUCA_GOLF_ICON_URL = "/map/buca_02.png";
-
 function waypointDivIcon(waypoint: SquadWaypoint): L.DivIcon {
   const name = escapeHtml(waypointDisplayName(waypoint).slice(0, 22).toUpperCase());
+  const iconUrl = waypointIconMapUrl(waypoint.iconKey);
   return L.divIcon({
     className: "gs-wp-divicon",
-    html: `<div class="gs-wp-pin"><img class="gs-wp-icon" src="${BUCA_GOLF_ICON_URL}" width="40" height="40" alt="" /><div class="gs-wp-chip">${name}</div></div>`,
+    html: `<div class="gs-wp-pin"><img class="gs-wp-icon" src="${iconUrl}" width="40" height="40" alt="" /><div class="gs-wp-chip">${name}</div></div>`,
     iconSize: [120, 56],
     iconAnchor: [60, 18],
     popupAnchor: [0, -22],

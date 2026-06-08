@@ -24,6 +24,10 @@ import {
   waypointsFromRows,
   type SquadWaypoint,
 } from "@/lib/waypoints";
+import {
+  WAYPOINT_ICON_OPTIONS,
+  type WaypointIconKey,
+} from "@/lib/waypoint-icons";
 import styles from "./waypoints-page.module.css";
 
 export default function WaypointsPage() {
@@ -38,6 +42,7 @@ export default function WaypointsPage() {
 
   const [waypoints, setWaypoints] = useState<SquadWaypoint[]>([]);
   const [waypointLabel, setWaypointLabel] = useState("");
+  const [waypointIconKey, setWaypointIconKey] = useState<WaypointIconKey>("buche");
   const [waypointLat, setWaypointLat] = useState("");
   const [waypointLon, setWaypointLon] = useState("");
   const [editingWaypointId, setEditingWaypointId] = useState<string | null>(null);
@@ -150,6 +155,7 @@ export default function WaypointsPage() {
   function resetWaypointForm() {
     setEditingWaypointId(null);
     setWaypointLabel("");
+    setWaypointIconKey("buche");
     setWaypointLat("");
     setWaypointLon("");
     setWaypointFormError(null);
@@ -158,6 +164,7 @@ export default function WaypointsPage() {
   function beginEditWaypoint(waypoint: SquadWaypoint) {
     setEditingWaypointId(waypoint.id);
     setWaypointLabel(waypoint.label?.trim() ?? "");
+    setWaypointIconKey(waypoint.iconKey);
     setWaypointLat(String(waypoint.latitude));
     setWaypointLon(String(waypoint.longitude));
     setWaypointFormError(null);
@@ -214,6 +221,7 @@ export default function WaypointsPage() {
             latitude: lat,
             longitude: lon,
             label: nameTrim,
+            icon_key: waypointIconKey,
           })
           .eq("id", editingWaypointId);
 
@@ -227,6 +235,7 @@ export default function WaypointsPage() {
           latitude: lat,
           longitude: lon,
           label: nameTrim,
+          icon_key: waypointIconKey,
           created_by_admin_code: session.code,
           source: "toc_backend",
         });
@@ -325,7 +334,7 @@ export default function WaypointsPage() {
 
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2>Waypoint fissi (icona buca golf)</h2>
+              <h2>Waypoint fissi</h2>
               <p>
                 Evento attivo: <strong>{activeEventTitle || "—"}</strong> · Solo latitudine e
                 longitudine (senza quota), come in TocAppBuild.
@@ -337,8 +346,7 @@ export default function WaypointsPage() {
             ) : (
               <div className={styles.registryForm}>
                 <div className={styles.messageBox}>
-                  {waypoints.length} waypoint · Ordine A–Z · Icona{" "}
-                  <code>buca_02.png</code> sulla mappa.
+                  {waypoints.length} waypoint · Ordine A–Z · Icona selezionabile per ogni punto.
                 </div>
 
                 {waypointFeedError ? (
@@ -369,6 +377,32 @@ export default function WaypointsPage() {
                         onChange={(e) => setWaypointLabel(e.target.value)}
                         required
                       />
+                    </div>
+                    <div className={styles.fieldGroup}>
+                      <span className={styles.iconPickerLabel}>Icona sulla mappa</span>
+                      <div className={styles.iconPicker} role="radiogroup" aria-label="Icona waypoint">
+                        {WAYPOINT_ICON_OPTIONS.map((opt) => (
+                          <label
+                            key={opt.key}
+                            className={
+                              waypointIconKey === opt.key
+                                ? `${styles.iconOption} ${styles.iconOptionActive}`
+                                : styles.iconOption
+                            }
+                          >
+                            <input
+                              type="radio"
+                              name="wp-icon"
+                              value={opt.key}
+                              checked={waypointIconKey === opt.key}
+                              onChange={() => setWaypointIconKey(opt.key)}
+                            />
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={opt.mapUrl} alt="" width={40} height={40} />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                     <div className={styles.formGrid}>
                       <div className={styles.fieldGroup}>
@@ -421,17 +455,32 @@ export default function WaypointsPage() {
                     waypointsOrdered.map((wp) => (
                       <article className={styles.listItem} key={wp.id}>
                         <div className={styles.listRow}>
-                          <div>
+                          <div className={styles.listRowMain}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              className={styles.listIconThumb}
+                              src={
+                                WAYPOINT_ICON_OPTIONS.find((o) => o.key === wp.iconKey)
+                                  ?.mapUrl ?? "/map/buca_02.png"
+                              }
+                              alt=""
+                              width={40}
+                              height={40}
+                            />
+                            <div>
                             <div className={styles.listCode}>
                               {waypointDisplayName(wp)}
                             </div>
                             <div className={styles.missionText}>
-                              {wp.latitude.toFixed(5)}, {wp.longitude.toFixed(5)}
+                              {wp.latitude.toFixed(5)}, {wp.longitude.toFixed(5)} · Icona:{" "}
+                              {WAYPOINT_ICON_OPTIONS.find((o) => o.key === wp.iconKey)?.label ??
+                                wp.iconKey}
                             </div>
                             <div className={styles.missionText}>
                               {waypointSourceLabel(wp.source)} ·{" "}
                               {formatWaypointTimestamp(wp.createdAt)}
                               {wp.createdByAdminCode ? ` · ${wp.createdByAdminCode}` : ""}
+                            </div>
                             </div>
                           </div>
                           {canEdit ? (

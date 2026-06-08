@@ -1,9 +1,12 @@
+import { normalizeWaypointIconKey, type WaypointIconKey } from "@/lib/waypoint-icons";
+
 export type SquadWaypoint = {
   id: string;
   eventId: string;
   label: string | null;
   latitude: number;
   longitude: number;
+  iconKey: WaypointIconKey;
   createdAt: string;
   createdByAdminCode: string | null;
   source: string;
@@ -41,6 +44,7 @@ export function waypointsFromRows(rows: Record<string, unknown>[]): SquadWaypoin
         label: (row.label as string | null) ?? null,
         latitude: lat,
         longitude: lon,
+        iconKey: normalizeWaypointIconKey(row.icon_key as string | null),
         createdAt: String(row.created_at),
         createdByAdminCode: (row.created_by_admin_code as string | null) ?? null,
         source: (row.source as string) ?? "toc_backend",

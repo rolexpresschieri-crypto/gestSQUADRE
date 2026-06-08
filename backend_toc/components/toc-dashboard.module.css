@@ -1,6 +1,13 @@
 .screen {
   min-height: 100vh;
-  background: linear-gradient(180deg, #1a2e1a 0%, #0d1a12 100%);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(166, 0, 53, 0.38) 0%,
+      rgba(120, 0, 40, 0.48) 55%,
+      rgba(70, 0, 24, 0.55) 100%
+    ),
+    #0a0607;
   color: #f5f5f5;
   padding: 16px;
   font-family: system-ui, sans-serif;

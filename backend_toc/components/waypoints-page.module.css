@@ -1,6 +1,13 @@
 .root {
   min-height: 100vh;
-  background: #06080f;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(166, 0, 53, 0.38) 0%,
+      rgba(120, 0, 40, 0.48) 55%,
+      rgba(70, 0, 24, 0.55) 100%
+    ),
+    #0a0607;
   color: #edf2ff;
   display: flex;
   flex-direction: column;
@@ -214,4 +221,64 @@
 
 .loginHint a {
   color: #90caf9;
+}
+
+.iconPickerLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #e8e8e8;
+}
+
+.iconPicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.iconOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ddd;
+  min-width: 96px;
+}
+
+.iconOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.iconOption img {
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.iconOptionActive {
+  border-color: #e0be3a;
+  background: rgba(166, 0, 53, 0.22);
+}
+
+.listRowMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.listIconThumb {
+  flex-shrink: 0;
+  object-fit: contain;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
 }

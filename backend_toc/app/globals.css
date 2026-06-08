@@ -7,4 +7,12 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(166, 0, 53, 0.38) 0%,
+      rgba(120, 0, 40, 0.48) 55%,
+      rgba(70, 0, 24, 0.55) 100%
+    ),
+    #0a0607;
 }

@@ -17,8 +17,11 @@ import {
   fetchActiveEvent,
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
+import { brandBackgroundCss } from "@/lib/brand-colors";
 import { waypointDisplayName, type SquadWaypoint } from "@/lib/waypoints";
 import "@/components/squad-live-map.css";
+
+const brandBg = brandBackgroundCss.replace(/\s+/g, " ").trim();
 
 const SquadLiveMap = dynamic(() => import("@/components/squad-live-map"), {
   ssr: false,
@@ -200,7 +203,7 @@ function MapFullscreenContent() {
         style={{
           padding: 24,
           color: "#fff",
-          background: "#0d1a12",
+          background: brandBg,
           minHeight: "100vh",
         }}
       >
@@ -222,7 +225,7 @@ function MapFullscreenContent() {
         flexDirection: "column",
         height: "100vh",
         width: "100vw",
-        background: "#0d1a12",
+        background: brandBg,
         margin: 0,
         overflow: "hidden",
       }}
@@ -333,7 +336,7 @@ export default function MapFullscreenPage() {
   return (
     <Suspense
       fallback={
-        <main style={{ padding: 24, color: "#fff", background: "#0d1a12" }}>
+        <main style={{ padding: 24, color: "#fff", background: brandBg }}>
           Caricamento mappa…
         </main>
       }
