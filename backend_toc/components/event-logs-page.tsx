@@ -6,6 +6,7 @@ import {
   ADMIN_SESSION_STORAGE_KEY,
   canManageEventLogs,
   canViewEventLogs,
+  isCampoGolfSession,
   type AdminSessionData,
 } from "@/lib/admin-auth";
 import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
@@ -217,7 +218,12 @@ export default function EventLogsPage() {
   return (
     <div className={styles.root}>
       <header className={styles.topBar}>
-        <h1>Log evento</h1>
+        <h1>
+          Log evento
+          {session && isCampoGolfSession(session) && session.golfCourseCode ? (
+            <span className={styles.campoTag}> · {session.golfCourseCode}</span>
+          ) : null}
+        </h1>
         <Link className={styles.backLink} href="/">
           ← Dashboard TOC
         </Link>
@@ -227,6 +233,18 @@ export default function EventLogsPage() {
         <p className={styles.hint}>
           Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Messaggi e
           allarmi TOC → volontari (titolo e testo completi)
+          {session && isCampoGolfSession(session) ? (
+            <>
+              {" "}
+              · Filtro campo: solo squadre del campo{" "}
+              <strong>{session.golfCourseName ?? session.golfCourseCode ?? "golf"}</strong>
+            </>
+          ) : null}
+        </p>
+        <p className={styles.hintMuted}>
+          Login, logout e GPS dall&apos;app mobile non compaiono qui (solo allarme squadra→TOC e
+          push TOC→volontario). Se un allarme dall&apos;app non compare con login GOLF_TORINO,
+          verifica che la squadra abbia <code>golf_course_id</code> (sql/golf_courses_campo.sql).
         </p>
         {status ? <p className={styles.status}>{status}</p> : null}
 

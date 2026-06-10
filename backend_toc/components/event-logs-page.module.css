@@ -39,10 +39,28 @@
   padding: 16px;
 }
 
+.campoTag {
+  color: #e0be3a;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
 .hint {
   color: #ccc;
   font-size: 13px;
   margin: 0 0 12px;
+}
+
+.hintMuted {
+  color: #8a9aaa;
+  font-size: 12px;
+  margin: -6px 0 12px;
+  line-height: 1.45;
+}
+
+.hintMuted code {
+  color: #e0be3a;
+  font-size: 11px;
 }
 
 .status {
