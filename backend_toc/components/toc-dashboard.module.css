@@ -179,8 +179,9 @@
 .mapColumn {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
+  overflow: visible;
 }
 
 @media (max-width: 900px) {
@@ -489,14 +490,14 @@
 }
 
 .dashboardFooter {
-  grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  margin-top: 4px;
+  margin-top: 0;
   padding: 0;
-  width: 100%;
+  width: calc(100% + 336px);
+  max-width: calc(100vw - 32px);
 }
 
 .footerLogoWrap {
@@ -516,6 +517,8 @@
 
 @media (max-width: 900px) {
   .dashboardFooter {
+    width: 100%;
+    max-width: none;
     flex-direction: column;
     align-items: center;
     gap: 12px;

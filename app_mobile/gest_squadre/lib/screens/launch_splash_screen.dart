@@ -26,10 +26,10 @@ class _LaunchSplashScreenState extends State<LaunchSplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 4300),
     );
-    _logoScale = Tween<double>(begin: 0.28, end: 1.0).animate(
+    _logoScale = Tween<double>(begin: 0.30, end: 0.88).animate(
       CurvedAnimation(parent: _splashController, curve: Curves.easeOutCubic),
     );
-    _logoAlignY = Tween<double>(begin: -0.78, end: -0.22).animate(
+    _logoAlignY = Tween<double>(begin: -0.72, end: -0.34).animate(
       CurvedAnimation(parent: _splashController, curve: Curves.easeOutCubic),
     );
     _titleOpacity = Tween<double>(begin: 0, end: 1).animate(
@@ -69,7 +69,7 @@ class _LaunchSplashScreenState extends State<LaunchSplashScreen>
                 child: child,
               ),
             ),
-            child: const OpenGolfLogoBanner(width: 280),
+            child: const OpenGolfLogoBanner(width: 268),
           ),
           Align(
             alignment: Alignment.center,

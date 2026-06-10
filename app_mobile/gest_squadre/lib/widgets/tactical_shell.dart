@@ -13,8 +13,9 @@ class TacticalShell extends StatelessWidget {
   Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Center(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Align(
+          alignment: Alignment.topCenter,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: DecoratedBox(
@@ -23,7 +24,7 @@ class TacticalShell extends StatelessWidget {
                 borderRadius: BorderRadius.circular(42),
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 18, 24, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
                 child: child,
               ),
             ),
@@ -83,34 +84,39 @@ class AppTitleBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
-      children: [
-        OpenGolfLogoBanner(width: 240),
-        SizedBox(height: 18),
-        Text(
-          'Tracking',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 32,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.8,
-            shadows: kTacticalWhiteTextShadows,
-          ),
-        ),
-        SizedBox(height: 2),
-        Text(
-          'SQUADRE',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 36,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.4,
-            shadows: kTacticalWhiteTextShadows,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final logoWidth = (constraints.maxWidth * 0.92).clamp(0.0, 260.0);
+        return Column(
+          children: [
+            OpenGolfLogoBanner(width: logoWidth),
+            const SizedBox(height: 18),
+            const Text(
+              'Tracking',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.8,
+                shadows: kTacticalWhiteTextShadows,
+              ),
+            ),
+            const SizedBox(height: 2),
+            const Text(
+              'SQUADRE',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.4,
+                shadows: kTacticalWhiteTextShadows,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
