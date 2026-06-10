@@ -426,6 +426,12 @@
   text-align: center;
 }
 
+.courseTag {
+  font-size: 0.85em;
+  color: #e0be3a;
+  font-weight: 700;
+}
+
 .message {
   margin: 8px 0;
   color: #e0be3a;

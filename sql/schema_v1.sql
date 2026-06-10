@@ -189,7 +189,7 @@ select
   'GOLF_TORINO',
   'Campo Golf Torino',
   'gt1234',
-  'campo',
+  'admin',
   true,
   (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO');

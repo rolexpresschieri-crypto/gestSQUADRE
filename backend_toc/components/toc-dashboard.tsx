@@ -13,7 +13,11 @@ import {
   type AdminSessionData,
 } from "@/lib/admin-auth";
 import { loginTocAdmin, restoreAdminSessionFromStorage } from "@/lib/campo-login";
-import CampoDashboard from "@/components/campo-dashboard";
+import {
+  canManageSquadsForCourse,
+  fetchGolfCourseSquadIds,
+  fetchLiveSquads,
+} from "@/lib/golf-course-scope";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { openExternalMapWindow } from "@/lib/open-external-map";
 import { layerOptions, type LayerMode } from "@/lib/map-layers";
@@ -24,7 +28,7 @@ import {
   writeStoredPushMessage,
 } from "@/lib/push-message-storage";
 import { tocPushTextUpper } from "@/lib/toc-push-text";
-import { liveSquadsFromRows, type LiveSquad } from "@/lib/live-squads";
+import type { LiveSquad } from "@/lib/live-squads";
 import {
   fetchActiveEvent,
   fetchSquadMapPoints,
@@ -55,7 +59,7 @@ export default function TocDashboard() {
   const router = useRouter();
   const [supabase, setSupabase] = useState<ReturnType<typeof getSupabaseBrowserClient>>(null);
   const [session, setSession] = useState<AdminSessionData | null>(null);
-  const [loginCode, setLoginCode] = useState("TOC01");
+  const [loginCode, setLoginCode] = useState("GOLF_TORINO");
   const [loginPassword, setLoginPassword] = useState("");
   const [squads, setSquads] = useState<LiveSquad[]>([]);
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
@@ -112,63 +116,25 @@ export default function TocDashboard() {
     }
   }, []);
 
+  const golfCourseId = session?.golfCourseId ?? null;
+
   const loadSquads = useCallback(async () => {
     if (!supabase) {
       setStatusMessage("Configura NEXT_PUBLIC_SUPABASE_* in .env.local");
       return;
     }
-    const { data, error } = await supabase
-      .from("active_squad_summaries")
-      .select("*")
-      .order("squad_code", { ascending: true });
-
-    if (error) {
-      setStatusMessage(error.message);
-      return;
-    }
-    setSquads(liveSquadsFromRows((data ?? []) as Record<string, unknown>[]));
-    setStatusMessage(`${data?.length ?? 0} squadre online`);
-  }, [supabase]);
+    const rows = await fetchLiveSquads(supabase, golfCourseId);
+    setSquads(rows);
+    setStatusMessage(`${rows.length} squadre online`);
+  }, [supabase, golfCourseId]);
 
   const loadOnlineSessionsForLogout = useCallback(async () => {
     if (!supabase) {
       setOnlineSessionsLogout([]);
       return;
     }
-    const { data, error } = await supabase
-      .from("squad_sessions")
-      .select(
-        "id, event_id, squad_id, is_online, login_at, squads(squad_code, squad_name, map_color)",
-      )
-      .eq("is_online", true)
-      .order("login_at", { ascending: false });
 
-    if (error || !data) {
-      setOnlineSessionsLogout([]);
-      return;
-    }
-
-    const rows = data.map((row) => {
-      const squad = row.squads as
-        | { squad_code: string; squad_name: string; map_color: string | null }
-        | { squad_code: string; squad_name: string; map_color: string | null }[]
-        | null;
-      const s = Array.isArray(squad) ? squad[0] : squad;
-      return {
-        sessionId: row.id as string,
-        eventId: row.event_id as string,
-        squadId: row.squad_id as string,
-        squadCode: (s?.squad_code ?? "?").toUpperCase(),
-        squadName: s?.squad_name ?? "Squadra",
-        isOnline: true,
-        lastLatitude: null,
-        lastLongitude: null,
-        lastAccuracy: null,
-        lastFixAt: null,
-        mapColor: s?.map_color ?? "#079B42",
-      } satisfies LiveSquad;
-    });
-
+    const rows = await fetchLiveSquads(supabase, golfCourseId);
     rows.sort((a, b) => a.squadCode.localeCompare(b.squadCode, "it"));
     setOnlineSessionsLogout(rows);
     setSquadLogoutPickId((prev) => {
@@ -180,21 +146,32 @@ export default function TocDashboard() {
       }
       return rows[0]!.sessionId;
     });
-  }, [supabase]);
+  }, [supabase, golfCourseId]);
 
   const loadAlarms = useCallback(async () => {
     if (!supabase) {
       return;
     }
-    const { data } = await supabase
+    let query = supabase
       .from("squad_alarms")
       .select(
-        "id, session_id, squad_code, squad_name, message, created_at, acknowledged_at",
+        "id, session_id, squad_code, squad_name, message, created_at, acknowledged_at, squad_id",
       )
       .order("created_at", { ascending: false })
       .limit(40);
+
+    if (golfCourseId) {
+      const squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
+      if (squadIds.length === 0) {
+        setAlarms([]);
+        return;
+      }
+      query = query.in("squad_id", squadIds);
+    }
+
+    const { data } = await query;
     setAlarms((data ?? []) as AlarmRow[]);
-  }, [supabase]);
+  }, [supabase, golfCourseId]);
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
@@ -209,14 +186,18 @@ export default function TocDashboard() {
       return;
     }
     setActiveEventId(event.id);
-    const { waypoints: wps, error } = await fetchSquadMapPoints(supabase, event.id);
+    const { waypoints: wps, error } = await fetchSquadMapPoints(
+      supabase,
+      event.id,
+      golfCourseId,
+    );
     setWaypoints(wps);
     if (error && error.includes("squad_map_points")) {
       setStatusMessage(
         "Waypoint: esegui sql/squad_map_points.sql su Supabase per abilitare la tabella.",
       );
     }
-  }, [supabase]);
+  }, [supabase, golfCourseId]);
 
   async function handleDeleteWaypointFromMap(waypoint: SquadWaypoint) {
     if (!supabase || !canEditWaypointsOnMap) {
@@ -494,18 +475,6 @@ export default function TocDashboard() {
     }
   }
 
-  if (session && isCampoGolfSession(session)) {
-    return (
-      <CampoDashboard
-        session={session}
-        onLogout={() => {
-          handleLogout();
-          setStatusMessage("");
-        }}
-      />
-    );
-  }
-
   if (!session) {
     return (
       <main className={`${styles.screen} ${styles.loginScreen}`}>
@@ -537,8 +506,8 @@ export default function TocDashboard() {
               Accedi
             </button>
             <p className={styles.loginHint}>
-              <strong>TOC01</strong> — mappa live, push e allarmi ·{" "}
-              <strong>GOLF_TORINO</strong> — waypoint e squadre del campo golf
+              <strong>GOLF_TORINO</strong> — dashboard TOC completa per il campo
+              golf_torino · opzionale <strong>TOC01</strong> (tutti i campi)
             </p>
             {statusMessage ? <p className={styles.message}>{statusMessage}</p> : null}
           </form>
@@ -564,7 +533,12 @@ export default function TocDashboard() {
     <main className={styles.screen}>
       <header className={styles.header}>
         <div>
-          <h1>gestSQUADRE — TOC</h1>
+          <h1>
+            gestSQUADRE — TOC
+            {session.golfCourseCode ? (
+              <span className={styles.courseTag}> · {session.golfCourseCode}</span>
+            ) : null}
+          </h1>
           <p className={styles.message}>{statusMessage}</p>
         </div>
         <div className={styles.actions}>
@@ -602,6 +576,11 @@ export default function TocDashboard() {
           <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/waypoints">
             Waypoint ({waypoints.length})
           </Link>
+          {canManageSquadsForCourse(session) ? (
+            <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/campo/squads">
+              Squadre campo
+            </Link>
+          ) : null}
           {canOpenEventLogs ? (
             <Link className={`${styles.btn} ${styles.btnYellow}`} href="/logs">
               Log evento

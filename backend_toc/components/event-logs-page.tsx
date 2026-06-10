@@ -6,9 +6,10 @@ import {
   ADMIN_SESSION_STORAGE_KEY,
   canManageEventLogs,
   canViewEventLogs,
-  normalizeAdminRole,
   type AdminSessionData,
 } from "@/lib/admin-auth";
+import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
+import { fetchGolfCourseSquadIds } from "@/lib/golf-course-scope";
 import {
   downloadTextFile,
   eventLogsToCsv,
@@ -38,15 +39,10 @@ export default function EventLogsPage() {
     setSupabase(getSupabaseBrowserClient());
     const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as AdminSessionData;
-        setSession({
-          code: parsed.code,
-          name: parsed.name,
-          role: normalizeAdminRole(parsed.role),
-          adminId: parsed.adminId,
-        });
-      } catch {
+      const restored = restoreAdminSessionFromStorage(raw);
+      if (restored) {
+        setSession(restored);
+      } else {
         window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
       }
     }
@@ -60,20 +56,36 @@ export default function EventLogsPage() {
       return;
     }
 
-    const [alarmRes, pushRes] = await Promise.all([
-      supabase
-        .from("squad_alarms")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("created_at", { ascending: false })
-        .limit(500),
-      supabase
-        .from("toc_push_logs")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("created_at", { ascending: false })
-        .limit(500),
-    ]);
+    const golfCourseId = session?.golfCourseId ?? null;
+    let squadIds: string[] | null = null;
+    if (golfCourseId) {
+      squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
+      if (squadIds.length === 0) {
+        setAlarms([]);
+        setPushes([]);
+        return;
+      }
+    }
+
+    let alarmQuery = supabase
+      .from("squad_alarms")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    let pushQuery = supabase
+      .from("toc_push_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (squadIds) {
+      alarmQuery = alarmQuery.in("squad_id", squadIds);
+      pushQuery = pushQuery.in("squad_id", squadIds);
+    }
+
+    const [alarmRes, pushRes] = await Promise.all([alarmQuery, pushQuery]);
 
     if (alarmRes.error) {
       setStatus(`Errore allarmi: ${alarmRes.error.message}`);
@@ -91,7 +103,7 @@ export default function EventLogsPage() {
     } else {
       setPushes((pushRes.data ?? []) as TocPushLogRow[]);
     }
-  }, [supabase, eventId]);
+  }, [supabase, eventId, session?.golfCourseId]);
 
   useEffect(() => {
     if (!authChecked || !session || !supabase) {

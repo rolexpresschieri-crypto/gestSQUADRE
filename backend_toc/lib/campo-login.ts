@@ -29,13 +29,11 @@ export function adminSessionFromLoginRow(row: AdminLoginRow): AdminSessionData {
     adminId: row.id,
   };
 
-  if (role === "campo") {
-    const courseId = row.golf_course_id ?? course?.id;
-    if (courseId) {
-      session.golfCourseId = courseId;
-      session.golfCourseCode = course?.course_code ?? undefined;
-      session.golfCourseName = course?.course_name ?? undefined;
-    }
+  const courseId = row.golf_course_id ?? course?.id;
+  if (courseId) {
+    session.golfCourseId = courseId;
+    session.golfCourseCode = course?.course_code ?? undefined;
+    session.golfCourseName = course?.course_name ?? undefined;
   }
 
   return session;
@@ -89,6 +87,9 @@ export function restoreAdminSessionFromStorage(raw: string): AdminSessionData | 
       golfCourseName: parsed.golfCourseName,
     };
     if (session.role === "campo" && !session.golfCourseId) {
+      return null;
+    }
+    if (session.code === "GOLF_TORINO" && !session.golfCourseId) {
       return null;
     }
     return session;

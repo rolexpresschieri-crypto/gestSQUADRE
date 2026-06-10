@@ -4,10 +4,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
-  isCampoGolfSession,
   type AdminSessionData,
 } from "@/lib/admin-auth";
 import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
+import { canManageSquadsForCourse } from "@/lib/golf-course-scope";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./campo-squads-page.module.css";
 
@@ -103,7 +103,8 @@ export default function CampoSquadsPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!supabase || !session?.golfCourseId || !isCampoGolfSession(session)) {
+    const golfCourseId = session?.golfCourseId;
+    if (!supabase || !golfCourseId || !canManageSquadsForCourse(session)) {
       return;
     }
 
@@ -128,7 +129,7 @@ export default function CampoSquadsPage() {
             is_enabled: isEnabled,
           })
           .eq("id", editingId)
-          .eq("golf_course_id", session.golfCourseId);
+          .eq("golf_course_id", golfCourseId);
 
         if (error) {
           throw error;
@@ -141,7 +142,7 @@ export default function CampoSquadsPage() {
           password_hash: pwd,
           map_color: mapColor,
           is_enabled: isEnabled,
-          golf_course_id: session.golfCourseId,
+          golf_course_id: golfCourseId,
         });
 
         if (error) {
@@ -160,7 +161,8 @@ export default function CampoSquadsPage() {
   }
 
   async function handleDelete(row: SquadRow) {
-    if (!supabase || !session?.golfCourseId) {
+    const golfCourseId = session?.golfCourseId;
+    if (!supabase || !golfCourseId) {
       return;
     }
     if (
@@ -178,7 +180,7 @@ export default function CampoSquadsPage() {
         .from("squads")
         .delete()
         .eq("id", row.id)
-        .eq("golf_course_id", session.golfCourseId);
+        .eq("golf_course_id", golfCourseId);
 
       if (error) {
         throw error;
@@ -199,12 +201,12 @@ export default function CampoSquadsPage() {
     return <div className={styles.root}>Caricamento…</div>;
   }
 
-  if (!session || !isCampoGolfSession(session)) {
+  if (!session || !canManageSquadsForCourse(session)) {
     return (
       <div className={styles.root}>
         <div className={styles.panel}>
-          <p>Accesso riservato ai login campo golf.</p>
-          <Link href="/">← Torna al login</Link>
+          <p>Accesso riservato agli operatori con campo golf associato.</p>
+          <Link href="/">← Dashboard TOC</Link>
         </div>
       </div>
     );
@@ -220,7 +222,7 @@ export default function CampoSquadsPage() {
           <p className={styles.sub}>Campo: {session.golfCourseCode}</p>
         </div>
         <Link className={styles.backLink} href="/">
-          ← Home campo
+          ← Dashboard TOC
         </Link>
       </header>
 

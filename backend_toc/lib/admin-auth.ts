@@ -12,12 +12,9 @@ export type AdminSessionData = {
   golfCourseName?: string;
 };
 
+/** Sessione legata a un campo golf (es. GOLF_TORINO → golf_torino). */
 export function isCampoGolfSession(session: AdminSessionData | null): boolean {
-  return session?.role === "campo" && Boolean(session.golfCourseId);
-}
-
-export function canManageCampoSquads(role: AdminRole): boolean {
-  return role === "campo";
+  return Boolean(session?.golfCourseId);
 }
 
 export function normalizeAdminRole(value: string | null | undefined): AdminRole {

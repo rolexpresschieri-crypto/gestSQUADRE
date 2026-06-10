@@ -1,6 +1,5 @@
--- Campo golf_torino: waypoint e squadre legati al campo.
--- GOLF_TORINO = admin con scope golf_torino (dashboard TOC completa).
--- TOC01 opzionale per operatore senza filtro campo.
+-- GOLF_TORINO: dashboard TOC completa con dati filtrati su golf_torino.
+-- Eseguire su Supabase se il login era ancora ruolo "campo".
 
 insert into golf_courses (course_code, course_name)
 select 'golf_torino', 'Campo Golf Torino'
@@ -31,7 +30,3 @@ select
   true,
   (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO');
-
-insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
-select 'TOC01', 'Operatore TOC', 'toc123', 'admin', true
-where not exists (select 1 from toc_admins where admin_code = 'TOC01');

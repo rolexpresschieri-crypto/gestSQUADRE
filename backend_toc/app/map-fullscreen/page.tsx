@@ -6,13 +6,14 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ADMIN_SESSION_STORAGE_KEY,
-  normalizeAdminRole,
   type AdminSessionData,
 } from "@/lib/admin-auth";
+import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
+import { fetchGolfCourseSquadIds, fetchLiveSquads } from "@/lib/golf-course-scope";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { layerOptions, type LayerMode } from "@/lib/map-layers";
 import { readStoredLayerMode, writeStoredLayerMode } from "@/lib/map-layer-storage";
-import { liveSquadsFromRows, type LiveSquad } from "@/lib/live-squads";
+import type { LiveSquad } from "@/lib/live-squads";
 import {
   fetchActiveEvent,
   fetchSquadMapPoints,
@@ -61,14 +62,10 @@ function MapFullscreenContent() {
     setSupabase(getSupabaseBrowserClient());
     const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as AdminSessionData;
-        setSession({
-          code: parsed.code,
-          name: parsed.name,
-          role: normalizeAdminRole(parsed.role),
-        });
-      } catch {
+      const restored = restoreAdminSessionFromStorage(raw);
+      if (restored) {
+        setSession(restored);
+      } else {
         window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
       }
     }
@@ -79,26 +76,36 @@ function MapFullscreenContent() {
     }
   }, [displayMode, searchParams]);
 
+  const golfCourseId = session?.golfCourseId ?? null;
+
   const loadSquads = useCallback(async () => {
     if (!supabase) {
       return;
     }
-    const { data } = await supabase.from("active_squad_summaries").select("*");
-    setSquads(liveSquadsFromRows((data ?? []) as Record<string, unknown>[]));
-  }, [supabase]);
+    setSquads(await fetchLiveSquads(supabase, golfCourseId));
+  }, [supabase, golfCourseId]);
 
   const loadActiveAlarms = useCallback(async () => {
     if (!supabase) {
       return;
     }
-    const { data } = await supabase
+    let query = supabase
       .from("squad_alarms")
-      .select("session_id")
+      .select("session_id, squad_id")
       .is("acknowledged_at", null);
+    if (golfCourseId) {
+      const squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
+      if (squadIds.length === 0) {
+        setAlarmSessionIds([]);
+        return;
+      }
+      query = query.in("squad_id", squadIds);
+    }
+    const { data } = await query;
     setAlarmSessionIds(
       (data ?? []).map((r) => r.session_id as string).filter(Boolean),
     );
-  }, [supabase]);
+  }, [supabase, golfCourseId]);
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
@@ -113,9 +120,13 @@ function MapFullscreenContent() {
       return;
     }
     setActiveEventId(event.id);
-    const { waypoints: wps } = await fetchSquadMapPoints(supabase, event.id);
+    const { waypoints: wps } = await fetchSquadMapPoints(
+      supabase,
+      event.id,
+      golfCourseId,
+    );
     setWaypoints(wps);
-  }, [supabase]);
+  }, [supabase, golfCourseId]);
 
   async function handleDeleteWaypointFromMap(waypoint: SquadWaypoint) {
     if (!supabase || !canManageWaypoints) {

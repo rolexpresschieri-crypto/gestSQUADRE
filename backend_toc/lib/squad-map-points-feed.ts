@@ -30,12 +30,13 @@ export async function fetchActiveEvent(
 export async function fetchSquadMapPoints(
   supabase: SupabaseClient,
   eventId: string,
+  golfCourseId?: string | null,
 ): Promise<{ waypoints: SquadWaypoint[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from("squad_map_points")
-    .select("*")
-    .eq("event_id", eventId)
-    .limit(400);
+  let query = supabase.from("squad_map_points").select("*").eq("event_id", eventId);
+  if (golfCourseId) {
+    query = query.eq("golf_course_id", golfCourseId);
+  }
+  const { data, error } = await query.limit(400);
 
   if (error) {
     return { waypoints: [], error: error.message };

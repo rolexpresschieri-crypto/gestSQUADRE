@@ -55,8 +55,7 @@ export default function WaypointsPage() {
   const [loading, setLoading] = useState(true);
 
   const canEdit = session ? canManageWaypoints(session.role) : false;
-  const waypointSource =
-    session?.role === "campo" ? "golf_campo" : "toc_backend";
+  const waypointSource = session?.golfCourseId ? "golf_campo" : "toc_backend";
 
   useEffect(() => {
     setSupabase(getSupabaseBrowserClient());
@@ -321,15 +320,9 @@ export default function WaypointsPage() {
     <div className={styles.root}>
       <header className={styles.topBar}>
         <h1>Waypoint tattici</h1>
-        {isCampoGolfSession(session) ? (
-          <Link className={styles.backLink} href="/">
-            ← Home campo
-          </Link>
-        ) : (
-          <Link className={styles.backLink} href="/">
-            ← Mappa live
-          </Link>
-        )}
+        <Link className={styles.backLink} href="/">
+          ← Dashboard TOC
+        </Link>
       </header>
 
       <div className={styles.scroll}>
