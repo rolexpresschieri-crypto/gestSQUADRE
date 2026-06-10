@@ -180,6 +180,10 @@ select
   (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where not exists (select 1 from squads where squad_code = 'SQD002');
 
+insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
+select 'TOC01', 'Operatore TOC', 'toc123', 'admin', true
+where not exists (select 1 from toc_admins where admin_code = 'TOC01');
+
 insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled, golf_course_id)
 select
   'GOLF_TORINO',

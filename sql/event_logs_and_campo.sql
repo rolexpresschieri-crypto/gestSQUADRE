@@ -38,8 +38,6 @@ select
 where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO')
   and exists (select 1 from golf_courses where course_code = 'golf_torino');
 
-delete from toc_admins where admin_code = 'TOC01';
-
 alter table toc_push_logs enable row level security;
 
 drop policy if exists "gest anon all toc_push_logs" on toc_push_logs;

@@ -40,7 +40,7 @@ set
   golf_course_id = (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where admin_code = 'GOLF_TORINO';
 
--- Un solo login operatore: tutti i dati su golf_torino, rimuovi TOC01
+-- Dati campo golf_torino (TOC01 resta per mappa / push / allarmi)
 update squad_map_points
 set golf_course_id = (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where golf_course_id is null;
@@ -48,8 +48,6 @@ where golf_course_id is null;
 update squads
 set golf_course_id = (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where golf_course_id is null;
-
-delete from toc_admins where admin_code = 'TOC01';
 
 alter table golf_courses enable row level security;
 
