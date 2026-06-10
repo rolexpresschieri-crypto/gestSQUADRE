@@ -97,6 +97,7 @@ class HomeScreen extends StatelessWidget {
           body: TacticalShell(
             child: SingleChildScrollView(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const AppTitleBlock(),
                   const SizedBox(height: 24),
@@ -118,6 +119,7 @@ class HomeScreen extends StatelessWidget {
                         style: kTacticalBodyWhite.copyWith(fontSize: 14),
                       ),
                     ),
+                  const SizedBox(height: 20),
                   Container(
                     width: double.infinity,
                     constraints: const BoxConstraints(minHeight: 96),

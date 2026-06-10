@@ -36,7 +36,7 @@ Future<void> setupGestFcm({
     return;
   }
 
-  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const androidInit = AndroidInitializationSettings('@drawable/ic_stat_notification');
   await _localNotifications.initialize(
     const InitializationSettings(android: androidInit),
   );
@@ -100,6 +100,7 @@ Future<void> _showLocalNotification({
           gestTocAlarmChannelId,
           'Allarme TOC (sirena)',
           channelDescription: 'Push TOC con sirena AllarmeApp',
+          icon: '@drawable/ic_stat_notification',
           importance: Importance.max,
           priority: Priority.max,
           playSound: true,
@@ -111,6 +112,7 @@ Future<void> _showLocalNotification({
       : const AndroidNotificationDetails(
           gestFcmChannelId,
           'gestSQUADRE avvisi',
+          icon: '@drawable/ic_stat_notification',
           importance: Importance.high,
           priority: Priority.high,
         );

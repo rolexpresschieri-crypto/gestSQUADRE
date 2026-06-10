@@ -168,6 +168,7 @@ export async function POST(request: Request) {
         priority: "high",
         notification: {
           channelId: useAlarm ? ANDROID_ALARM_CHANNEL_ID : "gest_squadre_alerts",
+          icon: "ic_stat_notification",
           defaultVibrateTimings: true,
           ...(useAlarm ? { sound: ANDROID_ALARM_SOUND } : {}),
         },
