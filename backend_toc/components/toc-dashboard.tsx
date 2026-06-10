@@ -55,7 +55,7 @@ export default function TocDashboard() {
   const router = useRouter();
   const [supabase, setSupabase] = useState<ReturnType<typeof getSupabaseBrowserClient>>(null);
   const [session, setSession] = useState<AdminSessionData | null>(null);
-  const [loginCode, setLoginCode] = useState("TOC01");
+  const [loginCode, setLoginCode] = useState("GOLF_TORINO");
   const [loginPassword, setLoginPassword] = useState("");
   const [squads, setSquads] = useState<LiveSquad[]>([]);
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
@@ -521,9 +521,9 @@ export default function TocDashboard() {
             />
           </div>
           <form className={styles.loginCard} onSubmit={handleLogin}>
-            <h1>Login Tactical Operations Center</h1>
+            <h1>Login Campo Golf Torino</h1>
             <input
-              placeholder="Codice TOC"
+              placeholder="Codice operatore"
               value={loginCode}
               onChange={(e) => setLoginCode(e.target.value)}
             />
@@ -537,7 +537,7 @@ export default function TocDashboard() {
               Accedi
             </button>
             <p className={styles.loginHint}>
-              TOC: TOC01 · Campo golf: GOLF_TORINO
+              Unico accesso: GOLF_TORINO · gestione waypoint e squadre del campo
             </p>
             {statusMessage ? <p className={styles.message}>{statusMessage}</p> : null}
           </form>

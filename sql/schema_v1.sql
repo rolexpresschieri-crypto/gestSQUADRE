@@ -158,21 +158,27 @@ insert into events (title, description, is_active)
 select 'Evento operativo gestSQUADRE', 'Evento demo', true
 where not exists (select 1 from events where is_active = true);
 
-insert into squads (squad_code, squad_name, password_hash, is_enabled)
-select 'SQD001', 'Squadra Alpha', '1234', true
-where not exists (select 1 from squads where squad_code = 'SQD001');
-
-insert into squads (squad_code, squad_name, password_hash, is_enabled)
-select 'SQD002', 'Squadra Bravo', '1234', true
-where not exists (select 1 from squads where squad_code = 'SQD002');
-
-insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
-select 'TOC01', 'Operatore TOC', 'toc123', 'admin', true
-where not exists (select 1 from toc_admins where admin_code = 'TOC01');
-
 insert into golf_courses (course_code, course_name)
 select 'golf_torino', 'Campo Golf Torino'
 where not exists (select 1 from golf_courses where course_code = 'golf_torino');
+
+insert into squads (squad_code, squad_name, password_hash, is_enabled, golf_course_id)
+select
+  'SQD001',
+  'Squadra Alpha',
+  '1234',
+  true,
+  (select id from golf_courses where course_code = 'golf_torino' limit 1)
+where not exists (select 1 from squads where squad_code = 'SQD001');
+
+insert into squads (squad_code, squad_name, password_hash, is_enabled, golf_course_id)
+select
+  'SQD002',
+  'Squadra Bravo',
+  '1234',
+  true,
+  (select id from golf_courses where course_code = 'golf_torino' limit 1)
+where not exists (select 1 from squads where squad_code = 'SQD002');
 
 insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled, golf_course_id)
 select

@@ -27,9 +27,18 @@ alter table toc_admins drop constraint if exists toc_admins_role_check;
 alter table toc_admins add constraint toc_admins_role_check
   check (role in ('admin', 'viewer', 'campo'));
 
-insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
-select 'GOLF_TORINO', 'Campo Golf Torino', 'gt1234', 'campo', true
-where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO');
+insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled, golf_course_id)
+select
+  'GOLF_TORINO',
+  'Campo Golf Torino',
+  'gt1234',
+  'campo',
+  true,
+  (select id from golf_courses where course_code = 'golf_torino' limit 1)
+where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO')
+  and exists (select 1 from golf_courses where course_code = 'golf_torino');
+
+delete from toc_admins where admin_code = 'TOC01';
 
 alter table toc_push_logs enable row level security;
 
