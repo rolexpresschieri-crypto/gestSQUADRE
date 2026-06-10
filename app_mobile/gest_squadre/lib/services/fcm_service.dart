@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../constants/toc_push_text.dart';
 
@@ -23,6 +26,7 @@ bool _isTocAlarmMessage(RemoteMessage message) {
 
 Future<void> setupGestFcm({
   required void Function(String title, String body) onForegroundMessage,
+  Future<void> Function(String token)? onTokenRefresh,
 }) async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
     return;
@@ -37,11 +41,13 @@ Future<void> setupGestFcm({
     const InitializationSettings(android: androidInit),
   );
 
-  await FirebaseMessaging.instance.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+  await ensureFcmNotificationPermission();
+
+  if (onTokenRefresh != null) {
+    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+      unawaited(onTokenRefresh(token));
+    });
+  }
 
   FirebaseMessaging.onMessage.listen((message) {
     final title = tocPushDisplayText(
@@ -63,6 +69,25 @@ Future<void> setupGestFcm({
     final body = tocPushDisplayText(message.notification?.body ?? '');
     onForegroundMessage(title, body);
   });
+}
+
+/// Richiede permesso notifiche (Android 13+) prima di [obtainFcmToken].
+Future<void> ensureFcmNotificationPermission() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return;
+  }
+  if (Firebase.apps.isEmpty) {
+    return;
+  }
+  final status = await Permission.notification.status;
+  if (!status.isGranted) {
+    await Permission.notification.request();
+  }
+  await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
 }
 
 Future<void> _showLocalNotification({
@@ -106,6 +131,7 @@ Future<String?> obtainFcmToken() async {
     return null;
   }
   try {
+    await ensureFcmNotificationPermission();
     return await FirebaseMessaging.instance.getToken();
   } catch (e) {
     debugPrint('FCM token: $e');

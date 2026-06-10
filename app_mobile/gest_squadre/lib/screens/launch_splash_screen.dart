@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-import '../theme/tactical_theme.dart';
 import '../widgets/logo_badge.dart';
 
 /// Splash iniziale con motion come TOC (`_ForcedLaunchSplashScreen`).
@@ -16,6 +15,7 @@ class _LaunchSplashScreenState extends State<LaunchSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _splashController;
   late final Animation<double> _logoScale;
+  late final Animation<double> _logoAlignY;
   late final Animation<double> _titleOpacity;
   late final Animation<double> _signatureOpacity;
 
@@ -26,7 +26,10 @@ class _LaunchSplashScreenState extends State<LaunchSplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 4300),
     );
-    _logoScale = Tween<double>(begin: 0.28, end: 1.55).animate(
+    _logoScale = Tween<double>(begin: 0.28, end: 1.0).animate(
+      CurvedAnimation(parent: _splashController, curve: Curves.easeOutCubic),
+    );
+    _logoAlignY = Tween<double>(begin: -0.78, end: -0.22).animate(
       CurvedAnimation(parent: _splashController, curve: Curves.easeOutCubic),
     );
     _titleOpacity = Tween<double>(begin: 0, end: 1).animate(
@@ -56,30 +59,17 @@ class _LaunchSplashScreenState extends State<LaunchSplashScreen>
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          Positioned.fill(
-            child: Opacity(
-              opacity: kVegetatoTextureOpacity,
-              child: Image.asset(
-                'assets/bg_vegetato.png',
-                fit: BoxFit.cover,
+          AnimatedBuilder(
+            animation: Listenable.merge([_logoScale, _logoAlignY]),
+            builder: (context, child) => Align(
+              alignment: Alignment(0, _logoAlignY.value),
+              child: Transform.scale(
+                scale: _logoScale.value,
                 alignment: Alignment.center,
+                child: child,
               ),
             ),
-          ),
-          Align(
-            alignment: Alignment.topCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(top: 122),
-              child: AnimatedBuilder(
-                animation: _logoScale,
-                builder: (context, child) => Transform.scale(
-                  scale: _logoScale.value,
-                  alignment: Alignment.center,
-                  child: child,
-                ),
-                child: const LogoBadge(size: 210),
-              ),
-            ),
+            child: const OpenGolfLogoBanner(width: 280),
           ),
           Align(
             alignment: Alignment.center,

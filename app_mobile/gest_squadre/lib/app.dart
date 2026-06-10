@@ -49,7 +49,7 @@ class _GestSquadreAppState extends State<GestSquadreApp> {
         return Stack(
           fit: StackFit.expand,
           children: [
-            globalVegetatoBackground(),
+            globalAppBackground(),
             child ?? const SizedBox.shrink(),
           ],
         );

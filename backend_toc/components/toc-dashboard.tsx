@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
+  canManageWaypoints,
+  canViewEventLogs,
   normalizeAdminRole,
   type AdminSessionData,
 } from "@/lib/admin-auth";
@@ -80,8 +82,9 @@ export default function TocDashboard() {
   const [squadLogoutBusy, setSquadLogoutBusy] = useState(false);
   const [onlineSessionsLogout, setOnlineSessionsLogout] = useState<LiveSquad[]>([]);
 
-  const canManageWaypoints = session?.role === "admin";
+  const canEditWaypointsOnMap = session ? canManageWaypoints(session.role) : false;
   const canForceSquadLogout = session?.role === "admin";
+  const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
 
   const alarmingSessionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -111,6 +114,12 @@ export default function TocDashboard() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (session?.role === "campo") {
+      router.replace("/waypoints");
+    }
+  }, [session, router]);
 
   const loadSquads = useCallback(async () => {
     if (!supabase) {
@@ -219,7 +228,7 @@ export default function TocDashboard() {
   }, [supabase]);
 
   async function handleDeleteWaypointFromMap(waypoint: SquadWaypoint) {
-    if (!supabase || !canManageWaypoints) {
+    if (!supabase || !canEditWaypointsOnMap) {
       return;
     }
     if (
@@ -341,6 +350,10 @@ export default function TocDashboard() {
     };
     window.localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify(next));
     setSession(next);
+    if (next.role === "campo") {
+      router.push("/waypoints");
+      return;
+    }
     setStatusMessage(`Benvenuto ${next.name}`);
   }
 
@@ -591,6 +604,11 @@ export default function TocDashboard() {
           <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/waypoints">
             Waypoint ({waypoints.length})
           </Link>
+          {canOpenEventLogs ? (
+            <Link className={`${styles.btn} ${styles.btnYellow}`} href="/logs">
+              Log evento
+            </Link>
+          ) : null}
           <button className={`${styles.btn} ${styles.btnDanger}`} type="button" onClick={handleLogout}>
             Logout TOC
           </button>
@@ -627,7 +645,7 @@ export default function TocDashboard() {
             alarmingSessionIds={alarmingSessionIds}
             selectedSessionId={selectedSessionId}
             onSelect={(s) => setSelectedSessionId(s.sessionId)}
-            canManageWaypoints={canManageWaypoints && Boolean(activeEventId)}
+            canManageWaypoints={canEditWaypointsOnMap && Boolean(activeEventId)}
             onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}
             onDeleteWaypoint={(wp) => void handleDeleteWaypointFromMap(wp)}
             height="400px"

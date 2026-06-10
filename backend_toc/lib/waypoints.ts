@@ -68,6 +68,8 @@ export function waypointSourceLabel(source: string): string {
       return "TOC backoffice";
     case "toc_mobile":
       return "App mobile";
+    case "golf_campo":
+      return "Campo golf";
     default:
       return source;
   }

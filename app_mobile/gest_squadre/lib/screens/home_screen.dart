@@ -1,16 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/alarm_message.dart';
 import '../controllers/squad_controller.dart';
 import '../theme/tactical_theme.dart';
 import '../widgets/tactical_shell.dart';
 import 'squad_login_screen.dart';
-
-const _tocBackendUrl = String.fromEnvironment(
-  'TOC_BACKEND_URL',
-  defaultValue: 'https://localhost:3000',
-);
+import 'toc_map_screen.dart';
 
 Color _gpsLabelColor(double? accuracyM) {
   if (accuracyM == null || accuracyM <= 0) {
@@ -221,49 +216,31 @@ class HomeScreen extends StatelessWidget {
                   foregroundColor: Colors.black,
                   onTap: controller.isInitializing
                       ? null
-                      : () async {
-                          final url = _tocBackendUrl.trim();
-                          if (url.contains('localhost') ||
-                              url.contains('127.0.0.1')) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: tacticalNavy,
-                                  content: Text(
-                                    'Dal telefono localhost non funziona. '
-                                    'Usa TOC_BACKEND_URL su Vercel (es. https://gest-squadre.vercel.app) '
-                                    'in dart-defines.json. Per push TOC aggiungi anche FIREBASE_ANDROID_* '
-                                    'nello stesso file (vedi dart-defines.example.json).',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                      : () {
+                          if (!controller.backendConfigured) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                backgroundColor: tacticalNavy,
+                                content: Text(
+                                  'Mappa TOC: configura SUPABASE_* in dart-defines.json.',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  duration: const Duration(seconds: 8),
                                 ),
-                              );
-                            }
+                              ),
+                            );
                             return;
                           }
-                          final uri = Uri.parse(url);
-                          if (!await launchUrl(
-                            uri,
-                            mode: LaunchMode.externalApplication,
-                          )) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Impossibile aprire il backend TOC.',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-                          }
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              fullscreenDialog: true,
+                              builder: (_) => TocMapScreen(
+                                backendConfigured: controller.backendConfigured,
+                                currentSession: controller.currentSession,
+                              ),
+                            ),
+                          );
                         },
                 ),
                 ],

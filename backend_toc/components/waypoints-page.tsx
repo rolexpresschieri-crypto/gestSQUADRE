@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
+  canManageWaypoints,
   normalizeAdminRole,
   type AdminSessionData,
 } from "@/lib/admin-auth";
@@ -52,7 +53,9 @@ export default function WaypointsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const canEdit = session?.role === "admin";
+  const canEdit = session ? canManageWaypoints(session.role) : false;
+  const waypointSource =
+    session?.role === "campo" ? "golf_campo" : "toc_backend";
 
   useEffect(() => {
     setSupabase(getSupabaseBrowserClient());
@@ -237,7 +240,7 @@ export default function WaypointsPage() {
           label: nameTrim,
           icon_key: waypointIconKey,
           created_by_admin_code: session.code,
-          source: "toc_backend",
+          source: waypointSource,
         });
 
         if (error) {
@@ -312,9 +315,22 @@ export default function WaypointsPage() {
     <div className={styles.root}>
       <header className={styles.topBar}>
         <h1>Waypoint tattici</h1>
-        <Link className={styles.backLink} href="/">
-          ← Mappa live
-        </Link>
+        {session.role === "campo" ? (
+          <button
+            type="button"
+            className={styles.backLink}
+            onClick={() => {
+              window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
+              window.location.href = "/";
+            }}
+          >
+            Logout
+          </button>
+        ) : (
+          <Link className={styles.backLink} href="/">
+            ← Mappa live
+          </Link>
+        )}
       </header>
 
       <div className={styles.scroll}>

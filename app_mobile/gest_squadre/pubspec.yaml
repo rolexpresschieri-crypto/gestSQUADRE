@@ -20,6 +20,8 @@ dependencies:
   url_launcher: ^6.3.1
   flutter_local_notifications: ^18.0.1
   google_fonts: ^6.3.0
+  flutter_map: ^8.3.0
+  latlong2: ^0.9.1
 
 dev_dependencies:
   flutter_test:
@@ -38,6 +40,14 @@ flutter:
   uses-material-design: true
   assets:
     - assets/logo_ansmi.png
-    - assets/bg_vegetato.png
+    - assets/logo_open_golf_2026.png
+    - assets/waypoint_buche.png
+    - assets/waypoint_croce_rossa.png
+    - assets/waypoint_club_house.png
+    - assets/waypoint_cancello_in.png
+    - assets/waypoint_driving_range.png
+    - assets/waypoint_villaggio_comm.png
+    - assets/waypoint_welcome.png
+    - assets/waypoint_media_center.png
     - assets/firebase/
     - assets/app_icon.png

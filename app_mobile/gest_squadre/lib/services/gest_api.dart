@@ -105,12 +105,15 @@ class GestApi {
     required String squadId,
     required String token,
   }) async {
-    await _client.from('squad_fcm_tokens').upsert({
-      'session_id': sessionId,
-      'squad_id': squadId,
-      'fcm_token': token,
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
-    });
+    await _client.from('squad_fcm_tokens').upsert(
+      {
+        'session_id': sessionId,
+        'squad_id': squadId,
+        'fcm_token': token,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      },
+      onConflict: 'session_id',
+    );
   }
 
   Future<void> sendAlarm({required SquadSession session}) async {

@@ -53,10 +53,10 @@ Vercel → progetto → **Settings** → **Environment Variables** → aggiungi 
 
 | Nome | Valore |
 |------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://xxxx.supabase.co` |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chiave **anon** Supabase |
-| `SUPABASE_URL` | stesso URL Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | chiave **service_role** (segreta, solo server) |
+| `NEXT_PUBLIC_SUPABASE_URL` | **stesso URL** dell’app mobile (`dart-defines.json`), es. `https://tdylzdrpmxvftfblvmnu.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | chiave **anon** / `sb_publishable_` dello **stesso** progetto |
+| `SUPABASE_URL` | identico a `NEXT_PUBLIC_SUPABASE_URL` |
+| `SUPABASE_SERVICE_ROLE_KEY` | chiave **service_role** (Supabase → Settings → API). **Non** la `sb_publishable_` |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | **intero** file JSON del service account Firebase, **una riga** |
 
 ### Firebase su Vercel
@@ -72,7 +72,7 @@ Verifica dopo il deploy:
 
 `https://TUO-PROGETTO.vercel.app/api/push-health`
 
-Deve mostrare `firebaseAdmin: true` e `supabaseServiceRole: true`.
+Deve mostrare `apiVersion: 2`, `firebaseAdmin: true`, `supabaseProject: "tdylzdrpmxvftfblvmnu"` e `fcmTokenRows` ≥ 1 dopo login squadra sul telefono.
 
 ---
 

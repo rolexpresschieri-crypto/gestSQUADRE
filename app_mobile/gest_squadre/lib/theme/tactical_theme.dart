@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-/// Come TOC (`app.dart`): camo attenuato su fondo scuro.
-const double kVegetatoTextureOpacity = 0.44;
-const Color kTacticalBackground = Color(0xFF050505);
+/// Pantone 7427 C — CMYK 0, 100, 68, 35 (#A60035).
+const Color kBrandTint = Color(0xFFA60035);
+const Color kBrandBase = Color(0xFF0A0607);
+
+/// Overlay brand: più trasparente così i pulsanti rossi (logout / allarme) risaltano.
+const double kBrandBackgroundAlpha = 0.48;
+
+const Color kTacticalBackground = kBrandBase;
 const Color kTacticalFrame = Color(0xFF14295D);
 
 const tacticalGreen = Color(0xFF079B42);
@@ -34,23 +39,12 @@ const TextStyle kTacticalBodyWhite = TextStyle(
   shadows: kTacticalWhiteTextShadows,
 );
 
-Widget globalVegetatoBackground() {
+Widget globalAppBackground() {
   return Stack(
     fit: StackFit.expand,
     children: [
-      const ColoredBox(color: kTacticalBackground),
-      IgnorePointer(
-        child: Opacity(
-          opacity: kVegetatoTextureOpacity,
-          child: Image.asset(
-            'assets/bg_vegetato.png',
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
-            filterQuality: FilterQuality.medium,
-            errorBuilder: (_, _, _) => const SizedBox.shrink(),
-          ),
-        ),
-      ),
+      const ColoredBox(color: kBrandBase),
+      ColoredBox(color: kBrandTint.withValues(alpha: kBrandBackgroundAlpha)),
     ],
   );
 }

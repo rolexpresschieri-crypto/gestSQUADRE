@@ -34,10 +34,10 @@ function waypointDivIcon(waypoint: SquadWaypoint): L.DivIcon {
   const iconUrl = waypointIconMapUrl(waypoint.iconKey);
   return L.divIcon({
     className: "gs-wp-divicon",
-    html: `<div class="gs-wp-pin"><img class="gs-wp-icon" src="${iconUrl}" width="40" height="40" alt="" /><div class="gs-wp-chip">${name}</div></div>`,
-    iconSize: [120, 56],
-    iconAnchor: [60, 18],
-    popupAnchor: [0, -22],
+    html: `<div class="gs-wp-pin"><img class="gs-wp-icon" src="${iconUrl}" width="28" height="28" alt="" /><div class="gs-wp-chip">${name}</div></div>`,
+    iconSize: [96, 46],
+    iconAnchor: [48, 14],
+    popupAnchor: [0, -18],
   });
 }
 

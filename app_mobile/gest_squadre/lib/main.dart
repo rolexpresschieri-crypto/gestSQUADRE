@@ -34,10 +34,12 @@ Future<void> main() async {
       },
     );
     controller = SquadController(backendConfigured: true);
-    await controller.initialize();
     if (firebaseReady) {
       try {
-        await setupGestFcm(onForegroundMessage: controller.onTocPush);
+        await setupGestFcm(
+          onForegroundMessage: controller.onTocPush,
+          onTokenRefresh: controller.registerFcmToken,
+        );
       } catch (e, stack) {
         debugPrint('FCM setup: $e\n$stack');
       }
@@ -47,6 +49,7 @@ Future<void> main() async {
         '(login Supabase e allarme mappa funzionano comunque).',
       );
     }
+    await controller.initialize();
   } else {
     controller = SquadController(backendConfigured: false);
     await controller.initialize();

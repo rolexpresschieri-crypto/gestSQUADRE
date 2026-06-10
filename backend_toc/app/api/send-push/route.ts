@@ -53,14 +53,15 @@ export async function POST(request: Request) {
     alarm?: boolean;
   };
 
-  const adminSession = payload.session;
-  if (!adminSession?.code) {
+  const adminSessionRaw = payload.session;
+  if (!adminSessionRaw?.code) {
     return NextResponse.json({ error: "Sessione TOC assente" }, { status: 401 });
   }
+  const adminSession = adminSessionRaw;
 
   const role = normalizeAdminRole(adminSession.role);
-  if (role !== "admin" && role !== "viewer") {
-    return NextResponse.json({ error: "Ruolo non valido" }, { status: 403 });
+  if (role === "campo" || (role !== "admin" && role !== "viewer")) {
+    return NextResponse.json({ error: "Ruolo non autorizzato per push." }, { status: 403 });
   }
 
   const sessionId =
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
 
   const { data: sessionRow, error: sessionErr } = await admin
     .from("squad_sessions")
-    .select("id, is_online")
+    .select("id, is_online, event_id, squad_id, squads(squad_code, squad_name)")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -101,6 +102,35 @@ export async function POST(request: Request) {
   }
   if (!sessionRow?.is_online) {
     return NextResponse.json({ error: "Sessione non online" }, { status: 409 });
+  }
+
+  const session = sessionRow;
+
+  const squadJoin = session.squads as
+    | { squad_code: string; squad_name: string }
+    | { squad_code: string; squad_name: string }[]
+    | null;
+  const squadInfo = Array.isArray(squadJoin) ? squadJoin[0] : squadJoin;
+  const eventId = session.event_id as string;
+
+  async function writePushLog(status: "sent" | "failed", extra: {
+    fcmMessageId?: string;
+    errorMessage?: string;
+  }) {
+    await admin.from("toc_push_logs").insert({
+      event_id: eventId,
+      session_id: sessionId,
+      squad_id: session.squad_id as string,
+      squad_code: squadInfo?.squad_code ?? null,
+      squad_name: squadInfo?.squad_name ?? null,
+      admin_code: adminSession.code,
+      title,
+      body: bodyText,
+      is_alarm: useAlarm,
+      fcm_message_id: extra.fcmMessageId ?? null,
+      status,
+      error_message: extra.errorMessage ?? null,
+    });
   }
 
   const { data: tokenRow, error: tokenErr } = await admin
@@ -115,6 +145,9 @@ export async function POST(request: Request) {
 
   const token = tokenRow?.fcm_token as string | undefined;
   if (!token) {
+    await writePushLog("failed", {
+      errorMessage: "Nessun token FCM per questa sessione.",
+    });
     return NextResponse.json(
       {
         error: "Nessun token FCM per questa sessione.",
@@ -140,9 +173,11 @@ export async function POST(request: Request) {
         },
       },
     });
+    await writePushLog("sent", { fcmMessageId: messageId });
     return NextResponse.json({ ok: true, messageId, alarm: useAlarm });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Errore FCM";
+    await writePushLog("failed", { errorMessage: msg });
     return NextResponse.json({ error: msg, code: "FCM_SEND_FAILED" }, { status: 502 });
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/tactical_theme.dart';
+import 'logo_badge.dart';
 
 /// Cornice TOC: solo bordo navy, contenuto su sfondo trasparente (camo dal root).
 class TacticalShell extends StatelessWidget {
@@ -84,16 +85,7 @@ class AppTitleBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        SizedBox(
-          width: 188,
-          height: 188,
-          child: ClipOval(
-            child: Image(
-              image: AssetImage('assets/logo_ansmi.png'),
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
+        OpenGolfLogoBanner(width: 240),
         SizedBox(height: 18),
         Text(
           'Tracking',

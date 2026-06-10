@@ -29,7 +29,7 @@ create table if not exists toc_admins (
   admin_code text not null unique,
   admin_name text not null,
   password_hash text not null,
-  role text not null default 'admin' check (role in ('admin', 'viewer')),
+  role text not null default 'admin' check (role in ('admin', 'viewer', 'campo')),
   is_enabled boolean not null default true,
   created_at timestamptz not null default now()
 );
@@ -80,11 +80,33 @@ create table if not exists squad_alarms (
 create index if not exists squad_alarms_event_created_idx
   on squad_alarms (event_id, created_at desc);
 
+-- Log push TOC → squadre (FCM)
+create table if not exists toc_push_logs (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  session_id uuid references squad_sessions(id) on delete set null,
+  squad_id uuid references squads(id) on delete set null,
+  squad_code text,
+  squad_name text,
+  admin_code text not null,
+  title text not null,
+  body text not null,
+  is_alarm boolean not null default true,
+  fcm_message_id text,
+  status text not null default 'sent' check (status in ('sent', 'failed')),
+  error_message text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists toc_push_logs_event_created_idx
+  on toc_push_logs (event_id, created_at desc);
+
 -- Waypoint fissi mappa TOC (lat/long, senza quota)
 create table if not exists squad_map_points (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references events(id) on delete cascade,
   label text,
+  icon_key text not null default 'buche',
   latitude double precision not null,
   longitude double precision not null,
   created_at timestamptz not null default now(),
@@ -134,6 +156,10 @@ insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
 select 'TOC01', 'Operatore TOC', 'toc123', 'admin', true
 where not exists (select 1 from toc_admins where admin_code = 'TOC01');
 
+insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
+select 'GOLF_TORINO', 'Campo Golf Torino', 'gt1234', 'campo', true
+where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO');
+
 -- RLS permissiva per MVP (anon key app mobile + browser TOC)
 alter table events enable row level security;
 alter table squads enable row level security;
@@ -142,12 +168,13 @@ alter table squad_sessions enable row level security;
 alter table squad_fcm_tokens enable row level security;
 alter table squad_alarms enable row level security;
 alter table squad_map_points enable row level security;
+alter table toc_push_logs enable row level security;
 
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'events','squads','toc_admins','squad_sessions','squad_fcm_tokens','squad_alarms','squad_map_points'
+    'events','squads','toc_admins','squad_sessions','squad_fcm_tokens','squad_alarms','squad_map_points','toc_push_logs'
   ] loop
     execute format('drop policy if exists "gest anon all %s" on %s', t, t);
     execute format(

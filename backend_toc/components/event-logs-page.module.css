@@ -1,0 +1,116 @@
+.root {
+  min-height: 100vh;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(166, 0, 53, 0.38) 0%,
+      rgba(120, 0, 40, 0.48) 55%,
+      rgba(70, 0, 24, 0.55) 100%
+    ),
+    #0a0607;
+  color: #f5f5f5;
+  padding: 16px;
+}
+
+.topBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.topBar h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.backLink {
+  color: #e0be3a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.panel {
+  background: rgba(0, 0, 0, 0.35);
+  border: 2px solid #1a3066;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.hint {
+  color: #ccc;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.status {
+  color: #e0be3a;
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.btnPrimary,
+.btnYellow,
+.btnDanger,
+.btnGhost {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnPrimary {
+  background: #079b42;
+  color: #fff;
+}
+
+.btnYellow {
+  background: #e0be3a;
+  color: #000;
+}
+
+.btnDanger {
+  background: #c62828;
+  color: #fff;
+}
+
+.btnGhost {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #666;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  max-height: 70vh;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.table th,
+.table td {
+  border: 1px solid #3a4a5a;
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table th {
+  background: rgba(0, 0, 0, 0.45);
+  position: sticky;
+  top: 0;
+}

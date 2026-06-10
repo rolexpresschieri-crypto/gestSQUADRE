@@ -52,7 +52,7 @@ class SquadController extends ChangeNotifier {
         bannerMessage = 'Nessun evento attivo su Supabase.';
       }
       await _restoreSession();
-      await _registerFcmIfNeeded();
+      await registerFcmToken();
       _startPositionLoop();
     } catch (e) {
       bannerMessage = 'Errore init: $e';
@@ -134,7 +134,7 @@ class SquadController extends ChangeNotifier {
       );
       currentSession = session;
       await _persistSession();
-      await _registerFcmIfNeeded();
+      await registerFcmToken();
       _startPositionLoop();
       if (Firebase.apps.isEmpty) {
         bannerMessage =
@@ -200,21 +200,49 @@ class SquadController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _registerFcmIfNeeded() async {
+  Future<void> registerFcmToken([String? prefetchedToken]) async {
     final s = currentSession;
     final api = _api;
     if (s == null || api == null) {
       return;
     }
-    final token = await obtainFcmToken();
-    if (token == null) {
+    if (Firebase.apps.isEmpty) {
+      bannerMessage =
+          'Push TOC disabilitata: ricompila con google-services.json e FIREBASE_* in dart-defines.';
+      notifyListeners();
       return;
     }
-    await api.registerFcmToken(
-      sessionId: s.sessionId,
-      squadId: s.squadId,
-      token: token,
-    );
+    try {
+      var token = prefetchedToken?.trim();
+      token = (token != null && token.isNotEmpty)
+          ? token
+          : await obtainFcmToken();
+      if (token == null || token.isEmpty) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        token = await obtainFcmToken();
+      }
+      if (token == null || token.isEmpty) {
+        bannerMessage =
+            'Token push non ottenuto: consenti notifiche, poi logout/login.';
+        notifyListeners();
+        return;
+      }
+      await api.registerFcmToken(
+        sessionId: s.sessionId,
+        squadId: s.squadId,
+        token: token,
+      );
+      debugPrint('gestSQUADRE FCM: token registrato per sessione ${s.sessionId}');
+      if (bannerMessage != null &&
+          bannerMessage!.toLowerCase().contains('token push')) {
+        bannerMessage = null;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('gestSQUADRE FCM register: $e');
+      bannerMessage = 'Errore registrazione push: $e';
+      notifyListeners();
+    }
   }
 
   void _stopPositionTracking() {
