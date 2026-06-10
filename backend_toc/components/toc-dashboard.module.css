@@ -173,6 +173,14 @@
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 16px;
+  align-items: start;
+}
+
+.mapColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
@@ -482,11 +490,11 @@
 
 .dashboardFooter {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  margin-top: 24px;
-  padding: 8px 0 28px;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(20px, 4vw, 40px);
+  margin-top: -2px;
+  padding: 0;
 }
 
 .footerLogoWrap {
