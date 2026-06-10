@@ -12,6 +12,14 @@ create table if not exists events (
   created_at timestamptz not null default now()
 );
 
+-- Campi golf (multi-tenant: un login campo per course_code)
+create table if not exists golf_courses (
+  id uuid primary key default gen_random_uuid(),
+  course_code text not null unique,
+  course_name text not null,
+  created_at timestamptz not null default now()
+);
+
 -- Anagrafica squadre (password_hash: stesso uso di TOC pin_hash, confronto lato app)
 create table if not exists squads (
   id uuid primary key default gen_random_uuid(),
@@ -20,8 +28,11 @@ create table if not exists squads (
   password_hash text not null,
   map_color text default '#079B42',
   is_enabled boolean not null default true,
+  golf_course_id uuid references golf_courses(id) on delete set null,
   created_at timestamptz not null default now()
 );
+
+create index if not exists squads_golf_course_idx on squads (golf_course_id);
 
 -- Operatori TOC
 create table if not exists toc_admins (
@@ -31,6 +42,7 @@ create table if not exists toc_admins (
   password_hash text not null,
   role text not null default 'admin' check (role in ('admin', 'viewer', 'campo')),
   is_enabled boolean not null default true,
+  golf_course_id uuid references golf_courses(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
@@ -111,10 +123,12 @@ create table if not exists squad_map_points (
   longitude double precision not null,
   created_at timestamptz not null default now(),
   created_by_admin_code text,
-  source text not null default 'toc_backend'
+  source text not null default 'toc_backend',
+  golf_course_id uuid references golf_courses(id) on delete set null
 );
 
 create index if not exists squad_map_points_event_idx on squad_map_points (event_id);
+create index if not exists squad_map_points_golf_course_idx on squad_map_points (golf_course_id);
 
 -- Vista per mappa TOC
 create or replace view active_squad_summaries as
@@ -156,8 +170,18 @@ insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
 select 'TOC01', 'Operatore TOC', 'toc123', 'admin', true
 where not exists (select 1 from toc_admins where admin_code = 'TOC01');
 
-insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled)
-select 'GOLF_TORINO', 'Campo Golf Torino', 'gt1234', 'campo', true
+insert into golf_courses (course_code, course_name)
+select 'golf_torino', 'Campo Golf Torino'
+where not exists (select 1 from golf_courses where course_code = 'golf_torino');
+
+insert into toc_admins (admin_code, admin_name, password_hash, role, is_enabled, golf_course_id)
+select
+  'GOLF_TORINO',
+  'Campo Golf Torino',
+  'gt1234',
+  'campo',
+  true,
+  (select id from golf_courses where course_code = 'golf_torino' limit 1)
 where not exists (select 1 from toc_admins where admin_code = 'GOLF_TORINO');
 
 -- RLS permissiva per MVP (anon key app mobile + browser TOC)
@@ -169,12 +193,13 @@ alter table squad_fcm_tokens enable row level security;
 alter table squad_alarms enable row level security;
 alter table squad_map_points enable row level security;
 alter table toc_push_logs enable row level security;
+alter table golf_courses enable row level security;
 
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'events','squads','toc_admins','squad_sessions','squad_fcm_tokens','squad_alarms','squad_map_points','toc_push_logs'
+    'events','golf_courses','squads','toc_admins','squad_sessions','squad_fcm_tokens','squad_alarms','squad_map_points','toc_push_logs'
   ] loop
     execute format('drop policy if exists "gest anon all %s" on %s', t, t);
     execute format(

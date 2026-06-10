@@ -13,9 +13,10 @@ import {
 import {
   ADMIN_SESSION_STORAGE_KEY,
   canManageWaypoints,
-  normalizeAdminRole,
+  isCampoGolfSession,
   type AdminSessionData,
 } from "@/lib/admin-auth";
+import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import {
   formatWaypointTimestamp,
@@ -61,14 +62,10 @@ export default function WaypointsPage() {
     setSupabase(getSupabaseBrowserClient());
     const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as AdminSessionData;
-        setSession({
-          code: parsed.code,
-          name: parsed.name,
-          role: normalizeAdminRole(parsed.role),
-        });
-      } catch {
+      const restored = restoreAdminSessionFromStorage(raw);
+      if (restored) {
+        setSession(restored);
+      } else {
         window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
       }
     }
@@ -80,11 +77,14 @@ export default function WaypointsPage() {
       setWaypoints([]);
       return;
     }
-    const { data, error } = await supabase
+    let query = supabase
       .from("squad_map_points")
       .select("*")
-      .eq("event_id", activeEventId)
-      .limit(400);
+      .eq("event_id", activeEventId);
+    if (session?.golfCourseId) {
+      query = query.eq("golf_course_id", session.golfCourseId);
+    }
+    const { data, error } = await query.limit(400);
 
     if (!error && data) {
       setWaypoints(waypointsFromRows(data as Record<string, unknown>[]));
@@ -92,7 +92,7 @@ export default function WaypointsPage() {
     } else if (error) {
       setWaypointFeedError(`Lettura waypoint: ${error.message}`);
     }
-  }, [supabase, activeEventId]);
+  }, [supabase, activeEventId, session?.golfCourseId]);
 
   useEffect(() => {
     if (!authChecked || !session || !supabase) {
@@ -218,7 +218,7 @@ export default function WaypointsPage() {
 
     try {
       if (editingWaypointId) {
-        const { error } = await supabase
+        let updateQuery = supabase
           .from("squad_map_points")
           .update({
             latitude: lat,
@@ -227,6 +227,10 @@ export default function WaypointsPage() {
             icon_key: waypointIconKey,
           })
           .eq("id", editingWaypointId);
+        if (session.golfCourseId) {
+          updateQuery = updateQuery.eq("golf_course_id", session.golfCourseId);
+        }
+        const { error } = await updateQuery;
 
         if (error) {
           throw error;
@@ -241,6 +245,7 @@ export default function WaypointsPage() {
           icon_key: waypointIconKey,
           created_by_admin_code: session.code,
           source: waypointSource,
+          golf_course_id: session.golfCourseId ?? null,
         });
 
         if (error) {
@@ -274,10 +279,11 @@ export default function WaypointsPage() {
 
     setWaypointBusy(true);
     try {
-      const { error } = await supabase
-        .from("squad_map_points")
-        .delete()
-        .eq("id", waypoint.id);
+      let deleteQuery = supabase.from("squad_map_points").delete().eq("id", waypoint.id);
+      if (session?.golfCourseId) {
+        deleteQuery = deleteQuery.eq("golf_course_id", session.golfCourseId);
+      }
+      const { error } = await deleteQuery;
       if (error) {
         throw error;
       }
@@ -315,17 +321,10 @@ export default function WaypointsPage() {
     <div className={styles.root}>
       <header className={styles.topBar}>
         <h1>Waypoint tattici</h1>
-        {session.role === "campo" ? (
-          <button
-            type="button"
-            className={styles.backLink}
-            onClick={() => {
-              window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
-              window.location.href = "/";
-            }}
-          >
-            Logout
-          </button>
+        {isCampoGolfSession(session) ? (
+          <Link className={styles.backLink} href="/">
+            ← Home campo
+          </Link>
         ) : (
           <Link className={styles.backLink} href="/">
             ← Mappa live
@@ -352,8 +351,15 @@ export default function WaypointsPage() {
             <div className={styles.panelHeader}>
               <h2>Waypoint fissi</h2>
               <p>
-                Evento attivo: <strong>{activeEventTitle || "—"}</strong> · Solo latitudine e
-                longitudine (senza quota), come in TocAppBuild.
+                Evento attivo: <strong>{activeEventTitle || "—"}</strong>
+                {isCampoGolfSession(session) ? (
+                  <>
+                    {" "}
+                    · Campo: <strong>{session.golfCourseCode}</strong>
+                  </>
+                ) : null}
+                {" "}
+                · Solo latitudine e longitudine (senza quota).
               </p>
             </div>
 

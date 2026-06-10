@@ -7,7 +7,18 @@ export type AdminSessionData = {
   name: string;
   role: AdminRole;
   adminId?: string;
+  golfCourseId?: string;
+  golfCourseCode?: string;
+  golfCourseName?: string;
 };
+
+export function isCampoGolfSession(session: AdminSessionData | null): boolean {
+  return session?.role === "campo" && Boolean(session.golfCourseId);
+}
+
+export function canManageCampoSquads(role: AdminRole): boolean {
+  return role === "campo";
+}
 
 export function normalizeAdminRole(value: string | null | undefined): AdminRole {
   const v = typeof value === "string" ? value.trim().toLowerCase() : "";

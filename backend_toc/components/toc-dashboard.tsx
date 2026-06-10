@@ -9,9 +9,11 @@ import {
   ADMIN_SESSION_STORAGE_KEY,
   canManageWaypoints,
   canViewEventLogs,
-  normalizeAdminRole,
+  isCampoGolfSession,
   type AdminSessionData,
 } from "@/lib/admin-auth";
+import { loginTocAdmin, restoreAdminSessionFromStorage } from "@/lib/campo-login";
+import CampoDashboard from "@/components/campo-dashboard";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { openExternalMapWindow } from "@/lib/open-external-map";
 import { layerOptions, type LayerMode } from "@/lib/map-layers";
@@ -101,25 +103,14 @@ export default function TocDashboard() {
     setSupabase(getSupabaseBrowserClient());
     const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as AdminSessionData;
-        setSession({
-          code: parsed.code,
-          name: parsed.name,
-          role: normalizeAdminRole(parsed.role),
-          adminId: parsed.adminId,
-        });
-      } catch {
+      const restored = restoreAdminSessionFromStorage(raw);
+      if (restored) {
+        setSession(restored);
+      } else {
         window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
       }
     }
   }, []);
-
-  useEffect(() => {
-    if (session?.role === "campo") {
-      router.replace("/waypoints");
-    }
-  }, [session, router]);
 
   const loadSquads = useCallback(async () => {
     if (!supabase) {
@@ -324,37 +315,28 @@ export default function TocDashboard() {
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase) {
-      return;
-    }
-    const { data, error } = await supabase
-      .from("toc_admins")
-      .select("id, admin_code, admin_name, password_hash, role, is_enabled")
-      .eq("admin_code", loginCode.trim().toUpperCase())
-      .eq("is_enabled", true)
-      .maybeSingle();
-
-    if (error || !data) {
-      setStatusMessage("Credenziali TOC non valide.");
-      return;
-    }
-    if ((data.password_hash as string) !== loginPassword.trim()) {
-      setStatusMessage("Password TOC errata.");
+      setStatusMessage("Supabase non configurato (NEXT_PUBLIC_SUPABASE_*).");
       return;
     }
 
-    const next: AdminSessionData = {
-      code: data.admin_code as string,
-      name: data.admin_name as string,
-      role: normalizeAdminRole(data.role as string),
-      adminId: data.id as string,
-    };
+    const { session: next, error } = await loginTocAdmin(
+      supabase,
+      loginCode,
+      loginPassword,
+    );
+
+    if (error || !next) {
+      setStatusMessage(error ?? "Credenziali non valide.");
+      return;
+    }
+
     window.localStorage.setItem(ADMIN_SESSION_STORAGE_KEY, JSON.stringify(next));
     setSession(next);
-    if (next.role === "campo") {
-      router.push("/waypoints");
-      return;
-    }
-    setStatusMessage(`Benvenuto ${next.name}`);
+    setStatusMessage(
+      isCampoGolfSession(next)
+        ? `Benvenuto — ${next.golfCourseName ?? next.golfCourseCode}`
+        : `Benvenuto ${next.name}`,
+    );
   }
 
   function handleLogout() {
@@ -512,6 +494,18 @@ export default function TocDashboard() {
     }
   }
 
+  if (session && isCampoGolfSession(session)) {
+    return (
+      <CampoDashboard
+        session={session}
+        onLogout={() => {
+          handleLogout();
+          setStatusMessage("");
+        }}
+      />
+    );
+  }
+
   if (!session) {
     return (
       <main className={`${styles.screen} ${styles.loginScreen}`}>
@@ -542,6 +536,9 @@ export default function TocDashboard() {
             <button className={styles.loginBtn} type="submit">
               Accedi
             </button>
+            <p className={styles.loginHint}>
+              TOC: TOC01 · Campo golf: GOLF_TORINO
+            </p>
             {statusMessage ? <p className={styles.message}>{statusMessage}</p> : null}
           </form>
           <div className={styles.loginLogoWrap}>
