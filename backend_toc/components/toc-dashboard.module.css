@@ -489,12 +489,14 @@
 }
 
 .dashboardFooter {
+  grid-column: 1 / -1;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  gap: clamp(20px, 4vw, 40px);
-  margin-top: -2px;
+  gap: 16px;
+  margin-top: 4px;
   padding: 0;
+  width: 100%;
 }
 
 .footerLogoWrap {
@@ -515,12 +517,14 @@
 @media (max-width: 900px) {
   .dashboardFooter {
     flex-direction: column;
-    align-items: stretch;
+    align-items: center;
+    gap: 12px;
   }
 
   .footerLogoWrap {
     display: flex;
     justify-content: center;
+    width: 100%;
   }
 
   .footerLogo {

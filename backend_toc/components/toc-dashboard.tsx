@@ -629,26 +629,6 @@ export default function TocDashboard() {
             height="400px"
           />
         </section>
-        <footer className={styles.dashboardFooter}>
-          <div className={styles.footerLogoWrap}>
-            <Image
-              className={styles.footerLogo}
-              src="/logo_open_golf_2026.png"
-              alt="83 Open d'Italia 2026 — DS Automobiles"
-              width={840}
-              height={200}
-            />
-          </div>
-          <div className={styles.footerLogoWrap}>
-            <Image
-              className={styles.footerLogo}
-              src="/logo_open_golf_2026.png"
-              alt="83 Open d'Italia 2026 — DS Automobiles"
-              width={840}
-              height={200}
-            />
-          </div>
-        </footer>
         </div>
         <aside className={styles.sidePanel}>
           <h2>Allarmi mappa ({pendingAlarms.length} in rosso)</h2>
@@ -729,6 +709,26 @@ export default function TocDashboard() {
             </ul>
           </div>
         </aside>
+        <footer className={styles.dashboardFooter}>
+          <div className={styles.footerLogoWrap}>
+            <Image
+              className={styles.footerLogo}
+              src="/logo_open_golf_2026.png"
+              alt="83 Open d'Italia 2026 — DS Automobiles"
+              width={840}
+              height={200}
+            />
+          </div>
+          <div className={styles.footerLogoWrap}>
+            <Image
+              className={styles.footerLogo}
+              src="/logo_open_golf_2026.png"
+              alt="83 Open d'Italia 2026 — DS Automobiles"
+              width={840}
+              height={200}
+            />
+          </div>
+        </footer>
       </div>
 
       {squadLogoutOpen ? (
