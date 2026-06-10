@@ -14,9 +14,9 @@ import {
   downloadTextFile,
   eventLogsToCsv,
   mergeEventLogs,
+  printEventLogsAsPdf,
   type SquadAlarmLogRow,
   type TocPushLogRow,
-  type UnifiedEventLog,
 } from "@/lib/event-logs";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./event-logs-page.module.css";
@@ -151,44 +151,18 @@ export default function EventLogsPage() {
   }
 
   function exportPdf() {
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    if (!w) {
-      setStatus("Consenti i popup per esportare il PDF.");
+    if (unified.length === 0) {
+      setStatus("Nessun log da esportare.");
       return;
     }
-
-    const rows = unified
-      .map(
-        (r) =>
-          `<tr>
-            <td>${new Date(r.createdAt).toLocaleString("it-IT")}</td>
-            <td>${r.summary}</td>
-            <td>${r.squadCode}</td>
-            <td>${r.squadName}</td>
-            <td>${r.detail}</td>
-            <td>${r.status}</td>
-            <td>${r.actor}</td>
-          </tr>`,
-      )
-      .join("");
-
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/>
-      <title>Log evento gestSQUADRE</title>
-      <style>
-        body{font-family:system-ui,sans-serif;padding:24px;color:#111}
-        h1{font-size:18px} table{width:100%;border-collapse:collapse;font-size:11px}
-        th,td{border:1px solid #ccc;padding:6px;text-align:left;vertical-align:top}
-        th{background:#eee}
-      </style></head><body>
-      <h1>Log evento: ${eventTitle}</h1>
-      <p>Esportato: ${new Date().toLocaleString("it-IT")}</p>
-      <table><thead><tr>
-        <th>Data/ora</th><th>Tipo</th><th>Squadra</th><th>Nome</th>
-        <th>Dettaglio</th><th>Stato</th><th>Operatore</th>
-      </tr></thead><tbody>${rows}</tbody></table>
-      <script>window.onload=function(){window.print();}</script>
-      </body></html>`);
-    w.document.close();
+    const ok = printEventLogsAsPdf(unified, eventTitle);
+    if (!ok) {
+      setStatus("Impossibile avviare la stampa PDF. Riprova con un altro browser.");
+      return;
+    }
+    setStatus(
+      "Finestra di stampa aperta: scegli «Salva come PDF» o «Microsoft Print to PDF».",
+    );
   }
 
   async function clearEventLogs() {
@@ -251,8 +225,8 @@ export default function EventLogsPage() {
 
       <div className={styles.panel}>
         <p className={styles.hint}>
-          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi squadra → TOC + push TOC →
-          squadre
+          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Messaggi e
+          allarmi TOC → volontari (titolo e testo completi)
         </p>
         {status ? <p className={styles.status}>{status}</p> : null}
 
@@ -290,7 +264,7 @@ export default function EventLogsPage() {
                   <th>Data/ora</th>
                   <th>Tipo</th>
                   <th>Squadra</th>
-                  <th>Dettaglio</th>
+                  <th>Dettaglio messaggio</th>
                   <th>Stato</th>
                   <th>Operatore</th>
                 </tr>

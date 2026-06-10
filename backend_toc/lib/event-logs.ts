@@ -51,22 +51,34 @@ export function mergeEventLogs(
       createdAt: a.created_at,
       squadCode: a.squad_code,
       squadName: a.squad_name,
-      summary: "Allarme squadra → TOC",
-      detail: a.message?.trim() || "Chiamata TOC da squadra",
+      summary: "Allarme volontario → TOC",
+      detail: a.message?.trim() || "Richiesta intervento TOC da squadra",
       status: a.acknowledged_at ? "preso in carico" : "attivo",
       actor: a.acknowledged_by?.trim() || "—",
     })),
-    ...pushes.map((p) => ({
-      id: p.id,
-      kind: "toc_push" as const,
-      createdAt: p.created_at,
-      squadCode: p.squad_code?.trim() || "—",
-      squadName: p.squad_name?.trim() || "—",
-      summary: p.is_alarm ? "Push allarme TOC → squadra" : "Push TOC → squadra",
-      detail: `${p.title} — ${p.body}`,
-      status: p.status,
-      actor: p.admin_code,
-    })),
+    ...pushes.map((p) => {
+      const title = p.title?.trim() || "—";
+      const body = p.body?.trim() || "—";
+      const failed = p.status === "failed";
+      const statusLabel = failed
+        ? `fallito${p.error_message?.trim() ? `: ${p.error_message.trim()}` : ""}`
+        : p.status === "sent"
+          ? "inviato"
+          : p.status;
+      return {
+        id: p.id,
+        kind: "toc_push" as const,
+        createdAt: p.created_at,
+        squadCode: p.squad_code?.trim() || "—",
+        squadName: p.squad_name?.trim() || "—",
+        summary: p.is_alarm
+          ? "Allarme TOC → volontario"
+          : "Messaggio TOC → volontario",
+        detail: `Titolo: ${title} · Messaggio: ${body}`,
+        status: statusLabel,
+        actor: p.admin_code,
+      };
+    }),
   ];
 
   return rows.sort(
@@ -115,4 +127,113 @@ export function downloadTextFile(filename: string, content: string, mime: string
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function eventLogsPrintHtml(rows: UnifiedEventLog[], eventTitle: string): string {
+  const exportedAt = new Date().toLocaleString("it-IT");
+  const bodyRows = rows
+    .map(
+      (r) => `<tr>
+        <td>${escapeHtml(new Date(r.createdAt).toLocaleString("it-IT"))}</td>
+        <td>${escapeHtml(r.summary)}</td>
+        <td>${escapeHtml(r.squadCode)}</td>
+        <td>${escapeHtml(r.squadName)}</td>
+        <td>${escapeHtml(r.detail)}</td>
+        <td>${escapeHtml(r.status)}</td>
+        <td>${escapeHtml(r.actor)}</td>
+      </tr>`,
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>Log evento gestSQUADRE</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    body { font-family: system-ui, sans-serif; padding: 16px; color: #111; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    p.meta { font-size: 12px; color: #444; margin: 0 0 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    th, td { border: 1px solid #bbb; padding: 5px 6px; text-align: left; vertical-align: top; }
+    th { background: #eee; font-weight: 700; }
+    td:nth-child(5) { max-width: 280px; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <h1>Log evento: ${escapeHtml(eventTitle)}</h1>
+  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Allarmi volontario↔TOC e messaggi TOC→volontari</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Data/ora</th>
+        <th>Tipo</th>
+        <th>Squadra</th>
+        <th>Nome</th>
+        <th>Dettaglio messaggio</th>
+        <th>Stato</th>
+        <th>Operatore</th>
+      </tr>
+    </thead>
+    <tbody>${bodyRows}</tbody>
+  </table>
+</body>
+</html>`;
+}
+
+/** Apre la finestra di stampa (Salva come PDF) senza popup bloccati. */
+export function printEventLogsAsPdf(
+  rows: UnifiedEventLog[],
+  eventTitle: string,
+): boolean {
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("title", "Export log gestSQUADRE");
+  iframe.style.position = "fixed";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "none";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  document.body.appendChild(iframe);
+
+  const win = iframe.contentWindow;
+  const doc = win?.document;
+  if (!win || !doc) {
+    document.body.removeChild(iframe);
+    return false;
+  }
+
+  doc.open();
+  doc.write(eventLogsPrintHtml(rows, eventTitle));
+  doc.close();
+
+  const triggerPrint = () => {
+    try {
+      win.focus();
+      win.print();
+    } finally {
+      window.setTimeout(() => {
+        if (iframe.parentNode) {
+          iframe.parentNode.removeChild(iframe);
+        }
+      }, 1500);
+    }
+  };
+
+  if (doc.readyState === "complete") {
+    window.setTimeout(triggerPrint, 250);
+  } else {
+    iframe.onload = () => window.setTimeout(triggerPrint, 250);
+  }
+
+  return true;
 }
