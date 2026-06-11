@@ -3,6 +3,7 @@ package com.ansmi.gestsquadre.shared
 import com.ansmi.gestsquadre.shared.map.TocMapRepository
 import com.ansmi.gestsquadre.shared.model.EventInfo
 import com.ansmi.gestsquadre.shared.model.GpsPosition
+import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
 import com.ansmi.gestsquadre.shared.model.SquadSession
@@ -58,4 +59,7 @@ class GestSquadreFacade(
     suspend fun loadMapWaypoints(): List<MapWaypointPin> = mapRepository.loadWaypoints()
 
     suspend fun loadAlarmingSessionIds(): Set<String> = mapRepository.loadAlarmingSessionIds()
+
+    suspend fun loadActiveRouteAssignment(sessionId: String): ActiveRouteAssignment? =
+        mapRepository.loadActiveRouteAssignment(sessionId)
 }

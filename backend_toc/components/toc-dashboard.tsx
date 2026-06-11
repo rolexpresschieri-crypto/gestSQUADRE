@@ -15,6 +15,12 @@ import {
 import { loginTocAdmin, restoreAdminSessionFromStorage } from "@/lib/campo-login";
 import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import {
+  fetchActiveRouteAssignment,
+  fetchMapRoutes,
+  type MapRoute,
+  type SquadRouteAssignment,
+} from "@/lib/map-routes";
+import {
   canManageSquadsForCourse,
   fetchGolfCourseSquadIds,
   fetchLiveSquads,
@@ -74,6 +80,11 @@ export default function TocDashboard() {
   const [pushSending, setPushSending] = useState(false);
   const [pushTargetAll, setPushTargetAll] = useState(true);
   const [pushSelected, setPushSelected] = useState<Record<string, boolean>>({});
+  const [mapRoutes, setMapRoutes] = useState<MapRoute[]>([]);
+  const [pushRouteId, setPushRouteId] = useState("");
+  const [pushTargetWaypointId, setPushTargetWaypointId] = useState("");
+  const [selectedRouteAssignment, setSelectedRouteAssignment] =
+    useState<SquadRouteAssignment | null>(null);
   const [pushHealth, setPushHealth] = useState<{
     supabaseServiceRole: boolean;
     firebaseAdmin: boolean;
@@ -200,6 +211,40 @@ export default function TocDashboard() {
     }
   }, [supabase, golfCourseId]);
 
+  const loadMapRoutes = useCallback(async () => {
+    if (!supabase || !golfCourseId) {
+      setMapRoutes([]);
+      return;
+    }
+    setMapRoutes(await fetchMapRoutes(supabase, golfCourseId));
+  }, [supabase, golfCourseId]);
+
+  const loadSelectedRouteAssignment = useCallback(async () => {
+    if (!supabase || !selectedSessionId) {
+      setSelectedRouteAssignment(null);
+      return;
+    }
+    setSelectedRouteAssignment(
+      await fetchActiveRouteAssignment(supabase, selectedSessionId),
+    );
+  }, [supabase, selectedSessionId]);
+
+  useEffect(() => {
+    void loadMapRoutes();
+  }, [loadMapRoutes]);
+
+  useEffect(() => {
+    void loadSelectedRouteAssignment();
+  }, [loadSelectedRouteAssignment, squads]);
+
+  const pushSingleTarget = useMemo(() => {
+    if (pushTargetAll) {
+      return null;
+    }
+    const picked = squads.filter((s) => pushSelected[s.sessionId]);
+    return picked.length === 1 ? picked[0]! : null;
+  }, [pushTargetAll, pushSelected, squads]);
+
   async function handleDeleteWaypointFromMap(waypoint: SquadWaypoint) {
     if (!supabase || !canEditWaypointsOnMap) {
       return;
@@ -284,6 +329,15 @@ export default function TocDashboard() {
       )
       .subscribe();
 
+    const routeChannel = supabase
+      .channel("gest-route-assignments")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "squad_route_assignments" },
+        () => void loadSelectedRouteAssignment(),
+      )
+      .subscribe();
+
     const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
@@ -291,8 +345,9 @@ export default function TocDashboard() {
       void supabase.removeChannel(squadChannel);
       void supabase.removeChannel(alarmChannel);
       void supabase.removeChannel(wpChannel);
+      void supabase.removeChannel(routeChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -398,6 +453,8 @@ export default function TocDashboard() {
   function openPushModal() {
     setPushTitle(tocPushTextUpper(readStoredPushTitle(TOC_PUSH_TITLE)));
     setPushBody(tocPushTextUpper(readStoredPushBody(TOC_PUSH_BODY)));
+    setPushRouteId(mapRoutes[0]?.id ?? "");
+    setPushTargetWaypointId(waypoints[0]?.id ?? "");
     setPushAlert(null);
     setPushSending(false);
     setPushOpen(true);
@@ -433,7 +490,45 @@ export default function TocDashboard() {
     let fail = 0;
     const errors: string[] = [];
 
+    const selectedRoute =
+      pushRouteId && pushSingleTarget ? mapRoutes.find((r) => r.id === pushRouteId) : null;
+
     for (const squad of targets) {
+      const routeForSquad =
+        selectedRoute && pushSingleTarget?.sessionId === squad.sessionId
+          ? selectedRoute
+          : null;
+
+      if (routeForSquad) {
+        const assignRes = await fetch("/api/assign-route", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session,
+            sessionId: squad.sessionId,
+            routeId: routeForSquad.id,
+            targetWaypointId: pushTargetWaypointId || null,
+          }),
+        });
+        if (!assignRes.ok) {
+          let assignErr = `HTTP ${assignRes.status}`;
+          try {
+            const payload = (await assignRes.json()) as { error?: string };
+            if (payload.error) {
+              assignErr = payload.error;
+            }
+          } catch {
+            /* ignore */
+          }
+          fail += 1;
+          errors.push(`${squad.squadCode}: via — ${assignErr}`);
+          continue;
+        }
+        if (selectedSessionId === squad.sessionId) {
+          await loadSelectedRouteAssignment();
+        }
+      }
+
       const res = await fetch("/api/send-push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -443,6 +538,8 @@ export default function TocDashboard() {
           title,
           body,
           alarm: true,
+          routeCode: routeForSquad?.routeCode,
+          targetWaypointId: pushTargetWaypointId || null,
         }),
       });
       let payload: { error?: string; code?: string } = {};
@@ -621,6 +718,15 @@ export default function TocDashboard() {
             layerMode={layerMode}
             squads={squads}
             waypoints={waypoints}
+            activeRoute={
+              selectedRouteAssignment
+                ? {
+                    routeCode: selectedRouteAssignment.routeCode,
+                    colorHex: selectedRouteAssignment.colorHex,
+                    points: selectedRouteAssignment.points,
+                  }
+                : null
+            }
             alarmingSessionIds={alarmingSessionIds}
             selectedSessionId={selectedSessionId}
             onSelect={(s) => setSelectedSessionId(s.sessionId)}
@@ -903,6 +1009,45 @@ export default function TocDashboard() {
                   </label>
                 ))
               : null}
+            {pushSingleTarget && mapRoutes.length > 0 ? (
+              <>
+                <label className={styles.pushField}>
+                  Via da percorrere (opzionale)
+                  <select
+                    className={styles.pushInput}
+                    value={pushRouteId}
+                    onChange={(e) => setPushRouteId(e.target.value)}
+                  >
+                    <option value="">— Nessuna via —</option>
+                    {mapRoutes.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.routeCode}
+                        {r.routeName !== r.routeCode ? ` — ${r.routeName}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.pushField}>
+                  Target (waypoint)
+                  <select
+                    className={styles.pushInput}
+                    value={pushTargetWaypointId}
+                    onChange={(e) => setPushTargetWaypointId(e.target.value)}
+                  >
+                    <option value="">— Nessun target —</option>
+                    {waypoints.map((wp) => (
+                      <option key={wp.id} value={wp.id}>
+                        {waypointDisplayName(wp)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className={styles.pushHint}>
+                  Con una sola squadra selezionata: assegna la via e mostra solo quella polyline
+                  sulla mappa (TOC e cellulare).
+                </p>
+              </>
+            ) : null}
             <div className={styles.actions} style={{ marginTop: 12 }}>
               <button
                 className={`${styles.btn} ${styles.btnAlarm}`}

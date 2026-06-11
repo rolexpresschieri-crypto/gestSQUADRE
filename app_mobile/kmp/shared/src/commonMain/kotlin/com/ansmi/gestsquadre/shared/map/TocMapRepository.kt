@@ -1,12 +1,16 @@
 package com.ansmi.gestsquadre.shared.map
 
 import com.ansmi.gestsquadre.shared.GestSquadreConfig
+import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
 import com.ansmi.gestsquadre.shared.model.ActiveSquadSummaryRow
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
+import com.ansmi.gestsquadre.shared.model.MapRouteRow
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointRow
+import com.ansmi.gestsquadre.shared.model.RouteAssignmentRow
 import com.ansmi.gestsquadre.shared.model.SquadAlarmSessionRow
 import com.ansmi.gestsquadre.shared.model.toLiveSquadPin
+import com.ansmi.gestsquadre.shared.model.toMapRoutePin
 import com.ansmi.gestsquadre.shared.model.toMapWaypointPin
 import com.ansmi.gestsquadre.shared.network.SupabaseRestClient
 import kotlinx.serialization.Serializable
@@ -61,5 +65,45 @@ class TocMapRepository(
                 limit = 400,
             )
         return rows.mapNotNull { it.toMapWaypointPin() }
+    }
+
+    suspend fun loadActiveRouteAssignment(sessionId: String): ActiveRouteAssignment? {
+        val assignment =
+            rest.getList<RouteAssignmentRow>(
+                table = "squad_route_assignments",
+                select = "id,session_id,route_id,target_waypoint_id",
+                eqFilters = listOf("session_id" to sessionId),
+                isNullColumns = listOf("cleared_at"),
+                limit = 1,
+            ).firstOrNull() ?: return null
+
+        val route =
+            rest.getList<MapRouteRow>(
+                table = "map_routes",
+                select = "id,route_code,route_name,color_hex,points",
+                eqFilters = listOf("id" to assignment.routeId),
+                limit = 1,
+            ).firstOrNull()?.toMapRoutePin() ?: return null
+
+        var targetLabel: String? = null
+        val targetId = assignment.targetWaypointId
+        if (!targetId.isNullOrBlank()) {
+            val wp =
+                rest.getList<MapWaypointRow>(
+                    table = "squad_map_points",
+                    select = "label",
+                    eqFilters = listOf("id" to targetId),
+                    limit = 1,
+                ).firstOrNull()
+            targetLabel = wp?.label
+        }
+
+        return ActiveRouteAssignment(
+            routeCode = route.routeCode,
+            routeName = route.routeName,
+            colorArgb = route.colorArgb,
+            points = route.points,
+            targetLabel = targetLabel,
+        )
     }
 }

@@ -7,10 +7,12 @@ import {
   Circle,
   MapContainer,
   Marker,
+  Polyline,
   Popup,
   TileLayer,
   useMap,
 } from "react-leaflet";
+import type { MapRoutePoint } from "@/lib/map-routes";
 import type { LatLngExpression } from "leaflet";
 import { ALARM_RED } from "@/lib/alarm-styles";
 import { getMapTileConfig, type LayerMode } from "@/lib/map-layers";
@@ -191,6 +193,11 @@ type SquadLiveMapProps = {
   layerMode: LayerMode;
   squads: LiveSquad[];
   waypoints?: SquadWaypoint[];
+  activeRoute?: {
+    routeCode: string;
+    colorHex: string;
+    points: MapRoutePoint[];
+  } | null;
   alarmingSessionIds: ReadonlySet<string>;
   selectedSessionId: string | null;
   onSelect: (squad: LiveSquad) => void;
@@ -204,6 +211,7 @@ export default function SquadLiveMap({
   layerMode,
   squads,
   waypoints = [],
+  activeRoute = null,
   alarmingSessionIds,
   selectedSessionId,
   onSelect,
@@ -231,6 +239,18 @@ export default function SquadLiveMap({
         <LeafletInvalidateOnLayout />
         <MapBoundsController squads={withCoords} waypoints={waypoints} />
         <MapFocusSelected squads={withCoords} selectedSessionId={selectedSessionId} />
+        {activeRoute && activeRoute.points.length >= 2 ? (
+          <Polyline
+            positions={activeRoute.points.map((p) => [p.lat, p.lng] as [number, number])}
+            pathOptions={{
+              color: activeRoute.colorHex,
+              weight: 6,
+              opacity: 0.92,
+              lineCap: "round",
+              lineJoin: "round",
+            }}
+          />
+        ) : null}
         {waypoints.map((wp) => (
           <Marker
             key={`wp-${wp.id}`}

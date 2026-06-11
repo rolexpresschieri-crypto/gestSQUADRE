@@ -51,6 +51,8 @@ export async function POST(request: Request) {
     title?: string;
     body?: string;
     alarm?: boolean;
+    routeCode?: string;
+    targetWaypointId?: string | null;
   };
 
   const adminSessionRaw = payload.session;
@@ -85,7 +87,18 @@ export async function POST(request: Request) {
         ? "MESSAGGIO URGENTE DAL TACTICAL OPERATIONS CENTER."
         : "MESSAGGIO DAL TACTICAL OPERATIONS CENTER.";
   const title = tocPushTextUpper(titleRaw);
-  const bodyText = tocPushTextUpper(bodyRaw);
+  const routeCode =
+    typeof payload.routeCode === "string" ? payload.routeCode.trim().toUpperCase() : "";
+  const targetWaypointId =
+    typeof payload.targetWaypointId === "string" && payload.targetWaypointId.trim()
+      ? payload.targetWaypointId.trim()
+      : "";
+  let bodyText = tocPushTextUpper(bodyRaw);
+  if (routeCode) {
+    bodyText = tocPushTextUpper(
+      bodyRaw.includes(routeCode) ? bodyRaw : `${bodyRaw} — VIA ${routeCode}`,
+    );
+  }
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
@@ -166,6 +179,8 @@ export async function POST(request: Request) {
         type: useAlarm ? "toc_alarm" : "toc_message",
         title,
         body: bodyText,
+        ...(routeCode ? { route_code: routeCode } : {}),
+        ...(targetWaypointId ? { target_waypoint_id: targetWaypointId } : {}),
       },
       android: {
         priority: "high",

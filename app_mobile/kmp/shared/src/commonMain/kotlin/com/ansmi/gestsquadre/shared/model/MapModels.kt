@@ -81,6 +81,62 @@ fun MapWaypointRow.toMapWaypointPin(): MapWaypointPin? {
     )
 }
 
+@Serializable
+data class MapRoutePointRow(
+    val lat: Double,
+    val lng: Double,
+)
+
+@Serializable
+data class MapRouteRow(
+    val id: String,
+    @SerialName("route_code") val routeCode: String,
+    @SerialName("route_name") val routeName: String? = null,
+    @SerialName("color_hex") val colorHex: String? = null,
+    val points: List<MapRoutePointRow> = emptyList(),
+)
+
+@Serializable
+data class RouteAssignmentRow(
+    val id: String,
+    @SerialName("session_id") val sessionId: String,
+    @SerialName("route_id") val routeId: String,
+    @SerialName("target_waypoint_id") val targetWaypointId: String? = null,
+)
+
+data class MapRoutePin(
+    val id: String,
+    val routeCode: String,
+    val routeName: String,
+    val colorArgb: Long,
+    val points: List<Pair<Double, Double>>,
+)
+
+data class ActiveRouteAssignment(
+    val routeCode: String,
+    val routeName: String,
+    val colorArgb: Long,
+    val points: List<Pair<Double, Double>>,
+    val targetLabel: String? = null,
+)
+
+fun MapRouteRow.toMapRoutePin(): MapRoutePin? {
+    val coords =
+        points.mapNotNull { p ->
+            if (p.lat.isFinite() && p.lng.isFinite()) p.lat to p.lng else null
+        }
+    if (coords.size < 2) {
+        return null
+    }
+    return MapRoutePin(
+        id = id,
+        routeCode = routeCode,
+        routeName = routeName?.trim().orEmpty().ifEmpty { routeCode },
+        colorArgb = parseMapColorArgb(colorHex),
+        points = coords,
+    )
+}
+
 fun parseMapColorArgb(raw: String?): Long {
     val value = raw?.trim().orEmpty()
     if (value.length == 7 && value.startsWith("#")) {

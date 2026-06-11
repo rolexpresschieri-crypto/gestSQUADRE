@@ -55,6 +55,7 @@ import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.Polyline
 
 private val EsriWorldImagery =
     object : OnlineTileSourceBase(
@@ -85,7 +86,13 @@ fun TocMapScreen(
     val appContext = context.applicationContext
     val storage = remember { MapViewStorage(appContext) }
     val viewModel: TocMapViewModel =
-        viewModel(factory = TocMapViewModelFactory(facade, appContext))
+        viewModel(
+            factory = TocMapViewModelFactory(
+                facade,
+                appContext,
+                currentSession?.sessionId,
+            ),
+        )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
@@ -156,8 +163,21 @@ fun TocMapScreen(
                             },
                         )
                         val overlays = map.overlays
-                        overlays.removeAll(overlays.filter { it is Marker || it is Polygon })
+                        overlays.removeAll(
+                            overlays.filter { it is Marker || it is Polygon || it is Polyline },
+                        )
                         val selfId = currentSession?.sessionId
+                        uiState.activeRoute?.let { route ->
+                            if (route.points.size >= 2) {
+                                val polyline = Polyline(map)
+                                polyline.setPoints(
+                                    route.points.map { (lat, lng) -> GeoPoint(lat, lng) },
+                                )
+                                polyline.outlinePaint.color = route.colorArgb.toInt()
+                                polyline.outlinePaint.strokeWidth = 12f
+                                overlays.add(polyline)
+                            }
+                        }
                         for (wp in uiState.waypoints) {
                             val marker = Marker(map)
                             marker.position = GeoPoint(wp.latitude, wp.longitude)
@@ -220,13 +240,24 @@ fun TocMapScreen(
                     IconButton(onClick = onClose) {
                         Icon(Icons.Default.Close, contentDescription = "Chiudi", tint = Color.White)
                     }
-                    Text(
-                        text = "TOC — Mappa operativa",
-                        modifier = Modifier.weight(1f),
-                        color = Color.White,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 15.sp,
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "TOC — Mappa operativa",
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp,
+                        )
+                        uiState.activeRoute?.let { route ->
+                            val target = route.targetLabel?.trim().orEmpty()
+                            val suffix = if (target.isNotEmpty()) " → $target" else ""
+                            Text(
+                                text = "Via ${route.routeCode}$suffix",
+                                color = TacticalYellow,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
                     IconButton(
                         onClick = { viewModel.refresh() },
                         enabled = !uiState.loading,

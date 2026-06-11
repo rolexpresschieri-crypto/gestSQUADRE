@@ -9,6 +9,7 @@ import com.ansmi.gestsquadre.kmp.map.MapViewState
 import com.ansmi.gestsquadre.kmp.map.MapViewStorage
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
+import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
 import kotlinx.coroutines.Job
@@ -25,6 +26,7 @@ data class TocMapUiState(
     val error: String? = null,
     val squads: List<LiveSquadPin> = emptyList(),
     val waypoints: List<MapWaypointPin> = emptyList(),
+    val activeRoute: ActiveRouteAssignment? = null,
     val alarmingSessionIds: Set<String> = emptySet(),
     val layerMode: MapLayerMode = MapLayerMode.STANDARD,
     val viewState: MapViewState = MapViewState.DEFAULT,
@@ -34,6 +36,7 @@ data class TocMapUiState(
 class TocMapViewModel(
     private val facade: GestSquadreFacade,
     storage: MapViewStorage,
+    private val focusSessionId: String?,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TocMapUiState())
@@ -69,12 +72,15 @@ class TocMapViewModel(
                 val squads = facade.loadMapSquads()
                 val waypoints = facade.loadMapWaypoints()
                 val alarming = facade.loadAlarmingSessionIds()
+                val activeRoute =
+                    focusSessionId?.let { facade.loadActiveRouteAssignment(it) }
                 _uiState.update {
                     it.copy(
                         loading = false,
                         error = null,
                         squads = squads,
                         waypoints = waypoints,
+                        activeRoute = activeRoute,
                         alarmingSessionIds = alarming,
                     )
                 }
@@ -130,11 +136,16 @@ class TocMapViewModel(
 class TocMapViewModelFactory(
     private val facade: GestSquadreFacade,
     private val appContext: Context,
+    private val focusSessionId: String? = null,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TocMapViewModel::class.java)) {
-            return TocMapViewModel(facade, MapViewStorage(appContext)) as T
+            return TocMapViewModel(
+                facade,
+                MapViewStorage(appContext),
+                focusSessionId,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel: ${modelClass.name}")
     }
