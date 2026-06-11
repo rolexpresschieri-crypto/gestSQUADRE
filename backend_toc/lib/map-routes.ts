@@ -30,14 +30,27 @@ export type SquadRouteAssignment = {
 };
 
 export function parsePoints(raw: unknown): MapRoutePoint[] {
-  if (!Array.isArray(raw)) {
+  let value: unknown = raw;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value) as unknown;
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) {
     return [];
   }
-  return raw
+  return value
     .map((p) => {
-      const row = p as { lat?: unknown; lng?: unknown };
-      const lat = Number(row.lat);
-      const lng = Number(row.lng);
+      const row = p as {
+        lat?: unknown;
+        lng?: unknown;
+        latitude?: unknown;
+        longitude?: unknown;
+      };
+      const lat = Number(row.lat ?? row.latitude);
+      const lng = Number(row.lng ?? row.longitude);
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
         return null;
       }
@@ -111,19 +124,26 @@ export async function fetchActiveRouteAssignment(
   supabase: SupabaseClient,
   sessionId: string,
 ): Promise<SquadRouteAssignment | null> {
-  const map = await fetchActiveRouteAssignmentsForSessions(supabase, [sessionId]);
-  return map.get(sessionId) ?? null;
+  const { assignments } = await fetchActiveRouteAssignmentsForSessions(supabase, [
+    sessionId,
+  ]);
+  return assignments.get(sessionId) ?? null;
 }
+
+export type RouteAssignmentsLoadResult = {
+  assignments: Map<string, SquadRouteAssignment>;
+  error: string | null;
+};
 
 /** Assegnazioni via attive per più sessioni (mappa TOC). */
 export async function fetchActiveRouteAssignmentsForSessions(
   supabase: SupabaseClient,
   sessionIds: string[],
-): Promise<Map<string, SquadRouteAssignment>> {
+): Promise<RouteAssignmentsLoadResult> {
   const result = new Map<string, SquadRouteAssignment>();
   const uniqueIds = [...new Set(sessionIds.filter(Boolean))];
   if (uniqueIds.length === 0) {
-    return result;
+    return { assignments: result, error: null };
   }
 
   const { data: assignments, error: assignmentErr } = await supabase
@@ -133,8 +153,11 @@ export async function fetchActiveRouteAssignmentsForSessions(
     .is("cleared_at", null)
     .order("assigned_at", { ascending: false });
 
-  if (assignmentErr || !assignments?.length) {
-    return result;
+  if (assignmentErr) {
+    return { assignments: result, error: assignmentErr.message };
+  }
+  if (!assignments?.length) {
+    return { assignments: result, error: null };
   }
 
   const latestBySession = new Map<string, Record<string, unknown>>();
@@ -154,7 +177,7 @@ export async function fetchActiveRouteAssignmentsForSessions(
     ),
   ];
   if (routeIds.length === 0) {
-    return result;
+    return { assignments: result, error: null };
   }
 
   const { data: routes, error: routeErr } = await supabase
@@ -162,8 +185,11 @@ export async function fetchActiveRouteAssignmentsForSessions(
     .select("id, route_code, route_name, color_hex, points")
     .in("id", routeIds);
 
-  if (routeErr || !routes?.length) {
-    return result;
+  if (routeErr) {
+    return { assignments: result, error: routeErr.message };
+  }
+  if (!routes?.length) {
+    return { assignments: result, error: "map_routes: nessuna riga per le vie assegnate." };
   }
 
   const routeById = new Map(
@@ -205,7 +231,7 @@ export async function fetchActiveRouteAssignmentsForSessions(
     }
   }
 
-  return result;
+  return { assignments: result, error: null };
 }
 
 export async function clearRouteAssignmentForSession(

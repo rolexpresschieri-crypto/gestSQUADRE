@@ -15,6 +15,10 @@ import { layerOptions, type LayerMode } from "@/lib/map-layers";
 import { readStoredLayerMode, writeStoredLayerMode } from "@/lib/map-layer-storage";
 import type { LiveSquad } from "@/lib/live-squads";
 import {
+  fetchActiveRouteAssignmentsForSessions,
+  type SquadRouteAssignment,
+} from "@/lib/map-routes";
+import {
   fetchActiveEvent,
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
@@ -41,6 +45,9 @@ function MapFullscreenContent() {
   const [waypoints, setWaypoints] = useState<SquadWaypoint[]>([]);
   const [alarmSessionIds, setAlarmSessionIds] = useState<string[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [routeAssignmentsBySession, setRouteAssignmentsBySession] = useState<
+    Map<string, SquadRouteAssignment>
+  >(new Map());
   const [layerMode, setLayerMode] = useState<LayerMode>("standard");
   const [hint, setHint] = useState("");
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -48,6 +55,17 @@ function MapFullscreenContent() {
   const alarmingSessionIds = useMemo(
     () => new Set(alarmSessionIds),
     [alarmSessionIds],
+  );
+
+  const mapActiveRoutes = useMemo(
+    () =>
+      Array.from(routeAssignmentsBySession.values()).map((assignment) => ({
+        routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
+        colorHex: assignment.colorHex,
+        points: assignment.points,
+        highlighted: assignment.sessionId === selectedSessionId,
+      })),
+    [routeAssignmentsBySession, selectedSessionId],
   );
 
   const canManageWaypoints = session?.role === "admin";
@@ -108,6 +126,24 @@ function MapFullscreenContent() {
     );
   }, [supabase, golfCourseId]);
 
+  const loadRouteAssignments = useCallback(async () => {
+    if (!supabase || squads.length === 0) {
+      setRouteAssignmentsBySession(new Map());
+      return;
+    }
+    const { assignments } = await fetchActiveRouteAssignmentsForSessions(
+      supabase,
+      squads.map((s) => s.sessionId),
+    );
+    setRouteAssignmentsBySession(assignments);
+    if (!selectedSessionId) {
+      const firstWithRoute = squads.find((s) => assignments.has(s.sessionId));
+      if (firstWithRoute) {
+        setSelectedSessionId(firstWithRoute.sessionId);
+      }
+    }
+  }, [supabase, selectedSessionId, squads]);
+
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
       setActiveEventId(null);
@@ -153,12 +189,17 @@ function MapFullscreenContent() {
   }
 
   useEffect(() => {
+    void loadRouteAssignments();
+  }, [loadRouteAssignments, squads]);
+
+  useEffect(() => {
     if (!session || !supabase) {
       return;
     }
     void loadSquads();
     void loadActiveAlarms();
     void loadActiveEventAndWaypoints();
+    void loadRouteAssignments();
 
     const ch1 = supabase
       .channel("gest-fs-sessions")
@@ -187,15 +228,35 @@ function MapFullscreenContent() {
       )
       .subscribe();
 
-    const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
+    const ch4 = supabase
+      .channel("gest-fs-route-assignments")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "squad_route_assignments" },
+        () => void loadRouteAssignments(),
+      )
+      .subscribe();
+
+    const timer = window.setInterval(() => {
+      void loadSquads();
+      void loadRouteAssignments();
+    }, MAP_SQUAD_POLL_MS);
 
     return () => {
       window.clearInterval(timer);
       void supabase.removeChannel(ch1);
       void supabase.removeChannel(ch2);
       void supabase.removeChannel(ch3);
+      void supabase.removeChannel(ch4);
     };
-  }, [session, supabase, loadSquads, loadActiveAlarms, loadActiveEventAndWaypoints]);
+  }, [
+    session,
+    supabase,
+    loadSquads,
+    loadActiveAlarms,
+    loadActiveEventAndWaypoints,
+    loadRouteAssignments,
+  ]);
 
   function toggleBrowserFullscreen() {
     const el = mapRef.current;
@@ -305,6 +366,7 @@ function MapFullscreenContent() {
           layerMode={layerMode}
           squads={squads}
           waypoints={waypoints}
+          activeRoutes={mapActiveRoutes}
           alarmingSessionIds={alarmingSessionIds}
           selectedSessionId={selectedSessionId}
           onSelect={(s) => setSelectedSessionId(s.sessionId)}

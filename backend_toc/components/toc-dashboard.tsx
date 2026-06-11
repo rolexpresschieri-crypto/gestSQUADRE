@@ -16,7 +16,6 @@ import { loginTocAdmin, restoreAdminSessionFromStorage } from "@/lib/campo-login
 import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import {
   clearRouteAssignmentForSession,
-  fetchActiveRouteAssignment,
   fetchActiveRouteAssignmentsForSessions,
   fetchMapRoutes,
   type MapRoute,
@@ -87,6 +86,9 @@ export default function TocDashboard() {
   const [pushTargetWaypointId, setPushTargetWaypointId] = useState("");
   const [selectedRouteAssignment, setSelectedRouteAssignment] =
     useState<SquadRouteAssignment | null>(null);
+  const [routeAssignmentsBySession, setRouteAssignmentsBySession] = useState<
+    Map<string, SquadRouteAssignment>
+  >(new Map());
   const [pushHealth, setPushHealth] = useState<{
     supabaseServiceRole: boolean;
     firebaseAdmin: boolean;
@@ -115,6 +117,17 @@ export default function TocDashboard() {
     }
     return ids;
   }, [alarms]);
+
+  const mapActiveRoutes = useMemo(
+    () =>
+      Array.from(routeAssignmentsBySession.values()).map((assignment) => ({
+        routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
+        colorHex: assignment.colorHex,
+        points: assignment.points,
+        highlighted: assignment.sessionId === selectedSessionId,
+      })),
+    [routeAssignmentsBySession, selectedSessionId],
+  );
 
   useEffect(() => {
     setLayerMode(readStoredLayerMode());
@@ -223,25 +236,31 @@ export default function TocDashboard() {
 
   const loadSelectedRouteAssignment = useCallback(async () => {
     if (!supabase || squads.length === 0) {
+      setRouteAssignmentsBySession(new Map());
       setSelectedRouteAssignment(null);
       return;
     }
     const sessionIds = squads.map((s) => s.sessionId);
-    const assignments = await fetchActiveRouteAssignmentsForSessions(
+    const { assignments, error } = await fetchActiveRouteAssignmentsForSessions(
       supabase,
       sessionIds,
     );
-    const activeSessionId =
-      selectedSessionId && assignments.has(selectedSessionId)
+    setRouteAssignmentsBySession(assignments);
+    if (error) {
+      setStatusMessage(`Via mappa: ${error}`);
+    }
+    const routeSessionId =
+      (selectedSessionId && assignments.has(selectedSessionId)
         ? selectedSessionId
-        : selectedSessionId ??
-          sessionIds.find((id) => assignments.has(id)) ??
-          null;
-    if (!selectedSessionId && activeSessionId) {
-      setSelectedSessionId(activeSessionId);
+        : null) ??
+      sessionIds.find((id) => assignments.has(id)) ??
+      selectedSessionId ??
+      null;
+    if (!selectedSessionId && routeSessionId && assignments.has(routeSessionId)) {
+      setSelectedSessionId(routeSessionId);
     }
     setSelectedRouteAssignment(
-      activeSessionId ? (assignments.get(activeSessionId) ?? null) : null,
+      routeSessionId ? (assignments.get(routeSessionId) ?? null) : null,
     );
   }, [supabase, selectedSessionId, squads]);
 
@@ -466,9 +485,6 @@ export default function TocDashboard() {
       supabase,
       alarm.session_id,
     );
-    if (selectedSessionId === alarm.session_id) {
-      setSelectedRouteAssignment(null);
-    }
     await loadAlarms();
     await loadSelectedRouteAssignment();
     setStatusMessage(
@@ -553,11 +569,6 @@ export default function TocDashboard() {
           continue;
         }
         setSelectedSessionId(squad.sessionId);
-        if (supabase) {
-          setSelectedRouteAssignment(
-            await fetchActiveRouteAssignment(supabase, squad.sessionId),
-          );
-        }
       }
 
       const res = await fetch("/api/send-push", {
@@ -590,6 +601,9 @@ export default function TocDashboard() {
       }
     }
     setPushSending(false);
+    if (ok > 0) {
+      await loadSelectedRouteAssignment();
+    }
     if (fail === 0) {
       writeStoredPushMessage(title, body);
       setPushOpen(false);
@@ -748,12 +762,19 @@ export default function TocDashboard() {
                 ))}
               </select>
             </label>
-            {selectedSessionId && selectedRouteAssignment ? (
+            {mapActiveRoutes.length > 0 ? (
               <span className={styles.pushHint}>
-                Via attiva: <strong>{selectedRouteAssignment.routeCode}</strong>
-                {selectedRouteAssignment.targetLabel
-                  ? ` → ${selectedRouteAssignment.targetLabel}`
-                  : ""}
+                Vie attive: <strong>{mapActiveRoutes.length}</strong>
+                {selectedRouteAssignment ? (
+                  <>
+                    {" "}
+                    — selezionata{" "}
+                    <strong>{selectedRouteAssignment.routeCode}</strong>
+                    {selectedRouteAssignment.targetLabel
+                      ? ` → ${selectedRouteAssignment.targetLabel}`
+                      : ""}
+                  </>
+                ) : null}
               </span>
             ) : selectedSessionId ? (
               <span className={styles.pushHint} style={{ color: "#ffb74d" }}>
@@ -765,24 +786,14 @@ export default function TocDashboard() {
             layerMode={layerMode}
             squads={squads}
             waypoints={waypoints}
-            activeRoute={
-              selectedRouteAssignment
-                ? {
-                    routeCode: selectedRouteAssignment.routeCode,
-                    colorHex: selectedRouteAssignment.colorHex,
-                    points: selectedRouteAssignment.points,
-                  }
-                : null
-            }
+            activeRoutes={mapActiveRoutes}
             alarmingSessionIds={alarmingSessionIds}
             selectedSessionId={selectedSessionId}
             onSelect={(s) => {
               setSelectedSessionId(s.sessionId);
-              if (supabase) {
-                void fetchActiveRouteAssignment(supabase, s.sessionId).then(
-                  setSelectedRouteAssignment,
-                );
-              }
+              setSelectedRouteAssignment(
+                routeAssignmentsBySession.get(s.sessionId) ?? null,
+              );
             }}
             canManageWaypoints={canEditWaypointsOnMap && Boolean(activeEventId)}
             onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}

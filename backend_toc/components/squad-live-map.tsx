@@ -77,14 +77,20 @@ function squadDivIcon(
   });
 }
 
+type DrawnRoute = {
+  routeCode: string;
+  colorHex: string;
+  points: MapRoutePoint[];
+};
+
 function MapBoundsController({
   squads,
   waypoints,
-  activeRoute,
+  activeRoutes,
 }: {
   squads: LiveSquad[];
   waypoints: SquadWaypoint[];
-  activeRoute?: SquadLiveMapProps["activeRoute"];
+  activeRoutes: DrawnRoute[];
 }) {
   const map = useMap();
   const lastBoundsSignatureRef = useRef<string | null>(null);
@@ -99,12 +105,16 @@ function MapBoundsController({
       .map((w) => w.id)
       .sort()
       .join("|");
-    const routePart =
-      activeRoute?.points
-        .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
-        .join("|") ?? "";
+    const routePart = activeRoutes
+      .map(
+        (route) =>
+          `${route.routeCode}:${route.points
+            .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
+            .join(";")}`,
+      )
+      .join("|");
     return `${squadPart}#${wpPart}#${routePart}`;
-  }, [squads, waypoints, activeRoute]);
+  }, [squads, waypoints, activeRoutes]);
 
   const points = useMemo(() => {
     const squadPts = squads
@@ -113,10 +123,11 @@ function MapBoundsController({
     const wpPts = waypoints.map(
       (w) => [w.latitude, w.longitude] as [number, number],
     );
-    const routePts =
-      activeRoute?.points.map((p) => [p.lat, p.lng] as [number, number]) ?? [];
+    const routePts = activeRoutes.flatMap((route) =>
+      route.points.map((p) => [p.lat, p.lng] as [number, number]),
+    );
     return [...squadPts, ...wpPts, ...routePts];
-  }, [squads, waypoints, activeRoute]);
+  }, [squads, waypoints, activeRoutes]);
 
   useEffect(() => {
     if (!boundsSignature) {
@@ -171,49 +182,41 @@ function MapFocusSelected({
   return null;
 }
 
-function RoutePolylinePane() {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map.getPane("routePolylinePane")) {
-      const pane = map.createPane("routePolylinePane");
-      pane.style.zIndex = "620";
-    }
-  }, [map]);
-
-  return null;
-}
-
 function ActiveRoutePolylines({
-  activeRoute,
+  route,
+  highlighted = false,
 }: {
-  activeRoute: NonNullable<SquadLiveMapProps["activeRoute"]>;
+  route: DrawnRoute;
+  highlighted?: boolean;
 }) {
-  const positions = activeRoute.points.map(
+  if (route.points.length < 2) {
+    return null;
+  }
+  const positions = route.points.map(
     (p) => [p.lat, p.lng] as [number, number],
   );
+  const haloWeight = highlighted ? 12 : 9;
+  const lineWeight = highlighted ? 7 : 5;
 
   return (
     <>
       <Polyline
-        key={`${activeRoute.routeCode}-halo`}
+        key={`${route.routeCode}-halo`}
         positions={positions}
-        pane="routePolylinePane"
         pathOptions={{
           color: "#ffffff",
-          weight: 10,
+          weight: haloWeight,
           opacity: 0.95,
           lineCap: "round",
           lineJoin: "round",
         }}
       />
       <Polyline
-        key={`${activeRoute.routeCode}-line`}
+        key={`${route.routeCode}-line`}
         positions={positions}
-        pane="routePolylinePane"
         pathOptions={{
-          color: activeRoute.colorHex,
-          weight: 6,
+          color: route.colorHex,
+          weight: lineWeight,
           opacity: 0.98,
           lineCap: "round",
           lineJoin: "round",
@@ -258,6 +261,12 @@ type SquadLiveMapProps = {
     colorHex: string;
     points: MapRoutePoint[];
   } | null;
+  activeRoutes?: Array<{
+    routeCode: string;
+    colorHex: string;
+    points: MapRoutePoint[];
+    highlighted?: boolean;
+  }>;
   alarmingSessionIds: ReadonlySet<string>;
   selectedSessionId: string | null;
   onSelect: (squad: LiveSquad) => void;
@@ -272,6 +281,7 @@ export default function SquadLiveMap({
   squads,
   waypoints = [],
   activeRoute = null,
+  activeRoutes = [],
   alarmingSessionIds,
   selectedSessionId,
   onSelect,
@@ -282,6 +292,15 @@ export default function SquadLiveMap({
 }: SquadLiveMapProps) {
   const withCoords = squads.filter(hasCoordinates);
   const tile = getMapTileConfig(layerMode);
+  const routesToDraw = useMemo(() => {
+    if (activeRoutes.length > 0) {
+      return activeRoutes.filter((route) => route.points.length >= 2);
+    }
+    if (activeRoute && activeRoute.points.length >= 2) {
+      return [{ ...activeRoute, highlighted: true }];
+    }
+    return [];
+  }, [activeRoute, activeRoutes]);
 
   return (
     <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
@@ -297,11 +316,10 @@ export default function SquadLiveMap({
           url={tile.url}
         />
         <LeafletInvalidateOnLayout />
-        <RoutePolylinePane />
         <MapBoundsController
           squads={withCoords}
           waypoints={waypoints}
-          activeRoute={activeRoute}
+          activeRoutes={routesToDraw}
         />
         <MapFocusSelected squads={withCoords} selectedSessionId={selectedSessionId} />
         {waypoints.map((wp) => (
@@ -388,9 +406,13 @@ export default function SquadLiveMap({
             </Fragment>
           );
         })}
-        {activeRoute && activeRoute.points.length >= 2 ? (
-          <ActiveRoutePolylines activeRoute={activeRoute} />
-        ) : null}
+        {routesToDraw.map((route) => (
+          <ActiveRoutePolylines
+            key={route.routeCode}
+            route={route}
+            highlighted={route.highlighted}
+          />
+        ))}
       </MapContainer>
     </div>
   );
