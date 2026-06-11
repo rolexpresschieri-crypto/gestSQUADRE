@@ -1,6 +1,7 @@
 package com.ansmi.gestsquadre.kmp.ui.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,7 +19,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
@@ -32,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ansmi.gestsquadre.kmp.R
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalFrame
+import com.ansmi.gestsquadre.kmp.ui.theme.TacticalNavy
 
 private val WhiteTextShadow = TextStyle(
     shadow = Shadow(color = Color.Black, blurRadius = 8f),
@@ -68,10 +70,11 @@ fun TacticalShell(
             shape = RoundedCornerShape(42.dp),
             color = Color.Transparent,
         ) {
-            Box(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 content()
             }
@@ -116,14 +119,20 @@ fun OpenGolfLogoBanner(
     width: Float? = null,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val resolvedWidth = width ?: (maxWidth.value * 0.92f).coerceAtMost(260f)
         val aspect = 840f / 200f
-        val heightDp = (resolvedWidth / aspect).dp
+        val bannerModifier =
+            if (width == null) {
+                Modifier.fillMaxWidth()
+            } else {
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .width(width.dp)
+            }
+        val imageWidth = width ?: maxWidth.value
+        val heightDp = (imageWidth / aspect).dp
         Surface(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .width(resolvedWidth.dp)
-                .shadow(10.dp, RoundedCornerShape(10.dp))
+            modifier = bannerModifier
+                .shadow(6.dp, RoundedCornerShape(10.dp), clip = true)
                 .clip(RoundedCornerShape(10.dp)),
             color = Color.White,
             shape = RoundedCornerShape(10.dp),
@@ -132,11 +141,11 @@ fun OpenGolfLogoBanner(
                 painter = painterResource(R.drawable.logo_open_golf_2026),
                 contentDescription = "Open d'Italia 2026",
                 modifier = Modifier
-                    .padding(start = 5.dp, end = 11.dp, top = 5.dp, bottom = 5.dp)
-                    .width((resolvedWidth - 16f).dp)
-                    .height(heightDp + 4.dp),
-                contentScale = ContentScale.FillWidth,
-                alignment = BiasAlignment(-0.1f, 0f),
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 7.dp)
+                    .height(heightDp),
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.Center,
             )
         }
     }
@@ -180,6 +189,36 @@ fun TacticalTitleText(
         textAlign = TextAlign.Center,
         style = WhiteTitleStyle.copy(fontSize = fontSize.sp),
     )
+}
+
+@Composable
+fun TocNotificationPanel(
+    message: String?,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = 72.dp)
+                .background(TacticalNavy, RoundedCornerShape(10.dp))
+                .border(1.dp, Color.White.copy(alpha = 0.28f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (!message.isNullOrBlank()) {
+            Text(
+                text = message,
+                textAlign = TextAlign.Center,
+                style =
+                    WhiteBodyStyle.copy(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    ),
+            )
+        }
+    }
 }
 
 @Composable

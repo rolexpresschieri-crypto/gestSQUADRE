@@ -12,9 +12,11 @@ import androidx.core.content.ContextCompat
 import com.ansmi.gestsquadre.kmp.BuildConfig
 import com.ansmi.gestsquadre.kmp.R
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
+import com.ansmi.gestsquadre.shared.GestSquadreException
 import com.ansmi.gestsquadre.shared.model.SquadSession
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
 class FcmManager(
@@ -31,14 +33,10 @@ class FcmManager(
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             return true
         }
-        if (ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            return true
-        }
-        return false
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     suspend fun registerToken(
@@ -48,32 +46,47 @@ class FcmManager(
         if (!isConfigured) {
             return "Push TOC disabilitata: configura FIREBASE_* in dart-defines.json."
         }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) != PackageManager.PERMISSION_GRANTED
+            !ensureNotificationPermission()
         ) {
             return "Consenti le notifiche, poi logout/login."
         }
 
-        var token =
-            runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull()
-        if (token.isNullOrBlank()) {
-            kotlinx.coroutines.delay(2_000)
-            token =
-                runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull()
-        }
-        if (token.isNullOrBlank()) {
-            return "Token push non ottenuto: consenti notifiche, poi logout/login."
+        var lastError: String? = null
+        repeat(3) { attempt ->
+            val token =
+                runCatching { FirebaseMessaging.getInstance().token.await() }
+                    .fold(
+                        onSuccess = { it },
+                        onFailure = { error ->
+                            lastError = error.message ?: "Errore token Firebase."
+                            null
+                        },
+                    )
+
+            if (!token.isNullOrBlank()) {
+                return try {
+                    facade.registerFcmToken(
+                        sessionId = session.sessionId,
+                        squadId = session.squadId,
+                        token = token,
+                    )
+                    null
+                } catch (e: GestSquadreException) {
+                    e.message ?: "Errore salvataggio token push su Supabase."
+                } catch (e: Exception) {
+                    e.message ?: "Errore salvataggio token push su Supabase."
+                }
+            }
+
+            if (attempt < 2) {
+                delay(2_000L)
+            }
         }
 
-        facade.registerFcmToken(
-            sessionId = session.sessionId,
-            squadId = session.squadId,
-            token = token,
-        )
-        return null
+        return lastError
+            ?: "Token push non ottenuto: verifica Firebase (app KMP) e notifiche, poi logout/login."
     }
 
     fun showLocalNotification(

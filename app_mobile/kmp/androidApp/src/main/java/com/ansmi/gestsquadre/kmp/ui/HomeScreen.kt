@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,11 +41,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ansmi.gestsquadre.kmp.ui.components.AppTitleBlock
 import com.ansmi.gestsquadre.kmp.ui.components.MainButton
 import com.ansmi.gestsquadre.kmp.ui.components.TacticalBodyText
+import com.ansmi.gestsquadre.kmp.ui.components.TocNotificationPanel
 import com.ansmi.gestsquadre.kmp.ui.components.TacticalShell
 import com.ansmi.gestsquadre.kmp.ui.theme.GlobalAppBackground
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalDisabled
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalGreen
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalMuted
+import com.ansmi.gestsquadre.kmp.ui.theme.TacticalNavy
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalRed
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
@@ -232,128 +235,159 @@ fun HomeScreen(
         )
     }
 
-    TacticalShell {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            AppTitleBlock()
-            Spacer(modifier = Modifier.height(24.dp))
+    val scrollState = rememberScrollState()
+    val showScrollHint by remember {
+        derivedStateOf { scrollState.canScrollForward }
+    }
 
-            uiState.bannerMessage?.let { msg ->
-                TacticalBodyText(text = msg, modifier = Modifier.padding(bottom = 12.dp))
-            }
-            uiState.lastTocMessage?.let { msg ->
-                TacticalBodyText(text = msg, modifier = Modifier.padding(bottom = 12.dp))
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            val squadBoxColor = if (isLogged) TacticalGreen else Color.Black.copy(alpha = 0.48f)
-            val squadBorderColor = Color.White.copy(alpha = if (isLogged) 0.35f else 0.55f)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState)
+                .padding(bottom = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        TacticalShell {
             Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .background(squadBoxColor, RoundedCornerShape(12.dp))
-                        .border(1.dp, squadBorderColor, RoundedCornerShape(12.dp))
-                        .padding(16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    text =
-                        if (isLogged) {
-                            "${session!!.squadName} + ${session.loginTimeLabel()}"
-                        } else {
-                            "Nessuna squadra loggata"
-                        },
-                    textAlign = TextAlign.Center,
-                    style =
-                        TextStyle(
-                            color = Color.White,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 17.sp,
-                        ),
-                )
-            }
+                AppTitleBlock()
+                Spacer(modifier = Modifier.height(24.dp))
 
-            if (isLogged) {
-                Spacer(modifier = Modifier.height(14.dp))
-                uiState.gpsStatusLabel?.let { label ->
+                uiState.bannerMessage?.let { msg ->
+                    TacticalBodyText(text = msg, modifier = Modifier.padding(bottom = 12.dp))
+                }
+
+                TocNotificationPanel(
+                    message = uiState.lastTocMessage,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+
+                MainButton(
+                    label = "Reset notifica",
+                    backgroundColor = TacticalNavy,
+                    foregroundColor = Color.White,
+                    onClick = { viewModel.clearLastTocMessage() },
+                    modifier = Modifier.padding(bottom = 20.dp),
+                    fontWeight = FontWeight.Bold,
+                )
+
+                val squadBoxColor = if (isLogged) TacticalGreen else Color.Black.copy(alpha = 0.48f)
+                val squadBorderColor = Color.White.copy(alpha = if (isLogged) 0.35f else 0.55f)
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(squadBoxColor, RoundedCornerShape(12.dp))
+                            .border(1.dp, squadBorderColor, RoundedCornerShape(12.dp))
+                            .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        text =
+                            if (isLogged) {
+                                "${session!!.squadName} + ${session.loginTimeLabel()}"
+                            } else {
+                                "Nessuna squadra loggata"
+                            },
+                        textAlign = TextAlign.Center,
+                        style =
+                            TextStyle(
+                                color = Color.White,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 17.sp,
+                            ),
+                    )
+                }
+
+                if (isLogged) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    uiState.gpsStatusLabel?.let { label ->
+                        TacticalBodyText(
+                            text = label,
+                            fontSize = 13,
+                            color = gpsLabelColor(uiState.lastGpsAccuracyM),
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                     TacticalBodyText(
-                        text = label,
+                        text = SquadAlarmHint,
                         fontSize = 13,
-                        color = gpsLabelColor(uiState.lastGpsAccuracyM),
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
                 }
-                TacticalBodyText(
-                    text = SquadAlarmHint,
-                    fontSize = 13,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-            }
 
-            Spacer(modifier = Modifier.height(18.dp))
-            if (uiState.isBusy) {
-                LinearProgressIndicator(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = TacticalYellow,
+                Spacer(modifier = Modifier.height(18.dp))
+                if (uiState.isBusy) {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = TacticalYellow,
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+
+                MainButton(
+                    label = "Log-in",
+                    backgroundColor = if (isLogged) TacticalDisabled else TacticalGreen,
+                    foregroundColor = if (isLogged) TacticalMuted else Color.White,
+                    onClick = if (!isLogged && !uiState.isBusy && !uiState.isInitializing) onNavigateLogin else null,
                 )
                 Spacer(modifier = Modifier.height(18.dp))
-            }
 
-            MainButton(
-                label = "Log-in",
-                backgroundColor = if (isLogged) TacticalDisabled else TacticalGreen,
-                foregroundColor = if (isLogged) TacticalMuted else Color.White,
-                onClick = if (!isLogged && !uiState.isBusy && !uiState.isInitializing) onNavigateLogin else null,
-            )
-            Spacer(modifier = Modifier.height(18.dp))
-
-            MainButton(
-                label = "Log-out",
-                backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
-                foregroundColor = if (isLogged) Color.White else TacticalMuted,
-                onClick =
-                    if (isLogged) {
-                        {
-                            viewModel.logout { err ->
-                                err?.let(onShowMessage)
+                MainButton(
+                    label = "Log-out",
+                    backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
+                    foregroundColor = if (isLogged) Color.White else TacticalMuted,
+                    onClick =
+                        if (isLogged) {
+                            {
+                                viewModel.logout { err ->
+                                    err?.let(onShowMessage)
+                                }
                             }
-                        }
-                    } else {
-                        null
-                    },
-            )
-            Spacer(modifier = Modifier.height(18.dp))
+                        } else {
+                            null
+                        },
+                )
+                Spacer(modifier = Modifier.height(18.dp))
 
-            MainButton(
-                label = "INVIA ALLARME A TOC",
-                backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
-                foregroundColor = if (isLogged) Color.White else TacticalMuted,
-                fontWeight = FontWeight.Black,
-                onClick = if (isLogged) { { showAlarmDialog = true } } else null,
-            )
-            Spacer(modifier = Modifier.height(18.dp))
+                MainButton(
+                    label = "INVIA ALLARME A TOC",
+                    backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
+                    foregroundColor = if (isLogged) Color.White else TacticalMuted,
+                    fontWeight = FontWeight.Black,
+                    onClick = if (isLogged) { { showAlarmDialog = true } } else null,
+                )
+                Spacer(modifier = Modifier.height(18.dp))
 
-            MainButton(
-                label = "Tactical Operations Center",
-                backgroundColor = TacticalYellow,
-                foregroundColor = Color.Black,
-                onClick =
-                    if (uiState.isBusy || uiState.isInitializing) {
-                        null
-                    } else if (!uiState.backendConfigured) {
-                        {
-                            onShowMessage("Mappa TOC: configura SUPABASE_* in dart-defines.json.")
-                        }
-                    } else {
-                        onNavigateMap
-                    },
+                MainButton(
+                    label = "Tactical Operations Center",
+                    backgroundColor = TacticalYellow,
+                    foregroundColor = Color.Black,
+                    onClick =
+                        if (uiState.isBusy || uiState.isInitializing) {
+                            null
+                        } else if (!uiState.backendConfigured) {
+                            {
+                                onShowMessage("Mappa TOC: configura SUPABASE_* in dart-defines.json.")
+                            }
+                        } else {
+                            onNavigateMap
+                        },
+                )
+            }
+        }
+
+        if (showScrollHint) {
+            Text(
+                text = "▼",
+                modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+                color = Color.White.copy(alpha = 0.72f),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
             )
         }
     }

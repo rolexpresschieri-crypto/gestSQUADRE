@@ -47,8 +47,8 @@ fun LaunchSplashScreen() {
         )
     }
 
-    val logoScale = 0.30f + (0.58f * progress.value)
-    val logoAlignY = -0.72f + (0.38f * progress.value)
+    val logoScale = 0.34f + (0.68f * progress.value)
+    val logoAlignY = -0.74f + (0.36f * progress.value)
     val titleAlpha =
         when {
             progress.value < 0.24f -> 0f
@@ -69,7 +69,7 @@ fun LaunchSplashScreen() {
         ) {
             OpenGolfLogoBanner(
                 modifier = Modifier.scale(logoScale),
-                width = 268f,
+                width = 286f,
             )
         }
         Text(

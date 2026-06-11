@@ -23,7 +23,7 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
 
-        android:label="gestSQUADRE KMP dev"
+        android:label="gestSQUADRE"
 
         android:supportsRtl="true"
 
