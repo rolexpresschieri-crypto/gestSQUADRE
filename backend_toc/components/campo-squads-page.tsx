@@ -11,6 +11,7 @@ import {
   canManageSquadsForCourse,
   deleteSquadForCourse,
 } from "@/lib/golf-course-scope";
+import { printSquadsAsPdf, type SquadExportRow } from "@/lib/squad-export";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./campo-squads-page.module.css";
 
@@ -163,6 +164,29 @@ export default function CampoSquadsPage() {
     }
   }
 
+  function exportSquadsPdf() {
+    if (squads.length === 0) {
+      setFormError("Nessuna squadra da esportare.");
+      return;
+    }
+    const courseLabel = session?.golfCourseName || session?.golfCourseCode || "Campo";
+    const courseCode = session?.golfCourseCode || "—";
+    const rows: SquadExportRow[] = squads.map((row) => ({
+      squadCode: row.squad_code.toUpperCase(),
+      squadName: row.squad_name,
+      password: row.password_hash,
+      isEnabled: row.is_enabled,
+      mapColor: row.map_color,
+    }));
+    const ok = printSquadsAsPdf(rows, courseLabel, courseCode);
+    if (!ok) {
+      setFormError("Impossibile avviare la stampa PDF. Riprova con un altro browser.");
+      return;
+    }
+    setFormError(null);
+    setToast("Stampa PDF: scegli «Salva come PDF» o «Microsoft Print to PDF».");
+  }
+
   async function handleToggleEnabled(row: SquadRow) {
     const golfCourseId = session?.golfCourseId;
     if (!supabase || !golfCourseId) {
@@ -282,12 +306,22 @@ export default function CampoSquadsPage() {
 
           <section className={styles.panel}>
             <div className={styles.panelHeader}>
-              <h2>Anagrafica squadre</h2>
-              <p>
-                Le squadre create qui sono legate al campo{" "}
-                <strong>{session.golfCourseCode}</strong>{" "}
-                e possono fare login dall&apos;app mobile.
-              </p>
+              <div className={styles.panelHeaderText}>
+                <h2>Anagrafica squadre</h2>
+                <p>
+                  Le squadre create qui sono legate al campo{" "}
+                  <strong>{session.golfCourseCode}</strong>{" "}
+                  e possono fare login dall&apos;app mobile.
+                </p>
+              </div>
+              <button
+                type="button"
+                className={styles.btnExportPdf}
+                onClick={exportSquadsPdf}
+                disabled={loading || busy || squads.length === 0}
+              >
+                Esporta PDF
+              </button>
             </div>
 
             {formError ? <p className={styles.error}>{formError}</p> : null}

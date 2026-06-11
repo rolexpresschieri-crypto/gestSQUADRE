@@ -68,6 +68,16 @@
 .panelHeader {
   padding: 14px 18px;
   border-bottom: 1px solid #203667;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.panelHeaderText {
+  flex: 1;
+  min-width: 200px;
 }
 
 .panelHeader h2 {
@@ -79,6 +89,23 @@
   margin: 0;
   font-size: 13px;
   color: #9baccc;
+}
+
+.btnExportPdf {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #e0be3a;
+  color: #1a1200;
+  font-weight: 800;
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btnExportPdf:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .form {
