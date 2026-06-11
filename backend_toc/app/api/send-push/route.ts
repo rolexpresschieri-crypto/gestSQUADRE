@@ -158,20 +158,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Solo payload data: con notification+data Android in background non chiama
+    // onMessageReceived e il messaggio non finisce nel pannello blu in app.
     const messageId = await messaging.send({
       token,
-      notification: { title, body: bodyText },
       data: {
         type: useAlarm ? "toc_alarm" : "toc_message",
+        title,
+        body: bodyText,
       },
       android: {
         priority: "high",
-        notification: {
-          channelId: useAlarm ? ANDROID_ALARM_CHANNEL_ID : "gest_squadre_alerts",
-          icon: "ic_stat_notification",
-          defaultVibrateTimings: true,
-          ...(useAlarm ? { sound: ANDROID_ALARM_SOUND } : {}),
-        },
       },
     });
     await writePushLog("sent", { fcmMessageId: messageId });
