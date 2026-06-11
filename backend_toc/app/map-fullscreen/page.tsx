@@ -19,6 +19,7 @@ import {
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
 import { brandBackgroundCss } from "@/lib/brand-colors";
+import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import { waypointDisplayName, type SquadWaypoint } from "@/lib/waypoints";
 import "@/components/squad-live-map.css";
 
@@ -186,7 +187,7 @@ function MapFullscreenContent() {
       )
       .subscribe();
 
-    const timer = window.setInterval(() => void loadSquads(), 15000);
+    const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
       window.clearInterval(timer);

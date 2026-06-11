@@ -13,6 +13,7 @@ import {
   type AdminSessionData,
 } from "@/lib/admin-auth";
 import { loginTocAdmin, restoreAdminSessionFromStorage } from "@/lib/campo-login";
+import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import {
   canManageSquadsForCourse,
   fetchGolfCourseSquadIds,
@@ -283,7 +284,7 @@ export default function TocDashboard() {
       )
       .subscribe();
 
-    const timer = window.setInterval(() => void loadSquads(), 20000);
+    const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
       window.clearInterval(timer);
@@ -823,8 +824,8 @@ export default function TocDashboard() {
                     {" "}
                     <strong style={{ color: "#ff5252" }}>
                       {pushHealth.onlineSessions - (pushHealth.onlineSessionsWithToken ?? 0)}{" "}
-                      squadra/e online senza token push: ricompila APK (build-apk.bat), consenti
-                      notifiche, logout/login sul telefono.
+                      squadra/e online senza token push: ricompila APK KMP (kmp-dev.bat
+                      rebuild), consenti notifiche, logout/login sul telefono.
                     </strong>
                   </>
                 ) : pushHealth.fcmTokenRows != null && pushHealth.fcmTokenRows > 0 ? (

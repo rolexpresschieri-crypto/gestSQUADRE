@@ -5,8 +5,11 @@ import 'package:geolocator/geolocator.dart';
 /// Soglia oltre la quale un fix non viene inviato al TOC (metri).
 const double gpsMaxPublishAccuracyM = 50;
 
-/// Intervallo minimo tra due invii (salvo fix molto migliore).
-const Duration gpsMinPublishInterval = Duration(seconds: 12);
+/// Intervallo minimo tra due invii (allineato a lettura GPS 2 s / 2 m).
+const Duration gpsMinPublishInterval = Duration(seconds: 2);
+
+/// Refresh mappa TOC volontario (stesso ritmo).
+const Duration tocMapRefreshInterval = Duration(seconds: 2);
 
 /// Stream GPS: aggiornamenti frequenti, filtro distanza basso.
 LocationSettings buildGpsLocationSettings() {

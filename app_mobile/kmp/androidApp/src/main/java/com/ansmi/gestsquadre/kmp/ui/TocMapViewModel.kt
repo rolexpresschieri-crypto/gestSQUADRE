@@ -8,6 +8,7 @@ import com.ansmi.gestsquadre.kmp.map.MapLayerMode
 import com.ansmi.gestsquadre.kmp.map.MapViewState
 import com.ansmi.gestsquadre.kmp.map.MapViewStorage
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
+import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
 import kotlinx.coroutines.Job
@@ -53,7 +54,7 @@ class TocMapViewModel(
         refreshJob =
             viewModelScope.launch {
                 while (isActive) {
-                    delay(20_000)
+                    delay(GpsPublishPolicy.MAP_REFRESH_INTERVAL_MS)
                     refresh(silent = true)
                 }
             }

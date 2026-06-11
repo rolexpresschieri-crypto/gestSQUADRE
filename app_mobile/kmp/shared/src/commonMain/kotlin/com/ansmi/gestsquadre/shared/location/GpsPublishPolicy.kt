@@ -8,7 +8,10 @@ import kotlin.math.roundToInt
  */
 object GpsPublishPolicy {
     const val MAX_PUBLISH_ACCURACY_M = 50.0
-    const val MIN_PUBLISH_INTERVAL_MS = 12_000L
+    /** Allineato a LocationTracker Android (2 s / 2 m). */
+    const val MIN_PUBLISH_INTERVAL_MS = 2_000L
+    /** Refresh mappa TOC (stesso ritmo del GPS). */
+    const val MAP_REFRESH_INTERVAL_MS = 2_000L
     private const val IMPROVEMENT_RATIO = 0.55
 
     fun shouldPublish(

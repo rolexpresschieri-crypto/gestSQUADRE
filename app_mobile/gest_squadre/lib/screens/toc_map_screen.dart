@@ -7,11 +7,19 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/map_models.dart';
 import '../models/squad_session.dart';
+import '../services/gps_tracker.dart';
 import '../services/map_layer_config.dart';
 import '../services/map_view_storage.dart';
 import '../services/toc_map_repository.dart';
 import '../services/waypoint_icons.dart';
 import '../theme/tactical_theme.dart';
+
+String _squadMapChipLabel(LiveSquadPin squad, bool alarming) {
+  final raw = squad.squadName.trim().isEmpty ? squad.squadCode : squad.squadName;
+  final base = raw.length > 18 ? raw.substring(0, 18) : raw;
+  final chip = base.toUpperCase();
+  return alarming ? '⚠ $chip' : chip;
+}
 
 /// Mappa TOC fullscreen in-app: squadre, waypoint, layer stradale/ortofoto.
 /// Accessibile senza login squadra (solo Supabase configurato).
@@ -88,7 +96,7 @@ class _TocMapScreenState extends State<TocMapScreen> {
 
     await _reloadMapData();
     _subscribeRealtime();
-    _refreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+    _refreshTimer = Timer.periodic(tocMapRefreshInterval, (_) {
       unawaited(_reloadMapData());
     });
   }
@@ -259,7 +267,7 @@ class _TocMapScreenState extends State<TocMapScreen> {
                   ),
                 ),
                 child: Text(
-                  (alarming ? '⚠ ${s.squadCode}' : s.squadCode).toUpperCase(),
+                  _squadMapChipLabel(s, alarming),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 10,
