@@ -11,11 +11,7 @@ import {
   canManageSquadsForCourse,
   deleteSquadForCourse,
 } from "@/lib/golf-course-scope";
-import {
-  printSquadsAsPdf,
-  squadsPdfDocumentTitle,
-  type SquadExportRow,
-} from "@/lib/squad-export";
+import { downloadSquadsPdf, type SquadExportRow } from "@/lib/squad-export";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./campo-squads-page.module.css";
 
@@ -168,7 +164,7 @@ export default function CampoSquadsPage() {
     }
   }
 
-  function exportSquadsPdf() {
+  async function exportSquadsPdf() {
     if (squads.length === 0) {
       setFormError("Nessuna squadra da esportare.");
       return;
@@ -180,15 +176,19 @@ export default function CampoSquadsPage() {
       squadName: row.squad_name,
       isEnabled: row.is_enabled,
     }));
-    const ok = printSquadsAsPdf(rows, courseLabel, courseCode);
-    if (!ok) {
-      setFormError("Impossibile avviare la stampa PDF. Riprova con un altro browser.");
-      return;
-    }
+
+    setBusy(true);
     setFormError(null);
-    setToast(
-      `Salva come PDF (nome suggerito: ${squadsPdfDocumentTitle(courseCode)}.pdf).`,
-    );
+    try {
+      const result = await downloadSquadsPdf(rows, courseLabel, courseCode);
+      if (!result.ok) {
+        setFormError(result.error);
+        return;
+      }
+      setToast(`PDF scaricato: ${result.filename}`);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleToggleEnabled(row: SquadRow) {
