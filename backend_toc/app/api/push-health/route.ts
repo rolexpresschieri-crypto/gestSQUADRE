@@ -18,6 +18,7 @@ export async function GET() {
   let fcmTokenRows = 0;
   let onlineSessions = 0;
   let onlineSessionsWithToken = 0;
+  let onlineSquadsMissingPush: string[] = [];
   let queryError: string | null = null;
 
   if (url && serviceKey && !serviceKey.includes("YOUR_")) {
@@ -37,7 +38,7 @@ export async function GET() {
 
       const { data: online, error: onlineErr } = await admin
         .from("squad_sessions")
-        .select("id")
+        .select("id, squads(squad_code)")
         .eq("is_online", true);
       if (onlineErr) {
         queryError = queryError ?? onlineErr.message;
@@ -52,7 +53,21 @@ export async function GET() {
           if (tokenErr) {
             queryError = queryError ?? tokenErr.message;
           } else {
-            onlineSessionsWithToken = matched?.length ?? 0;
+            const tokenSessionIds = new Set(
+              (matched ?? []).map((row) => String(row.session_id)),
+            );
+            onlineSessionsWithToken = tokenSessionIds.size;
+            onlineSquadsMissingPush = online
+              .filter((row) => !tokenSessionIds.has(String(row.id)))
+              .map((row) => {
+                const squads = row.squads as
+                  | { squad_code?: string }
+                  | { squad_code?: string }[]
+                  | null;
+                const squad = Array.isArray(squads) ? squads[0] : squads;
+                return String(squad?.squad_code ?? row.id).trim();
+              })
+              .filter(Boolean);
           }
         }
       }
@@ -71,6 +86,7 @@ export async function GET() {
     fcmTokenRows,
     onlineSessions,
     onlineSessionsWithToken,
+    onlineSquadsMissingPush,
     queryError,
     firebase: {
       ...firebase,

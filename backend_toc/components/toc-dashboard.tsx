@@ -98,6 +98,7 @@ export default function TocDashboard() {
     fcmTokenRows?: number;
     onlineSessions?: number;
     onlineSessionsWithToken?: number;
+    onlineSquadsMissingPush?: string[];
     supabaseProject?: string | null;
   } | null>(null);
   const [activeEventId, setActiveEventId] = useState<string | null>(null);
@@ -998,8 +999,12 @@ export default function TocDashboard() {
                     {" "}
                     <strong style={{ color: "#ff5252" }}>
                       {pushHealth.onlineSessions - (pushHealth.onlineSessionsWithToken ?? 0)}{" "}
-                      squadra/e online senza token push: ricompila APK KMP (kmp-dev.bat
-                      rebuild), consenti notifiche, logout/login sul telefono.
+                      squadra/e online senza token push
+                      {pushHealth.onlineSquadsMissingPush?.length
+                        ? ` (${pushHealth.onlineSquadsMissingPush.join(", ")})`
+                        : ""}
+                      : sul telefono apri l&apos;app, consenti notifiche se richieste,
+                      logout/login (o riapri l&apos;app dopo l&apos;ultimo APK).
                     </strong>
                   </>
                 ) : pushHealth.fcmTokenRows != null && pushHealth.fcmTokenRows > 0 ? (

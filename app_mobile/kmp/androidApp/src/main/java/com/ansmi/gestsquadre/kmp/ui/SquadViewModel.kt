@@ -168,6 +168,22 @@ class SquadViewModel(
         }
     }
 
+    fun retryPushRegistration() {
+        val session = _uiState.value.session ?: return
+        if (!fcmManager.isConfigured) {
+            return
+        }
+        viewModelScope.launch {
+            if (!fcmManager.ensureNotificationPermission() &&
+                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+            ) {
+                _uiState.update { it.copy(requestNotificationPermission = true) }
+                return@launch
+            }
+            registerFcmForSession(session)
+        }
+    }
+
     fun onNotificationPermissionResult(granted: Boolean) {
         val session = _uiState.value.session ?: return
         if (!granted) {
