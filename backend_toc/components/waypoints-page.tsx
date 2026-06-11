@@ -81,7 +81,9 @@ export default function WaypointsPage() {
       .select("*")
       .eq("event_id", activeEventId);
     if (session?.golfCourseId) {
-      query = query.eq("golf_course_id", session.golfCourseId);
+      query = query.or(
+        `golf_course_id.eq.${session.golfCourseId},golf_course_id.is.null`,
+      );
     }
     const { data, error } = await query.limit(400);
 

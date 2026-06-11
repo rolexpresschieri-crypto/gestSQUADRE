@@ -30,7 +30,12 @@ class TocMapRepository(
     config: GestSquadreConfig,
 ) {
     private val rest = SupabaseRestClient(config)
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+            explicitNulls = false
+        }
 
     suspend fun loadLiveSquads(): List<LiveSquadPin> {
         val rows =
@@ -73,6 +78,12 @@ class TocMapRepository(
     }
 
     suspend fun loadActiveRouteAssignment(sessionId: String): ActiveRouteAssignment? {
+        return runCatching { loadActiveRouteAssignmentInternal(sessionId) }.getOrNull()
+    }
+
+    private suspend fun loadActiveRouteAssignmentInternal(
+        sessionId: String,
+    ): ActiveRouteAssignment? {
         val assignment =
             rest.getList<RouteAssignmentRow>(
                 table = "squad_route_assignments",

@@ -24,6 +24,8 @@ internal class SupabaseRestClient(
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = true
+        coerceInputValues = true
+        explicitNulls = false
     }
 
     private val http = createPlatformHttpClient {

@@ -34,7 +34,8 @@ export async function fetchSquadMapPoints(
 ): Promise<{ waypoints: SquadWaypoint[]; error: string | null }> {
   let query = supabase.from("squad_map_points").select("*").eq("event_id", eventId);
   if (golfCourseId) {
-    query = query.eq("golf_course_id", golfCourseId);
+    // Include waypoint legacy senza golf_course_id (creati prima del multi-campo).
+    query = query.or(`golf_course_id.eq.${golfCourseId},golf_course_id.is.null`);
   }
   const { data, error } = await query.limit(400);
 

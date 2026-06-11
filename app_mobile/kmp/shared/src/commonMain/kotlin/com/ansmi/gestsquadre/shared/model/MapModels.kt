@@ -26,7 +26,7 @@ data class SquadAlarmSessionRow(
 
 @Serializable
 data class MapWaypointRow(
-    val id: String,
+    val id: String? = null,
     val label: String? = null,
     @SerialName("icon_key") val iconKey: String? = null,
     val latitude: Double? = null,
@@ -72,13 +72,17 @@ fun ActiveSquadSummaryRow.toLiveSquadPin(): LiveSquadPin? {
 }
 
 fun MapWaypointRow.toMapWaypointPin(): MapWaypointPin? {
+    val waypointId = id?.trim().orEmpty()
+    if (waypointId.isEmpty()) {
+        return null
+    }
     val lat = latitude ?: return null
     val lon = longitude ?: return null
     if (!lat.isFinite() || !lon.isFinite()) {
         return null
     }
     return MapWaypointPin(
-        id = id,
+        id = waypointId,
         label = label.orEmpty(),
         iconKey = iconKey?.trim()?.ifEmpty { "buche" } ?: "buche",
         latitude = lat,

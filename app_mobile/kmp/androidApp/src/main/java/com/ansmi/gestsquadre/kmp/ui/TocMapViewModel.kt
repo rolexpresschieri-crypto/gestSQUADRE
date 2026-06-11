@@ -68,32 +68,29 @@ class TocMapViewModel(
             if (!silent) {
                 _uiState.update { it.copy(loading = true) }
             }
-            try {
-                val squads = facade.loadMapSquads()
-                val waypoints = facade.loadMapWaypoints()
-                val alarming = facade.loadAlarmingSessionIds()
-                val activeRoute =
-                    focusSessionId?.let { sessionId ->
-                        runCatching { facade.loadActiveRouteAssignment(sessionId) }
-                            .getOrNull()
-                    }
-                _uiState.update {
-                    it.copy(
-                        loading = false,
-                        error = null,
-                        squads = squads,
-                        waypoints = waypoints,
-                        activeRoute = activeRoute,
-                        alarmingSessionIds = alarming,
-                    )
+            val squadsResult = runCatching { facade.loadMapSquads() }
+            val waypointsResult = runCatching { facade.loadMapWaypoints() }
+            val alarmingResult = runCatching { facade.loadAlarmingSessionIds() }
+            val activeRoute =
+                focusSessionId?.let { sessionId ->
+                    runCatching { facade.loadActiveRouteAssignment(sessionId) }
+                        .getOrNull()
                 }
-            } catch (e: Exception) {
-                _uiState.update {
-                    it.copy(
-                        loading = false,
-                        error = "Errore mappa: ${e.message}",
-                    )
-                }
+            val firstError =
+                listOf(
+                    squadsResult.exceptionOrNull(),
+                    waypointsResult.exceptionOrNull(),
+                    alarmingResult.exceptionOrNull(),
+                ).firstOrNull()
+            _uiState.update {
+                it.copy(
+                    loading = false,
+                    error = firstError?.message?.let { msg -> "Errore mappa: $msg" },
+                    squads = squadsResult.getOrElse { emptyList() },
+                    waypoints = waypointsResult.getOrElse { emptyList() },
+                    activeRoute = activeRoute,
+                    alarmingSessionIds = alarmingResult.getOrElse { emptySet() },
+                )
             }
         }
     }
