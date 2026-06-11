@@ -21,6 +21,12 @@ export function sortSquadsForExport(rows: SquadExportRow[]): SquadExportRow[] {
   );
 }
 
+/** Cerchio colorato in SVG: in stampa/PDF i fill CSS spesso spariscono. */
+function squadColorDotHtml(mapColor: string | null): string {
+  const fill = normalizeMapColor(mapColor);
+  return `<svg class="colorDot" width="11" height="11" viewBox="0 0 11 11" aria-hidden="true" focusable="false"><circle cx="5.5" cy="5.5" r="4.5" fill="${fill}" stroke="#666666" stroke-width="1"/></svg>`;
+}
+
 export function squadsPrintHtml(
   rows: SquadExportRow[],
   courseLabel: string,
@@ -30,10 +36,9 @@ export function squadsPrintHtml(
   const exportedAt = new Date().toLocaleString("it-IT");
   const bodyRows = sorted
     .map((r) => {
-      const dotColor = normalizeMapColor(r.mapColor);
       return `<tr>
         <td class="codeCell">
-          <span class="colorDot" style="background:${dotColor}"></span>
+          ${squadColorDotHtml(r.mapColor)}
           <strong>${escapeHtml(r.squadCode)}</strong>
         </td>
         <td>${escapeHtml(r.squadName)}</td>
@@ -49,6 +54,10 @@ export function squadsPrintHtml(
   <title>Elenco squadre — gestSQUADRE</title>
   <style>
     @page { size: A4 portrait; margin: 14mm; }
+    html, body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     body { font-family: system-ui, sans-serif; padding: 16px; color: #111; }
     h1 { font-size: 20px; margin: 0 0 6px; }
     p.meta { font-size: 12px; color: #444; margin: 0 0 16px; }
@@ -60,8 +69,6 @@ export function squadsPrintHtml(
       display: inline-block;
       width: 11px;
       height: 11px;
-      border-radius: 50%;
-      border: 1px solid #888;
       margin-right: 8px;
       vertical-align: middle;
     }
