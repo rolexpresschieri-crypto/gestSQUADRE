@@ -1,7 +1,10 @@
+import { normalizeMapColor } from "@/lib/live-squads";
+
 export type SquadExportRow = {
   squadCode: string;
   squadName: string;
   isEnabled: boolean;
+  mapColor: string | null;
 };
 
 function escapeHtml(text: string): string {
@@ -26,13 +29,17 @@ export function squadsPrintHtml(
   const sorted = sortSquadsForExport(rows);
   const exportedAt = new Date().toLocaleString("it-IT");
   const bodyRows = sorted
-    .map(
-      (r) => `<tr>
-        <td><strong>${escapeHtml(r.squadCode)}</strong></td>
+    .map((r) => {
+      const dotColor = normalizeMapColor(r.mapColor);
+      return `<tr>
+        <td class="codeCell">
+          <span class="colorDot" style="background:${dotColor}"></span>
+          <strong>${escapeHtml(r.squadCode)}</strong>
+        </td>
         <td>${escapeHtml(r.squadName)}</td>
         <td>${r.isEnabled ? "Attiva" : "Disabilitata"}</td>
-      </tr>`,
-    )
+      </tr>`;
+    })
     .join("");
 
   return `<!DOCTYPE html>
@@ -48,6 +55,16 @@ export function squadsPrintHtml(
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th, td { border: 1px solid #bbb; padding: 7px 8px; text-align: left; vertical-align: middle; }
     th { background: #eee; font-weight: 700; }
+    .codeCell { white-space: nowrap; }
+    .colorDot {
+      display: inline-block;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      border: 1px solid #888;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
     tfoot td { border: none; padding-top: 12px; font-size: 11px; color: #555; }
   </style>
 </head>
