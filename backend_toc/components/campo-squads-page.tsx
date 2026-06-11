@@ -163,6 +163,49 @@ export default function CampoSquadsPage() {
     }
   }
 
+  async function handleToggleEnabled(row: SquadRow) {
+    const golfCourseId = session?.golfCourseId;
+    if (!supabase || !golfCourseId) {
+      return;
+    }
+
+    const nextEnabled = !row.is_enabled;
+    const label = nextEnabled ? "attivare" : "disabilitare";
+    if (
+      !window.confirm(
+        `${nextEnabled ? "Attivare" : "Disabilitare"} la squadra ${row.squad_code} — ${row.squad_name}?\n` +
+          (nextEnabled
+            ? "Potrà di nuovo fare login dall'app."
+            : "Non potrà più fare login (sessioni già aperte restano fino al logout)."),
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setFormError(null);
+    try {
+      const { error } = await supabase
+        .from("squads")
+        .update({ is_enabled: nextEnabled })
+        .eq("id", row.id)
+        .eq("golf_course_id", golfCourseId);
+
+      if (error) {
+        throw error;
+      }
+      if (editingId === row.id) {
+        setIsEnabled(nextEnabled);
+      }
+      setToast(nextEnabled ? "Squadra attivata." : "Squadra disabilitata.");
+      await refreshSquads();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : `Errore: impossibile ${label} la squadra.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleDelete(row: SquadRow) {
     const golfCourseId = session?.golfCourseId;
     if (!supabase || !golfCourseId) {
@@ -293,17 +336,15 @@ export default function CampoSquadsPage() {
                   />
                 </label>
               </div>
-              {editingId ? (
-                <label className={styles.checkLabel}>
-                  <input
-                    type="checkbox"
-                    checked={isEnabled}
-                    onChange={(e) => setIsEnabled(e.target.checked)}
-                    disabled={busy}
-                  />
-                  Squadra abilitata al login
-                </label>
-              ) : null}
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={isEnabled}
+                  onChange={(e) => setIsEnabled(e.target.checked)}
+                  disabled={busy}
+                />
+                Stato: abilitata al login (se disabilitata, l&apos;app rifiuta il login)
+              </label>
               <div className={styles.formActions}>
                 <button type="submit" className={styles.btnPrimary} disabled={busy}>
                   {editingId ? "Salva modifiche" : "Aggiungi squadra"}
@@ -348,7 +389,19 @@ export default function CampoSquadsPage() {
                       </td>
                       <td>{row.squad_name}</td>
                       <td>{row.password_hash}</td>
-                      <td>{row.is_enabled ? "Attiva" : "Disabilitata"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className={
+                            row.is_enabled ? styles.statusActive : styles.statusDisabled
+                          }
+                          onClick={() => void handleToggleEnabled(row)}
+                          disabled={busy}
+                          title="Clicca per attivare o disabilitare il login"
+                        >
+                          {row.is_enabled ? "Attiva" : "Disabilitata"}
+                        </button>
+                      </td>
                       <td className={styles.rowActions}>
                         <button type="button" onClick={() => beginEdit(row)} disabled={busy}>
                           Modifica

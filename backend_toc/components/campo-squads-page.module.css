@@ -192,6 +192,34 @@
   font-size: 12px;
 }
 
+.statusActive,
+.statusDisabled {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.statusActive {
+  background: rgba(7, 155, 66, 0.22);
+  border-color: #079b42;
+  color: #8fe88f;
+}
+
+.statusDisabled {
+  background: rgba(198, 40, 40, 0.2);
+  border-color: #c62828;
+  color: #ff8a80;
+}
+
+.statusActive:disabled,
+.statusDisabled:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .error {
   margin: 12px 18px 0;
   color: #ff8a80;
