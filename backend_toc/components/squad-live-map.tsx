@@ -206,8 +206,8 @@ function ActiveRoutePolylines({
   const positions = route.points.map(
     (p) => [p.lat, p.lng] as [number, number],
   );
-  const haloWeight = highlighted ? 12 : 9;
-  const lineWeight = highlighted ? 7 : 5;
+  const haloWeight = highlighted ? 7 : 5;
+  const lineWeight = highlighted ? 4 : 3;
 
   return (
     <>

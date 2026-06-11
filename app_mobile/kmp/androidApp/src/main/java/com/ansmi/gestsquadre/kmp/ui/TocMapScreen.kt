@@ -212,7 +212,7 @@ fun TocMapScreen(
                                     route.points.map { (lat, lng) -> GeoPoint(lat, lng) },
                                 )
                                 polyline.outlinePaint.color = route.colorArgb.toInt()
-                                polyline.outlinePaint.strokeWidth = 14f
+                                polyline.outlinePaint.strokeWidth = 9f
                                 polyline.outlinePaint.isAntiAlias = true
                                 overlays.add(polyline)
                             }
