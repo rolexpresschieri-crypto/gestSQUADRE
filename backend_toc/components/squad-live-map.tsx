@@ -80,9 +80,11 @@ function squadDivIcon(
 function MapBoundsController({
   squads,
   waypoints,
+  activeRoute,
 }: {
   squads: LiveSquad[];
   waypoints: SquadWaypoint[];
+  activeRoute?: SquadLiveMapProps["activeRoute"];
 }) {
   const map = useMap();
   const lastBoundsSignatureRef = useRef<string | null>(null);
@@ -97,8 +99,12 @@ function MapBoundsController({
       .map((w) => w.id)
       .sort()
       .join("|");
-    return `${squadPart}#${wpPart}`;
-  }, [squads, waypoints]);
+    const routePart =
+      activeRoute?.points
+        .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
+        .join("|") ?? "";
+    return `${squadPart}#${wpPart}#${routePart}`;
+  }, [squads, waypoints, activeRoute]);
 
   const points = useMemo(() => {
     const squadPts = squads
@@ -107,8 +113,10 @@ function MapBoundsController({
     const wpPts = waypoints.map(
       (w) => [w.latitude, w.longitude] as [number, number],
     );
-    return [...squadPts, ...wpPts];
-  }, [squads, waypoints]);
+    const routePts =
+      activeRoute?.points.map((p) => [p.lat, p.lng] as [number, number]) ?? [];
+    return [...squadPts, ...wpPts, ...routePts];
+  }, [squads, waypoints, activeRoute]);
 
   useEffect(() => {
     if (!boundsSignature) {
@@ -161,6 +169,58 @@ function MapFocusSelected({
   }, [map, selectedSessionId, squads]);
 
   return null;
+}
+
+function RoutePolylinePane() {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map.getPane("routePolylinePane")) {
+      const pane = map.createPane("routePolylinePane");
+      pane.style.zIndex = "620";
+    }
+  }, [map]);
+
+  return null;
+}
+
+function ActiveRoutePolylines({
+  activeRoute,
+}: {
+  activeRoute: NonNullable<SquadLiveMapProps["activeRoute"]>;
+}) {
+  const positions = activeRoute.points.map(
+    (p) => [p.lat, p.lng] as [number, number],
+  );
+
+  return (
+    <>
+      <Polyline
+        key={`${activeRoute.routeCode}-halo`}
+        positions={positions}
+        pane="routePolylinePane"
+        pathOptions={{
+          color: "#ffffff",
+          weight: 10,
+          opacity: 0.95,
+          lineCap: "round",
+          lineJoin: "round",
+        }}
+      />
+      <Polyline
+        key={`${activeRoute.routeCode}-line`}
+        positions={positions}
+        pane="routePolylinePane"
+        pathOptions={{
+          color: activeRoute.colorHex,
+          weight: 6,
+          opacity: 0.98,
+          lineCap: "round",
+          lineJoin: "round",
+        }}
+      />
+    </>
+  );
 }
 
 function LeafletInvalidateOnLayout() {
@@ -237,20 +297,13 @@ export default function SquadLiveMap({
           url={tile.url}
         />
         <LeafletInvalidateOnLayout />
-        <MapBoundsController squads={withCoords} waypoints={waypoints} />
+        <RoutePolylinePane />
+        <MapBoundsController
+          squads={withCoords}
+          waypoints={waypoints}
+          activeRoute={activeRoute}
+        />
         <MapFocusSelected squads={withCoords} selectedSessionId={selectedSessionId} />
-        {activeRoute && activeRoute.points.length >= 2 ? (
-          <Polyline
-            positions={activeRoute.points.map((p) => [p.lat, p.lng] as [number, number])}
-            pathOptions={{
-              color: activeRoute.colorHex,
-              weight: 6,
-              opacity: 0.92,
-              lineCap: "round",
-              lineJoin: "round",
-            }}
-          />
-        ) : null}
         {waypoints.map((wp) => (
           <Marker
             key={`wp-${wp.id}`}
@@ -335,6 +388,9 @@ export default function SquadLiveMap({
             </Fragment>
           );
         })}
+        {activeRoute && activeRoute.points.length >= 2 ? (
+          <ActiveRoutePolylines activeRoute={activeRoute} />
+        ) : null}
       </MapContainer>
     </div>
   );

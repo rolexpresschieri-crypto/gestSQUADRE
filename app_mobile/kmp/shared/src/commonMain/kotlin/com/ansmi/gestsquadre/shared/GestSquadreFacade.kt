@@ -62,4 +62,7 @@ class GestSquadreFacade(
 
     suspend fun loadActiveRouteAssignment(sessionId: String): ActiveRouteAssignment? =
         mapRepository.loadActiveRouteAssignment(sessionId)
+
+    suspend fun clearActiveRouteAssignment(sessionId: String) =
+        mapRepository.clearActiveRouteAssignment(sessionId)
 }

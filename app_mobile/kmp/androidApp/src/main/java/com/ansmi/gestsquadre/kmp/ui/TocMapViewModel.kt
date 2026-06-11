@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.ansmi.gestsquadre.kmp.map.MapLayerMode
 import com.ansmi.gestsquadre.kmp.map.MapViewState
 import com.ansmi.gestsquadre.kmp.map.MapViewStorage
+import com.ansmi.gestsquadre.kmp.map.RouteRefreshBus
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
 import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
@@ -61,6 +62,13 @@ class TocMapViewModel(
                     refresh(silent = true)
                 }
             }
+        viewModelScope.launch {
+            RouteRefreshBus.cleared.collect { sessionId ->
+                if (sessionId == focusSessionId) {
+                    _uiState.update { it.copy(activeRoute = null) }
+                }
+            }
+        }
     }
 
     fun refresh(silent: Boolean = false) {

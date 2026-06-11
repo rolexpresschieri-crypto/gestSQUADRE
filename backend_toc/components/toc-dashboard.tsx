@@ -15,7 +15,9 @@ import {
 import { loginTocAdmin, restoreAdminSessionFromStorage } from "@/lib/campo-login";
 import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import {
+  clearRouteAssignmentForSession,
   fetchActiveRouteAssignment,
+  fetchActiveRouteAssignmentsForSessions,
   fetchMapRoutes,
   type MapRoute,
   type SquadRouteAssignment,
@@ -220,14 +222,28 @@ export default function TocDashboard() {
   }, [supabase, golfCourseId]);
 
   const loadSelectedRouteAssignment = useCallback(async () => {
-    if (!supabase || !selectedSessionId) {
+    if (!supabase || squads.length === 0) {
       setSelectedRouteAssignment(null);
       return;
     }
-    setSelectedRouteAssignment(
-      await fetchActiveRouteAssignment(supabase, selectedSessionId),
+    const sessionIds = squads.map((s) => s.sessionId);
+    const assignments = await fetchActiveRouteAssignmentsForSessions(
+      supabase,
+      sessionIds,
     );
-  }, [supabase, selectedSessionId]);
+    const activeSessionId =
+      selectedSessionId && assignments.has(selectedSessionId)
+        ? selectedSessionId
+        : selectedSessionId ??
+          sessionIds.find((id) => assignments.has(id)) ??
+          null;
+    if (!selectedSessionId && activeSessionId) {
+      setSelectedSessionId(activeSessionId);
+    }
+    setSelectedRouteAssignment(
+      activeSessionId ? (assignments.get(activeSessionId) ?? null) : null,
+    );
+  }, [supabase, selectedSessionId, squads]);
 
   useEffect(() => {
     void loadMapRoutes();
@@ -431,7 +447,7 @@ export default function TocDashboard() {
     await forceLogoutSquad(picked);
   }
 
-  async function acknowledgeAlarm(alarmId: string) {
+  async function acknowledgeAlarm(alarm: AlarmRow) {
     if (!supabase || !session) {
       return;
     }
@@ -441,13 +457,25 @@ export default function TocDashboard() {
         acknowledged_at: new Date().toISOString(),
         acknowledged_by: session.code,
       })
-      .eq("id", alarmId);
+      .eq("id", alarm.id);
     if (error) {
       setStatusMessage(error.message);
       return;
     }
+    const routeClear = await clearRouteAssignmentForSession(
+      supabase,
+      alarm.session_id,
+    );
+    if (selectedSessionId === alarm.session_id) {
+      setSelectedRouteAssignment(null);
+    }
     await loadAlarms();
-    setStatusMessage("Allarme preso in carico — squadra non più in rosso.");
+    await loadSelectedRouteAssignment();
+    setStatusMessage(
+      routeClear.error
+        ? `Allarme preso in carico — squadra non più in rosso (via: ${routeClear.error}).`
+        : "Allarme preso in carico — squadra non più in rosso, via rimossa dalla mappa.",
+    );
   }
 
   function openPushModal() {
@@ -810,7 +838,7 @@ export default function TocDashboard() {
                     <button
                       className={styles.btnSmall}
                       type="button"
-                      onClick={() => void acknowledgeAlarm(a.id)}
+                      onClick={() => void acknowledgeAlarm(a)}
                     >
                       Preso in carico
                     </button>

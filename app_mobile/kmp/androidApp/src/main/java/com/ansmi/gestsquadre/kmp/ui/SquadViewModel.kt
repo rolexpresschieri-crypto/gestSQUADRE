@@ -6,6 +6,7 @@ import com.ansmi.gestsquadre.kmp.BuildConfig
 import com.ansmi.gestsquadre.kmp.data.SessionStorage
 import com.ansmi.gestsquadre.kmp.data.TocMessageStorage
 import com.ansmi.gestsquadre.kmp.push.FcmManager
+import com.ansmi.gestsquadre.kmp.map.RouteRefreshBus
 import com.ansmi.gestsquadre.kmp.push.FcmPushBus
 import com.ansmi.gestsquadre.kmp.push.FcmSessionRegistry
 import com.ansmi.gestsquadre.shared.GestSquadreException
@@ -81,6 +82,11 @@ class SquadViewModel(
     fun clearLastTocMessage() {
         tocMessageStorage.clear()
         _uiState.update { it.copy(lastTocMessage = null) }
+        val sessionId = _uiState.value.session?.sessionId ?: return
+        viewModelScope.launch {
+            runCatching { facade.clearActiveRouteAssignment(sessionId) }
+                .onSuccess { RouteRefreshBus.emitCleared(sessionId) }
+        }
     }
 
     fun login(squadCode: String, password: String, onResult: (String?) -> Unit) {

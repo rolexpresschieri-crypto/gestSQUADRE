@@ -13,6 +13,8 @@ import com.ansmi.gestsquadre.shared.model.toLiveSquadPin
 import com.ansmi.gestsquadre.shared.model.toMapRoutePin
 import com.ansmi.gestsquadre.shared.model.toMapWaypointPin
 import com.ansmi.gestsquadre.shared.network.SupabaseRestClient
+import kotlinx.datetime.Clock
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -24,6 +26,11 @@ private data class EventIdRow(
 @Serializable
 private data class WaypointLabelRow(
     val label: String? = null,
+)
+
+@Serializable
+private data class ClearRouteAssignmentBody(
+    @SerialName("cleared_at") val clearedAt: String,
 )
 
 class TocMapRepository(
@@ -120,6 +127,15 @@ class TocMapRepository(
             colorArgb = route.colorArgb,
             points = route.points,
             targetLabel = targetLabel,
+        )
+    }
+
+    suspend fun clearActiveRouteAssignment(sessionId: String) {
+        rest.patch(
+            table = "squad_route_assignments",
+            filters = listOf("session_id" to sessionId),
+            body = ClearRouteAssignmentBody(clearedAt = Clock.System.now().toString()),
+            isNullColumns = listOf("cleared_at"),
         )
     }
 }

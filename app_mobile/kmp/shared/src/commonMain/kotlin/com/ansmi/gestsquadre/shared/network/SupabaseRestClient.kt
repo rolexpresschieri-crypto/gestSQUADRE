@@ -65,12 +65,16 @@ internal class SupabaseRestClient(
         table: String,
         filters: List<Pair<String, String>>,
         body: Any,
+        isNullColumns: List<String> = emptyList(),
     ) {
         val response = http.patch("${config.restBaseUrl}$table") {
             authHeaders()
             preferMinimal()
             filters.forEach { (column, value) ->
                 parameter(column, "eq.$value")
+            }
+            isNullColumns.forEach { column ->
+                parameter(column, "is.null")
             }
             contentType(ContentType.Application.Json)
             setBody(body)
