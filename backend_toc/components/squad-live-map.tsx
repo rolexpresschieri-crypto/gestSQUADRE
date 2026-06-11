@@ -87,10 +87,13 @@ function MapBoundsController({
   squads,
   waypoints,
   activeRoutes,
+  preferOperationalArea,
 }: {
   squads: LiveSquad[];
   waypoints: SquadWaypoint[];
   activeRoutes: DrawnRoute[];
+  /** Con vie attive: inquadra percorso/waypoint, non inseguire il GPS squadra. */
+  preferOperationalArea: boolean;
 }) {
   const map = useMap();
   const lastBoundsSignatureRef = useRef<string | null>(null);
@@ -117,9 +120,11 @@ function MapBoundsController({
   }, [squads, waypoints, activeRoutes]);
 
   const points = useMemo(() => {
-    const squadPts = squads
-      .filter(hasCoordinates)
-      .map((s) => [s.lastLatitude!, s.lastLongitude!] as [number, number]);
+    const squadPts = preferOperationalArea
+      ? []
+      : squads
+          .filter(hasCoordinates)
+          .map((s) => [s.lastLatitude!, s.lastLongitude!] as [number, number]);
     const wpPts = waypoints.map(
       (w) => [w.latitude, w.longitude] as [number, number],
     );
@@ -127,7 +132,7 @@ function MapBoundsController({
       route.points.map((p) => [p.lat, p.lng] as [number, number]),
     );
     return [...squadPts, ...wpPts, ...routePts];
-  }, [squads, waypoints, activeRoutes]);
+  }, [squads, waypoints, activeRoutes, preferOperationalArea]);
 
   useEffect(() => {
     if (!boundsSignature) {
@@ -154,30 +159,36 @@ function MapBoundsController({
 function MapFocusSelected({
   squads,
   selectedSessionId,
+  enabled,
 }: {
   squads: LiveSquad[];
   selectedSessionId: string | null;
+  enabled: boolean;
 }) {
   const map = useMap();
-  const lastFocusRef = useRef<string | null>(null);
+  const lastFocusedSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      lastFocusedSessionRef.current = null;
+      return;
+    }
     if (!selectedSessionId) {
+      lastFocusedSessionRef.current = null;
+      return;
+    }
+    if (lastFocusedSessionRef.current === selectedSessionId) {
       return;
     }
     const squad = squads.find((s) => s.sessionId === selectedSessionId);
     if (!squad || !hasCoordinates(squad)) {
       return;
     }
-    const sig = `${selectedSessionId}:${squad.lastLatitude}:${squad.lastLongitude}`;
-    if (sig === lastFocusRef.current) {
-      return;
-    }
-    lastFocusRef.current = sig;
+    lastFocusedSessionRef.current = selectedSessionId;
     map.flyTo([squad.lastLatitude!, squad.lastLongitude!], Math.max(map.getZoom(), 15), {
       duration: 0.5,
     });
-  }, [map, selectedSessionId, squads]);
+  }, [map, enabled, selectedSessionId, squads]);
 
   return null;
 }
@@ -320,8 +331,13 @@ export default function SquadLiveMap({
           squads={withCoords}
           waypoints={waypoints}
           activeRoutes={routesToDraw}
+          preferOperationalArea={routesToDraw.length > 0}
         />
-        <MapFocusSelected squads={withCoords} selectedSessionId={selectedSessionId} />
+        <MapFocusSelected
+          squads={withCoords}
+          selectedSessionId={selectedSessionId}
+          enabled={routesToDraw.length === 0}
+        />
         {waypoints.map((wp) => (
           <Marker
             key={`wp-${wp.id}`}
