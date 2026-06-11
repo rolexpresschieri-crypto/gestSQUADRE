@@ -14,6 +14,7 @@ import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
 import com.ansmi.gestsquadre.shared.location.LocationTracker
 import com.ansmi.gestsquadre.shared.model.GpsPosition
+import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -125,12 +126,15 @@ class SquadViewModel(
         }
     }
 
-    fun sendAlarm(onResult: (String?) -> Unit) {
+    fun sendAlarm(
+        request: SquadAlarmRequest,
+        onResult: (String?) -> Unit,
+    ) {
         val session = _uiState.value.session ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true) }
             try {
-                facade.sendAlarm(session)
+                facade.sendAlarm(session, request)
                 _uiState.update { it.copy(isBusy = false) }
                 onResult(null)
             } catch (e: GestSquadreException) {

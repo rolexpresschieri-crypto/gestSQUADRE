@@ -41,6 +41,7 @@ import {
   fetchActiveEvent,
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
+import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { waypointDisplayName, type SquadWaypoint } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
 import "./squad-live-map.css";
@@ -59,6 +60,8 @@ type AlarmRow = {
   squad_code: string;
   squad_name: string;
   message: string | null;
+  request_types?: unknown;
+  other_detail?: string | null;
   created_at: string;
   acknowledged_at: string | null;
 };
@@ -346,7 +349,7 @@ export default function TocDashboard() {
             const row = payload.new as AlarmRow;
             setAlarms((prev) => [row, ...prev].slice(0, 40));
             setStatusMessage(
-              `ALLARME: ${row.squad_code} — cerchio rosso sulla mappa`,
+              `ALLARME: ${row.squad_code} — ${formatAlarmRequestDetail(row)}`,
             );
           } else {
             void loadAlarms();
@@ -840,9 +843,9 @@ export default function TocDashboard() {
                     <p className={styles.alarmTitle}>
                       {a.squad_code} — {a.squad_name}
                     </p>
-                    {a.message ? (
-                      <p className={styles.alarmMessage}>{a.message}</p>
-                    ) : null}
+                    <p className={styles.alarmMessage}>
+                      {formatAlarmRequestDetail(a)}
+                    </p>
                     <p className={styles.alarmMeta}>
                       {new Date(a.created_at).toLocaleString("it-IT")}
                     </p>

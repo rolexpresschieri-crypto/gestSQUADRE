@@ -1,3 +1,5 @@
+import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
+
 export type SquadAlarmLogRow = {
   id: string;
   event_id: string;
@@ -6,6 +8,8 @@ export type SquadAlarmLogRow = {
   squad_code: string;
   squad_name: string;
   message: string | null;
+  request_types?: unknown;
+  other_detail?: string | null;
   created_at: string;
   acknowledged_at: string | null;
   acknowledged_by: string | null;
@@ -52,7 +56,7 @@ export function mergeEventLogs(
       squadCode: a.squad_code,
       squadName: a.squad_name,
       summary: "Allarme volontario → TOC",
-      detail: a.message?.trim() || "Richiesta intervento TOC da squadra",
+      detail: formatAlarmRequestDetail(a),
       status: a.acknowledged_at ? "preso in carico" : "attivo",
       actor: a.acknowledged_by?.trim() || "—",
     })),

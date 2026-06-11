@@ -2,6 +2,7 @@ package com.ansmi.gestsquadre.shared
 
 import com.ansmi.gestsquadre.shared.model.EventInfo
 import com.ansmi.gestsquadre.shared.model.GpsPosition
+import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
 import com.ansmi.gestsquadre.shared.network.AlarmInsertBody
 import com.ansmi.gestsquadre.shared.network.EventRow
@@ -178,7 +179,12 @@ class GestSquadreRepository(
         )
     }
 
-    suspend fun sendAlarm(session: SquadSession) {
+    suspend fun sendAlarm(
+        session: SquadSession,
+        request: SquadAlarmRequest,
+    ) {
+        request.validate()?.let { throw GestSquadreException(it) }
+        val detail = request.toLogMessage()
         rest.insert(
             table = "squad_alarms",
             body =
@@ -188,7 +194,9 @@ class GestSquadreRepository(
                     squadId = session.squadId,
                     squadCode = session.squadCode,
                     squadName = session.squadName,
-                    message = SQUAD_ALARM_BACKEND_LABEL,
+                    message = "${SQUAD_ALARM_BACKEND_LABEL} — $detail",
+                    requestTypes = request.typeCodes(),
+                    otherDetail = request.otherDetail?.trim()?.takeIf { it.isNotEmpty() },
                 ),
         )
     }

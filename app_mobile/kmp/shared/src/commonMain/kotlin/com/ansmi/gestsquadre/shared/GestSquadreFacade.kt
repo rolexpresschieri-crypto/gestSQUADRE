@@ -6,6 +6,7 @@ import com.ansmi.gestsquadre.shared.model.GpsPosition
 import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
+import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
 
 /**
@@ -52,7 +53,10 @@ class GestSquadreFacade(
         token: String,
     ) = repository.registerFcmToken(sessionId, squadId, token)
 
-    suspend fun sendAlarm(session: SquadSession) = repository.sendAlarm(session)
+    suspend fun sendAlarm(
+        session: SquadSession,
+        request: SquadAlarmRequest,
+    ) = repository.sendAlarm(session, request)
 
     suspend fun loadMapSquads(): List<LiveSquadPin> = mapRepository.loadLiveSquads()
 

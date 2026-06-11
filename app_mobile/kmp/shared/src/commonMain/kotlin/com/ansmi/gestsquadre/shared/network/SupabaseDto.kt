@@ -86,4 +86,6 @@ internal data class AlarmInsertBody(
     @SerialName("squad_code") val squadCode: String,
     @SerialName("squad_name") val squadName: String,
     val message: String,
+    @SerialName("request_types") val requestTypes: List<String> = emptyList(),
+    @SerialName("other_detail") val otherDetail: String? = null,
 )

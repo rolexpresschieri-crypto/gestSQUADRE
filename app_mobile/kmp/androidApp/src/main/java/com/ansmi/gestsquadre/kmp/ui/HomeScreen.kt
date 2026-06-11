@@ -5,17 +5,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -51,6 +58,8 @@ import com.ansmi.gestsquadre.kmp.ui.theme.TacticalNavy
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalRed
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
+import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
+import com.ansmi.gestsquadre.shared.model.SquadAlarmRequestType
 import kotlinx.coroutines.launch
 
 private const val SquadAlarmHint =
@@ -192,44 +201,12 @@ fun HomeScreen(
     var showAlarmDialog by remember { mutableStateOf(false) }
 
     if (showAlarmDialog) {
-        AlertDialog(
-            onDismissRequest = { showAlarmDialog = false },
-            containerColor = Color(0xFF1A2E1A),
-            title = {
-                Text(
-                    text = SquadAlarmDialogTitle,
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 20.sp,
-                )
-            },
-            text = {
-                Text(
-                    text = SquadAlarmDialogBody,
-                    color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp,
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showAlarmDialog = false
-                        viewModel.sendAlarm { err ->
-                            onShowMessage(err ?: SquadAlarmSentOk)
-                        }
-                    },
-                ) {
-                    Text(
-                        text = "INVIA ALLARME",
-                        color = Color.White,
-                        fontWeight = FontWeight.Black,
-                    )
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAlarmDialog = false }) {
-                    Text(text = "Annulla", color = TacticalMuted)
+        SquadAlarmRequestDialog(
+            onDismiss = { showAlarmDialog = false },
+            onConfirm = { request ->
+                showAlarmDialog = false
+                viewModel.sendAlarm(request) { err ->
+                    onShowMessage(err ?: SquadAlarmSentOk)
                 }
             },
         )
@@ -390,5 +367,185 @@ fun HomeScreen(
                 textAlign = TextAlign.Center,
             )
         }
+    }
+}
+
+@Composable
+private fun SquadAlarmRequestDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (SquadAlarmRequest) -> Unit,
+) {
+    var ambulanza by remember { mutableStateOf(false) }
+    var medico by remember { mutableStateOf(false) }
+    var dae by remember { mutableStateOf(false) }
+    var altro by remember { mutableStateOf(false) }
+    var otherDetail by remember { mutableStateOf("") }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    fun buildRequest(): SquadAlarmRequest {
+        val types = buildSet {
+            if (ambulanza) add(SquadAlarmRequestType.AMBULANZA)
+            if (medico) add(SquadAlarmRequestType.MEDICO)
+            if (dae) add(SquadAlarmRequestType.DAE)
+            if (altro) add(SquadAlarmRequestType.ALTRO)
+        }
+        return SquadAlarmRequest(
+            types = types,
+            otherDetail = otherDetail.takeIf { altro },
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1A2E1A),
+        title = {
+            Text(
+                text = SquadAlarmDialogTitle,
+                color = Color.White,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = SquadAlarmDialogBody,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Cosa richiedi? (scelta multipla)",
+                    color = TacticalYellow,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                AlarmRequestCheckboxRow(
+                    label = "1. Ambulanza",
+                    checked = ambulanza,
+                    onCheckedChange = {
+                        ambulanza = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "2. Medico",
+                    checked = medico,
+                    onCheckedChange = {
+                        medico = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "3. DAE",
+                    checked = dae,
+                    onCheckedChange = {
+                        dae = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "4. Altro",
+                    checked = altro,
+                    onCheckedChange = {
+                        altro = it
+                        validationError = null
+                    },
+                )
+                if (altro) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = otherDetail,
+                        onValueChange = {
+                            otherDetail = it
+                            validationError = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Descrizione breve") },
+                        singleLine = false,
+                        maxLines = 3,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = TacticalYellow,
+                                unfocusedBorderColor = TacticalMuted,
+                                focusedLabelColor = TacticalYellow,
+                                unfocusedLabelColor = TacticalMuted,
+                                cursorColor = TacticalYellow,
+                            ),
+                    )
+                }
+                validationError?.let { err ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = err,
+                        color = TacticalRed,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val request = buildRequest()
+                    val err = request.validate()
+                    if (err != null) {
+                        validationError = err
+                    } else {
+                        onConfirm(request)
+                    }
+                },
+            ) {
+                Text(
+                    text = "INVIA ALLARME",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = "Annulla", color = TacticalMuted)
+            }
+        },
+    )
+}
+
+@Composable
+private fun AlarmRequestCheckboxRow(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { onCheckedChange(!checked) }
+                .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors =
+                CheckboxDefaults.colors(
+                    checkedColor = TacticalRed,
+                    uncheckedColor = TacticalMuted,
+                    checkmarkColor = Color.White,
+                ),
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold,
+            fontSize = 15.sp,
+        )
     }
 }
