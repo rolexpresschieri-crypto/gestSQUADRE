@@ -7,7 +7,10 @@ import {
   type AdminSessionData,
 } from "@/lib/admin-auth";
 import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
-import { canManageSquadsForCourse } from "@/lib/golf-course-scope";
+import {
+  canManageSquadsForCourse,
+  deleteSquadForCourse,
+} from "@/lib/golf-course-scope";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./campo-squads-page.module.css";
 
@@ -175,15 +178,12 @@ export default function CampoSquadsPage() {
     }
 
     setBusy(true);
+    setFormError(null);
     try {
-      const { error } = await supabase
-        .from("squads")
-        .delete()
-        .eq("id", row.id)
-        .eq("golf_course_id", golfCourseId);
-
+      const { error } = await deleteSquadForCourse(supabase, row.id, golfCourseId);
       if (error) {
-        throw error;
+        setFormError(error);
+        return;
       }
       if (editingId === row.id) {
         resetForm();
@@ -242,8 +242,8 @@ export default function CampoSquadsPage() {
               <h2>Anagrafica squadre</h2>
               <p>
                 Le squadre create qui sono legate al campo{" "}
-                <strong>{session.golfCourseCode}</strong> e possono fare login
-                dall&apos;app mobile.
+                <strong>{session.golfCourseCode}</strong>{" "}
+                e possono fare login dall&apos;app mobile.
               </p>
             </div>
 

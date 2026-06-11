@@ -15,6 +15,54 @@ export function canManageSquadsForCourse(session: AdminSessionData | null): bool
   return session.role === "admin" || session.role === "campo";
 }
 
+/** Rimuove sessioni/allarmi collegati, poi la riga squadra (FK restrict su squad_sessions / squad_alarms). */
+export async function deleteSquadForCourse(
+  supabase: SupabaseClient,
+  squadId: string,
+  golfCourseId: string,
+): Promise<{ error?: string }> {
+  const { data: squad, error: fetchErr } = await supabase
+    .from("squads")
+    .select("id")
+    .eq("id", squadId)
+    .eq("golf_course_id", golfCourseId)
+    .maybeSingle();
+
+  if (fetchErr) {
+    return { error: fetchErr.message };
+  }
+  if (!squad) {
+    return { error: "Squadra non trovata su questo campo." };
+  }
+
+  const { error: alarmsErr } = await supabase
+    .from("squad_alarms")
+    .delete()
+    .eq("squad_id", squadId);
+  if (alarmsErr) {
+    return { error: alarmsErr.message };
+  }
+
+  const { error: sessionsErr } = await supabase
+    .from("squad_sessions")
+    .delete()
+    .eq("squad_id", squadId);
+  if (sessionsErr) {
+    return { error: sessionsErr.message };
+  }
+
+  const { error: squadErr } = await supabase
+    .from("squads")
+    .delete()
+    .eq("id", squadId)
+    .eq("golf_course_id", golfCourseId);
+  if (squadErr) {
+    return { error: squadErr.message };
+  }
+
+  return {};
+}
+
 export async function fetchGolfCourseSquadIds(
   supabase: SupabaseClient,
   golfCourseId: string,
