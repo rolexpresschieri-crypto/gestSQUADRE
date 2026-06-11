@@ -1,4 +1,5 @@
 import {
+  isGlobalTocAdmin,
   normalizeAdminRole,
   type AdminSessionData,
 } from "@/lib/admin-auth";
@@ -64,10 +65,10 @@ export async function loginTocAdmin(
   }
 
   const session = adminSessionFromLoginRow(data as AdminLoginRow);
-  if (session.role === "campo" && !session.golfCourseId) {
+  if (!session.golfCourseId && !isGlobalTocAdmin(session)) {
     return {
       error:
-        "Login campo senza campo golf associato. Esegui sql/golf_courses_campo.sql su Supabase.",
+        "Admin senza campo golf associato: crea golf_courses e imposta golf_course_id su toc_admins (vedi sql/k9_nvansmi_campo.sql).",
     };
   }
 
@@ -86,10 +87,10 @@ export function restoreAdminSessionFromStorage(raw: string): AdminSessionData | 
       golfCourseCode: parsed.golfCourseCode,
       golfCourseName: parsed.golfCourseName,
     };
-    if (session.role === "campo" && !session.golfCourseId) {
+    if (!session.golfCourseId && !isGlobalTocAdmin(session)) {
       return null;
     }
-    if (session.code === "GOLF_TORINO" && !session.golfCourseId) {
+    if (session.role === "campo" && !session.golfCourseId) {
       return null;
     }
     return session;

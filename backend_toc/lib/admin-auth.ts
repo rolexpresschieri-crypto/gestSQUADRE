@@ -12,6 +12,14 @@ export type AdminSessionData = {
   golfCourseName?: string;
 };
 
+/** Unico login TOC globale (tutte le squadre / waypoint). */
+export const GLOBAL_TOC_ADMIN_CODES = new Set(["TOC01"]);
+
+export function isGlobalTocAdmin(session: AdminSessionData | null): boolean {
+  const code = session?.code?.trim().toUpperCase();
+  return Boolean(code && GLOBAL_TOC_ADMIN_CODES.has(code));
+}
+
 /** Sessione legata a un campo golf (es. GOLF_TORINO → golf_torino). */
 export function isCampoGolfSession(session: AdminSessionData | null): boolean {
   return Boolean(session?.golfCourseId);
