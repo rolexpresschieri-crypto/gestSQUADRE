@@ -13,8 +13,6 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
     "firebase-admin": "^13.10.0",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
     "leaflet": "^1.9.4",
     "next": "16.2.4",
     "react": "19.2.4",
