@@ -307,21 +307,31 @@ export default function TocDashboard() {
     setStatusMessage("Waypoint eliminato.");
   }
 
+  const loadPushHealth = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+    try {
+      const q = golfCourseId
+        ? `?golfCourseId=${encodeURIComponent(golfCourseId)}`
+        : "";
+      const res = await fetch(`/api/push-health${q}`);
+      if (res.ok) {
+        setPushHealth(await res.json());
+      }
+    } catch {
+      setPushHealth(null);
+    }
+  }, [session, golfCourseId]);
+
   useEffect(() => {
     if (!session) {
       return;
     }
-    void (async () => {
-      try {
-        const res = await fetch("/api/push-health");
-        if (res.ok) {
-          setPushHealth(await res.json());
-        }
-      } catch {
-        setPushHealth(null);
-      }
-    })();
-  }, [session]);
+    void loadPushHealth();
+    const timer = window.setInterval(() => void loadPushHealth(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [session, loadPushHealth]);
 
   useEffect(() => {
     if (!session || !supabase) {
@@ -506,6 +516,7 @@ export default function TocDashboard() {
     setPushAlert(null);
     setPushSending(false);
     setPushOpen(true);
+    void loadPushHealth();
   }
 
   async function sendPush() {
@@ -530,6 +541,22 @@ export default function TocDashboard() {
     if (targets.length === 0) {
       setPushAlert("Nessuna squadra selezionata.");
       return;
+    }
+
+    const missingPushCodes = new Set(
+      (pushHealth?.onlineSquadsMissingPush ?? []).map((c) => c.toUpperCase()),
+    );
+    const targetsWithoutPush = targets.filter((s) =>
+      missingPushCodes.has(s.squadCode.toUpperCase()),
+    );
+    if (targetsWithoutPush.length > 0) {
+      const names = targetsWithoutPush.map((s) => s.squadCode).join(", ");
+      const proceed = window.confirm(
+        `ATTENZIONE: ${names} risulta/e senza token push e NON riceverà la notifica.\n\nSul telefono: login, consenti notifiche, verifica "Push TOC: attiva" in verde.\n\nInviare comunque alle altre squadre?`,
+      );
+      if (!proceed) {
+        return;
+      }
     }
 
     setPushAlert(null);
@@ -1036,21 +1063,29 @@ export default function TocDashboard() {
               Tutte le squadre online
             </label>
             {!pushTargetAll
-              ? squads.map((s) => (
-                  <label key={s.sessionId} className={styles.squadCheck}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(pushSelected[s.sessionId])}
-                      onChange={(e) =>
-                        setPushSelected((prev) => ({
-                          ...prev,
-                          [s.sessionId]: e.target.checked,
-                        }))
-                      }
-                    />{" "}
-                    {s.squadCode} — {s.squadName}
-                  </label>
-                ))
+              ? squads.map((s) => {
+                  const missingPush = (pushHealth?.onlineSquadsMissingPush ?? []).some(
+                    (code) => code.toUpperCase() === s.squadCode.toUpperCase(),
+                  );
+                  return (
+                    <label key={s.sessionId} className={styles.squadCheck}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(pushSelected[s.sessionId])}
+                        onChange={(e) =>
+                          setPushSelected((prev) => ({
+                            ...prev,
+                            [s.sessionId]: e.target.checked,
+                          }))
+                        }
+                      />{" "}
+                      {s.squadCode} — {s.squadName}
+                      {missingPush ? (
+                        <strong style={{ color: "#ff5252" }}> (senza push)</strong>
+                      ) : null}
+                    </label>
+                  );
+                })
               : null}
             {pushSingleTarget ? (
               <>

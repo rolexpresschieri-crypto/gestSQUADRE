@@ -190,6 +190,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true, messageId, alarm: useAlarm });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Errore FCM";
+    if (
+      /registration-token-not-registered|invalid-registration-token|not a valid fcm registration token/i.test(
+        msg,
+      )
+    ) {
+      await admin.from("squad_fcm_tokens").delete().eq("session_id", sessionId);
+    }
     await writePushLog("failed", { errorMessage: msg });
     return NextResponse.json({ error: msg, code: "FCM_SEND_FAILED" }, { status: 502 });
   }

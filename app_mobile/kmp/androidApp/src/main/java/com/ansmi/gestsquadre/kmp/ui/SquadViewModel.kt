@@ -64,6 +64,7 @@ class SquadViewModel(
     private var lastPublishedAtMs: Long? = null
     private var gpsJob: Job? = null
     private var sessionWatchJob: Job? = null
+    private var pushWatchJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -228,6 +229,7 @@ class SquadViewModel(
             )
         }
         startGpsTracking()
+        startPushWatchdog()
         if (fcmManager.isConfigured) {
             if (!fcmManager.ensureNotificationPermission() &&
                 android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
@@ -288,6 +290,26 @@ class SquadViewModel(
         }
     }
 
+    private fun startPushWatchdog() {
+        pushWatchJob?.cancel()
+        if (!fcmManager.isConfigured) {
+            return
+        }
+        pushWatchJob =
+            viewModelScope.launch {
+                while (isActive) {
+                    delay(5 * 60_000L)
+                    val session = _uiState.value.session ?: continue
+                    registerFcmForSession(session)
+                }
+            }
+    }
+
+    private fun stopPushWatchdog() {
+        pushWatchJob?.cancel()
+        pushWatchJob = null
+    }
+
     private fun startSessionWatchdog() {
         sessionWatchJob?.cancel()
         sessionWatchJob =
@@ -307,6 +329,7 @@ class SquadViewModel(
 
     private suspend fun handleRemoteLogout() {
         stopGpsTracking()
+        stopPushWatchdog()
         FcmSessionRegistry.clear()
         sessionStorage.clear()
         _uiState.update {
@@ -323,6 +346,7 @@ class SquadViewModel(
     }
 
     private suspend fun clearLocalSession() {
+        stopPushWatchdog()
         FcmSessionRegistry.clear()
         sessionStorage.clear()
         tocMessageStorage.clear()
@@ -414,6 +438,7 @@ class SquadViewModel(
 
     override fun onCleared() {
         stopGpsTracking()
+        stopPushWatchdog()
         sessionWatchJob?.cancel()
         super.onCleared()
     }

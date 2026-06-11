@@ -8,7 +8,10 @@ import {
 export const runtime = "nodejs";
 
 /** Verifica se il server può inviare push FCM (solo diagnostica). */
-export async function GET() {
+export async function GET(request: Request) {
+  const golfCourseId = new URL(request.url).searchParams
+    .get("golfCourseId")
+    ?.trim();
   const url =
     process.env.SUPABASE_URL?.trim() ||
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -36,10 +39,17 @@ export async function GET() {
         fcmTokenRows = tokenRows?.length ?? 0;
       }
 
-      const { data: online, error: onlineErr } = await admin
+      const onlineQuery = admin
         .from("squad_sessions")
-        .select("id, squads(squad_code)")
+        .select(
+          golfCourseId
+            ? "id, squads!inner(squad_code, golf_course_id)"
+            : "id, squads(squad_code)",
+        )
         .eq("is_online", true);
+      const { data: online, error: onlineErr } = golfCourseId
+        ? await onlineQuery.eq("squads.golf_course_id", golfCourseId)
+        : await onlineQuery;
       if (onlineErr) {
         queryError = queryError ?? onlineErr.message;
       } else if (online) {
@@ -78,7 +88,8 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    apiVersion: 2,
+    apiVersion: 3,
+    golfCourseScoped: Boolean(golfCourseId),
     supabaseUrl: Boolean(url),
     supabaseProject: url ? new URL(url).hostname.split(".")[0] : null,
     supabaseServiceRole: Boolean(serviceKey && !serviceKey.includes("YOUR_")),
