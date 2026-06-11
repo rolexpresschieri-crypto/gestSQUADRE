@@ -954,6 +954,84 @@ export default function TocDashboard() {
                 )}
               </p>
             ) : null}
+            <label>
+              <input
+                type="checkbox"
+                checked={pushTargetAll}
+                onChange={(e) => setPushTargetAll(e.target.checked)}
+              />{" "}
+              Tutte le squadre online
+            </label>
+            {!pushTargetAll
+              ? squads.map((s) => (
+                  <label key={s.sessionId} className={styles.squadCheck}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(pushSelected[s.sessionId])}
+                      onChange={(e) =>
+                        setPushSelected((prev) => ({
+                          ...prev,
+                          [s.sessionId]: e.target.checked,
+                        }))
+                      }
+                    />{" "}
+                    {s.squadCode} — {s.squadName}
+                  </label>
+                ))
+              : null}
+            {pushSingleTarget ? (
+              <>
+                <p className={styles.pushHint}>
+                  Squadra: <strong>{pushSingleTarget.squadCode}</strong> — scegli via e target
+                  (non scrivere la via nel messaggio).
+                </p>
+                {mapRoutes.length > 0 ? (
+                  <>
+                    <label className={styles.pushField}>
+                      Via da percorrere
+                      <select
+                        className={styles.pushInput}
+                        value={pushRouteId}
+                        onChange={(e) => setPushRouteId(e.target.value)}
+                      >
+                        <option value="">— Nessuna via —</option>
+                        {mapRoutes.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {r.routeCode}
+                            {r.routeName !== r.routeCode ? ` — ${r.routeName}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className={styles.pushField}>
+                      Target (waypoint)
+                      <select
+                        className={styles.pushInput}
+                        value={pushTargetWaypointId}
+                        onChange={(e) => setPushTargetWaypointId(e.target.value)}
+                      >
+                        <option value="">— Nessun target —</option>
+                        {waypoints.map((wp) => (
+                          <option key={wp.id} value={wp.id}>
+                            {waypointDisplayName(wp)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                ) : (
+                  <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
+                    Nessuna via in database: su Supabase esegui{" "}
+                    <code>sql/map_routes.sql</code> e{" "}
+                    <code>sql/import_routes_golf_torino_seed.sql</code>, poi ricarica la pagina.
+                  </p>
+                )}
+              </>
+            ) : !pushTargetAll ? (
+              <p className={styles.pushHint}>
+                Per assegnare una via, seleziona <strong>una sola</strong> squadra (non tutte).
+              </p>
+            ) : null}
             <label className={styles.pushField}>
               Titolo notifica
               <input
@@ -983,70 +1061,6 @@ export default function TocDashboard() {
               <p className={styles.pushAlert} role="alert">
                 {pushAlert}
               </p>
-            ) : null}
-            <label>
-              <input
-                type="checkbox"
-                checked={pushTargetAll}
-                onChange={(e) => setPushTargetAll(e.target.checked)}
-              />{" "}
-              Tutte le squadre online
-            </label>
-            {!pushTargetAll
-              ? squads.map((s) => (
-                  <label key={s.sessionId} className={styles.squadCheck}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(pushSelected[s.sessionId])}
-                      onChange={(e) =>
-                        setPushSelected((prev) => ({
-                          ...prev,
-                          [s.sessionId]: e.target.checked,
-                        }))
-                      }
-                    />{" "}
-                    {s.squadCode} — {s.squadName}
-                  </label>
-                ))
-              : null}
-            {pushSingleTarget && mapRoutes.length > 0 ? (
-              <>
-                <label className={styles.pushField}>
-                  Via da percorrere (opzionale)
-                  <select
-                    className={styles.pushInput}
-                    value={pushRouteId}
-                    onChange={(e) => setPushRouteId(e.target.value)}
-                  >
-                    <option value="">— Nessuna via —</option>
-                    {mapRoutes.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.routeCode}
-                        {r.routeName !== r.routeCode ? ` — ${r.routeName}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={styles.pushField}>
-                  Target (waypoint)
-                  <select
-                    className={styles.pushInput}
-                    value={pushTargetWaypointId}
-                    onChange={(e) => setPushTargetWaypointId(e.target.value)}
-                  >
-                    <option value="">— Nessun target —</option>
-                    {waypoints.map((wp) => (
-                      <option key={wp.id} value={wp.id}>
-                        {waypointDisplayName(wp)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <p className={styles.pushHint}>
-                  Con una sola squadra selezionata: assegna la via e mostra solo quella polyline
-                  sulla mappa (TOC e cellulare).
-                </p>
-              </>
             ) : null}
             <div className={styles.actions} style={{ marginTop: 12 }}>
               <button
