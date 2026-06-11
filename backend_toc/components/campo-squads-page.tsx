@@ -11,7 +11,11 @@ import {
   canManageSquadsForCourse,
   deleteSquadForCourse,
 } from "@/lib/golf-course-scope";
-import { printSquadsAsPdf, type SquadExportRow } from "@/lib/squad-export";
+import {
+  printSquadsAsPdf,
+  squadsPdfDocumentTitle,
+  type SquadExportRow,
+} from "@/lib/squad-export";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./campo-squads-page.module.css";
 
@@ -174,9 +178,7 @@ export default function CampoSquadsPage() {
     const rows: SquadExportRow[] = squads.map((row) => ({
       squadCode: row.squad_code.toUpperCase(),
       squadName: row.squad_name,
-      password: row.password_hash,
       isEnabled: row.is_enabled,
-      mapColor: row.map_color,
     }));
     const ok = printSquadsAsPdf(rows, courseLabel, courseCode);
     if (!ok) {
@@ -184,7 +186,9 @@ export default function CampoSquadsPage() {
       return;
     }
     setFormError(null);
-    setToast("Stampa PDF: scegli «Salva come PDF» o «Microsoft Print to PDF».");
+    setToast(
+      `Salva come PDF (nome suggerito: ${squadsPdfDocumentTitle(courseCode)}.pdf).`,
+    );
   }
 
   async function handleToggleEnabled(row: SquadRow) {

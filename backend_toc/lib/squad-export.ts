@@ -1,9 +1,7 @@
 export type SquadExportRow = {
   squadCode: string;
   squadName: string;
-  password: string;
   isEnabled: boolean;
-  mapColor: string | null;
 };
 
 function escapeHtml(text: string): string {
@@ -20,6 +18,12 @@ export function sortSquadsForExport(rows: SquadExportRow[]): SquadExportRow[] {
   );
 }
 
+export function squadsPdfDocumentTitle(courseCode: string): string {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const safeCode = courseCode.trim().replace(/[^\w-]+/g, "_") || "campo";
+  return `gestSQUADRE elenco squadre ${safeCode} ${stamp}`;
+}
+
 export function squadsPrintHtml(
   rows: SquadExportRow[],
   courseLabel: string,
@@ -27,14 +31,13 @@ export function squadsPrintHtml(
 ): string {
   const sorted = sortSquadsForExport(rows);
   const exportedAt = new Date().toLocaleString("it-IT");
+  const docTitle = squadsPdfDocumentTitle(courseCode);
   const bodyRows = sorted
     .map(
       (r) => `<tr>
         <td><strong>${escapeHtml(r.squadCode)}</strong></td>
         <td>${escapeHtml(r.squadName)}</td>
-        <td>${escapeHtml(r.password)}</td>
         <td>${r.isEnabled ? "Attiva" : "Disabilitata"}</td>
-        <td><span class="colorSwatch" style="background:${escapeHtml(r.mapColor?.trim() || "#079B42")}"></span> ${escapeHtml(r.mapColor?.trim() || "#079B42")}</td>
       </tr>`,
     )
     .join("");
@@ -43,7 +46,7 @@ export function squadsPrintHtml(
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>Squadre ${escapeHtml(courseCode)} — gestSQUADRE</title>
+  <title>${escapeHtml(docTitle)}</title>
   <style>
     @page { size: A4 portrait; margin: 14mm; }
     body { font-family: system-ui, sans-serif; padding: 16px; color: #111; }
@@ -52,26 +55,23 @@ export function squadsPrintHtml(
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th, td { border: 1px solid #bbb; padding: 7px 8px; text-align: left; vertical-align: middle; }
     th { background: #eee; font-weight: 700; }
-    .colorSwatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid #999; vertical-align: middle; margin-right: 4px; }
     tfoot td { border: none; padding-top: 12px; font-size: 11px; color: #555; }
   </style>
 </head>
 <body>
-  <h1>Anagrafica squadre — ${escapeHtml(courseLabel)}</h1>
+  <h1>Elenco squadre — ${escapeHtml(courseLabel)}</h1>
   <p class="meta">Campo: ${escapeHtml(courseCode)} · Esportato: ${escapeHtml(exportedAt)} · Ordine: codice squadra (A→Z)</p>
   <table>
     <thead>
       <tr>
         <th>Codice squadra</th>
         <th>Nome squadra</th>
-        <th>Password app</th>
         <th>Stato</th>
-        <th>Colore mappa</th>
       </tr>
     </thead>
     <tbody>${bodyRows}</tbody>
     <tfoot>
-      <tr><td colspan="5">Totale squadre: ${sorted.length}</td></tr>
+      <tr><td colspan="3">Totale squadre: ${sorted.length}</td></tr>
     </tfoot>
   </table>
 </body>
@@ -101,9 +101,11 @@ export function printSquadsAsPdf(
     return false;
   }
 
+  const docTitle = squadsPdfDocumentTitle(courseCode);
   doc.open();
   doc.write(squadsPrintHtml(rows, courseLabel, courseCode));
   doc.close();
+  doc.title = docTitle;
 
   const triggerPrint = () => {
     try {
