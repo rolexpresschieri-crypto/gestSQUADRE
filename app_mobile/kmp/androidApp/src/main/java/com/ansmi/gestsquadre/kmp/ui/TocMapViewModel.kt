@@ -73,7 +73,10 @@ class TocMapViewModel(
                 val waypoints = facade.loadMapWaypoints()
                 val alarming = facade.loadAlarmingSessionIds()
                 val activeRoute =
-                    focusSessionId?.let { facade.loadActiveRouteAssignment(it) }
+                    focusSessionId?.let { sessionId ->
+                        runCatching { facade.loadActiveRouteAssignment(sessionId) }
+                            .getOrNull()
+                    }
                 _uiState.update {
                     it.copy(
                         loading = false,

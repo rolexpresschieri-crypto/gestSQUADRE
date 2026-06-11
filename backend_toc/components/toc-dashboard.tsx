@@ -720,6 +720,18 @@ export default function TocDashboard() {
                 ))}
               </select>
             </label>
+            {selectedSessionId && selectedRouteAssignment ? (
+              <span className={styles.pushHint}>
+                Via attiva: <strong>{selectedRouteAssignment.routeCode}</strong>
+                {selectedRouteAssignment.targetLabel
+                  ? ` → ${selectedRouteAssignment.targetLabel}`
+                  : ""}
+              </span>
+            ) : selectedSessionId ? (
+              <span className={styles.pushHint} style={{ color: "#ffb74d" }}>
+                Squadra selezionata: nessuna via assegnata (invia push con via + target).
+              </span>
+            ) : null}
           </div>
           <SquadLiveMap
             layerMode={layerMode}

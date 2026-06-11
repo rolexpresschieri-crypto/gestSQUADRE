@@ -21,6 +21,11 @@ private data class EventIdRow(
     val id: String,
 )
 
+@Serializable
+private data class WaypointLabelRow(
+    val label: String? = null,
+)
+
 class TocMapRepository(
     config: GestSquadreConfig,
 ) {
@@ -89,7 +94,7 @@ class TocMapRepository(
         val targetId = assignment.targetWaypointId
         if (!targetId.isNullOrBlank()) {
             val wp =
-                rest.getList<MapWaypointRow>(
+                rest.getList<WaypointLabelRow>(
                     table = "squad_map_points",
                     select = "label",
                     eqFilters = listOf("id" to targetId),
