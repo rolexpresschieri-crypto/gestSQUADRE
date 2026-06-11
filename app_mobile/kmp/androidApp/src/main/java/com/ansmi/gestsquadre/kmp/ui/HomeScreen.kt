@@ -305,6 +305,24 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
+                    uiState.pushStatusLabel?.let { label ->
+                        TacticalBodyText(
+                            text = label,
+                            fontSize = 13,
+                            color = if (uiState.pushStatusOk) Color(0xFF8FE88F) else TacticalRed,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
+                    if (!uiState.pushStatusOk) {
+                        MainButton(
+                            label = "Ripara push TOC",
+                            backgroundColor = TacticalNavy,
+                            foregroundColor = Color.White,
+                            onClick = { viewModel.retryPushRegistration() },
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     TacticalBodyText(
                         text = SquadAlarmHint,
                         fontSize = 13,

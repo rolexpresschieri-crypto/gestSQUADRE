@@ -38,6 +38,8 @@ data class SquadUiState(
     val gpsStatusLabel: String? = null,
     val requestLocationPermission: Boolean = false,
     val requestNotificationPermission: Boolean = false,
+    val pushStatusLabel: String? = null,
+    val pushStatusOk: Boolean = false,
 )
 
 class SquadViewModel(
@@ -178,7 +180,6 @@ class SquadViewModel(
                 android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
             ) {
                 _uiState.update { it.copy(requestNotificationPermission = true) }
-                return@launch
             }
             registerFcmForSession(session)
         }
@@ -186,15 +187,15 @@ class SquadViewModel(
 
     fun onNotificationPermissionResult(granted: Boolean) {
         val session = _uiState.value.session ?: return
-        if (!granted) {
-            _uiState.update {
-                it.copy(
-                    bannerMessage = "Notifiche disabilitate: il TOC non potrà inviarti push.",
-                )
-            }
-            return
-        }
         viewModelScope.launch {
+            if (!granted) {
+                _uiState.update {
+                    it.copy(
+                        bannerMessage =
+                            "Notifiche disabilitate: abilitale in Impostazioni per vedere gli allarmi sul telefono.",
+                    )
+                }
+            }
             registerFcmForSession(session)
         }
     }
@@ -232,12 +233,13 @@ class SquadViewModel(
                 android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
             ) {
                 _uiState.update { it.copy(requestNotificationPermission = true) }
-            } else {
-                registerFcmForSession(session)
             }
+            registerFcmForSession(session)
         } else {
             _uiState.update {
                 it.copy(
+                    pushStatusLabel = "Push TOC disabilitata nell'APK (Firebase).",
+                    pushStatusOk = false,
                     bannerMessage =
                         "Push TOC disabilitata: configura FIREBASE_* in dart-defines.json.",
                 )
@@ -262,20 +264,26 @@ class SquadViewModel(
         bindFcmSession(session)
         val err = fcmManager.registerToken(facade, session)
         if (err != null) {
+            val registeredOnServer = err.contains("Push registrata", ignoreCase = true)
             _uiState.update { state ->
                 state.copy(
-                    bannerMessage =
-                        if (state.bannerMessage == null) err else state.bannerMessage,
+                    pushStatusLabel = err,
+                    pushStatusOk = registeredOnServer,
+                    bannerMessage = err,
                 )
             }
         } else {
             _uiState.update { state ->
-                val banner = state.bannerMessage
-                if (banner != null && banner.contains("token push", ignoreCase = true)) {
-                    state.copy(bannerMessage = null)
-                } else {
-                    state
-                }
+                state.copy(
+                    pushStatusLabel = "Push TOC: attiva (il server può inviarti allarmi).",
+                    pushStatusOk = true,
+                    bannerMessage =
+                        state.bannerMessage?.takeUnless { msg ->
+                            msg.contains("token push", ignoreCase = true) ||
+                                msg.contains("Push TOC", ignoreCase = true) ||
+                                msg.contains("notifiche", ignoreCase = true)
+                        },
+                )
             }
         }
     }
@@ -308,6 +316,8 @@ class SquadViewModel(
                 lastGpsAccuracyM = null,
                 gpsStatusLabel = null,
                 bannerMessage = "Logout effettuato dal TOC.",
+                pushStatusLabel = null,
+                pushStatusOk = false,
             )
         }
     }
@@ -323,6 +333,8 @@ class SquadViewModel(
                 lastTocMessage = null,
                 lastGpsAccuracyM = null,
                 gpsStatusLabel = null,
+                pushStatusLabel = null,
+                pushStatusOk = false,
             )
         }
     }

@@ -47,11 +47,9 @@ class FcmManager(
             return "Push TOC disabilitata: configura FIREBASE_* in dart-defines.json."
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-            !ensureNotificationPermission()
-        ) {
-            return "Consenti le notifiche, poi logout/login."
-        }
+        val notificationsMissing =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                !ensureNotificationPermission()
 
         var lastError: String? = null
         repeat(3) { attempt ->
@@ -72,7 +70,11 @@ class FcmManager(
                         squadId = session.squadId,
                         token = token,
                     )
-                    null
+                    if (notificationsMissing) {
+                        "Push registrata sul server. Abilita le notifiche in Impostazioni → gestSQUADRE."
+                    } else {
+                        null
+                    }
                 } catch (e: GestSquadreException) {
                     e.message ?: "Errore salvataggio token push su Supabase."
                 } catch (e: Exception) {
