@@ -524,8 +524,11 @@ export default function TocDashboard() {
           errors.push(`${squad.squadCode}: via — ${assignErr}`);
           continue;
         }
-        if (selectedSessionId === squad.sessionId) {
-          await loadSelectedRouteAssignment();
+        setSelectedSessionId(squad.sessionId);
+        if (supabase) {
+          setSelectedRouteAssignment(
+            await fetchActiveRouteAssignment(supabase, squad.sessionId),
+          );
         }
       }
 
@@ -562,7 +565,11 @@ export default function TocDashboard() {
     if (fail === 0) {
       writeStoredPushMessage(title, body);
       setPushOpen(false);
-      setStatusMessage(`Push inviate con successo: ${ok} squadra/e.`);
+      const routeHint =
+        selectedRoute && pushSingleTarget
+          ? ` Via ${selectedRoute.routeCode} sulla mappa (squadra ${pushSingleTarget.squadCode} selezionata).`
+          : "";
+      setStatusMessage(`Push inviate con successo: ${ok} squadra/e.${routeHint}`);
     } else {
       setStatusMessage(
         `Push: ${ok} ok, ${fail} errori. ${errors.slice(0, 2).join(" | ")}`,
@@ -729,7 +736,14 @@ export default function TocDashboard() {
             }
             alarmingSessionIds={alarmingSessionIds}
             selectedSessionId={selectedSessionId}
-            onSelect={(s) => setSelectedSessionId(s.sessionId)}
+            onSelect={(s) => {
+              setSelectedSessionId(s.sessionId);
+              if (supabase) {
+                void fetchActiveRouteAssignment(supabase, s.sessionId).then(
+                  setSelectedRouteAssignment,
+                );
+              }
+            }}
             canManageWaypoints={canEditWaypointsOnMap && Boolean(activeEventId)}
             onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}
             onDeleteWaypoint={(wp) => void handleDeleteWaypointFromMap(wp)}

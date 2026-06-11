@@ -29,7 +29,7 @@ export type SquadRouteAssignment = {
   assignedAt: string;
 };
 
-function parsePoints(raw: unknown): MapRoutePoint[] {
+export function parsePoints(raw: unknown): MapRoutePoint[] {
   if (!Array.isArray(raw)) {
     return [];
   }
@@ -87,56 +87,55 @@ export async function fetchActiveRouteAssignment(
   supabase: SupabaseClient,
   sessionId: string,
 ): Promise<SquadRouteAssignment | null> {
-  const { data, error } = await supabase
+  const { data: assignment, error: assignmentErr } = await supabase
     .from("squad_route_assignments")
-    .select(
-      "id, session_id, route_id, target_waypoint_id, assigned_at, map_routes(route_code, route_name, color_hex, points), squad_map_points(label)",
-    )
+    .select("id, session_id, route_id, target_waypoint_id, assigned_at")
     .eq("session_id", sessionId)
     .is("cleared_at", null)
+    .order("assigned_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
-  if (error || !data) {
+  if (assignmentErr || !assignment?.route_id) {
     return null;
   }
 
-  const routeJoin = data.map_routes as
-    | {
-        route_code: string;
-        route_name: string | null;
-        color_hex: string | null;
-        points: unknown;
-      }
-    | {
-        route_code: string;
-        route_name: string | null;
-        color_hex: string | null;
-        points: unknown;
-      }[]
-    | null;
-  const route = Array.isArray(routeJoin) ? routeJoin[0] : routeJoin;
-  if (!route) {
+  const { data: route, error: routeErr } = await supabase
+    .from("map_routes")
+    .select("route_code, route_name, color_hex, points")
+    .eq("id", assignment.route_id as string)
+    .maybeSingle();
+
+  if (routeErr || !route) {
     return null;
   }
-
-  const wpJoin = data.squad_map_points as { label: string | null } | { label: string | null }[] | null;
-  const wp = Array.isArray(wpJoin) ? wpJoin[0] : wpJoin;
 
   const points = parsePoints(route.points);
   if (points.length < 2) {
     return null;
   }
 
+  let targetLabel: string | null = null;
+  const targetId = assignment.target_waypoint_id as string | null;
+  if (targetId) {
+    const { data: wp } = await supabase
+      .from("squad_map_points")
+      .select("label")
+      .eq("id", targetId)
+      .maybeSingle();
+    targetLabel = (wp?.label as string | null) ?? null;
+  }
+
   return {
-    id: String(data.id),
-    sessionId: String(data.session_id),
-    routeId: String(data.route_id),
-    routeCode: route.route_code,
-    routeName: route.route_name ?? route.route_code,
-    colorHex: route.color_hex ?? "#079B42",
+    id: String(assignment.id),
+    sessionId: String(assignment.session_id),
+    routeId: String(assignment.route_id),
+    routeCode: String(route.route_code),
+    routeName: String(route.route_name ?? route.route_code),
+    colorHex: String(route.color_hex ?? "#079B42"),
     points,
-    targetWaypointId: (data.target_waypoint_id as string | null) ?? null,
-    targetLabel: wp?.label ?? null,
-    assignedAt: String(data.assigned_at),
+    targetWaypointId: targetId,
+    targetLabel,
+    assignedAt: String(assignment.assigned_at),
   };
 }

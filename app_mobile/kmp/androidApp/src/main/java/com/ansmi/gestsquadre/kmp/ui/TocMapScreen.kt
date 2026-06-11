@@ -85,12 +85,14 @@ fun TocMapScreen(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val storage = remember { MapViewStorage(appContext) }
+    val focusSessionId = currentSession?.sessionId
     val viewModel: TocMapViewModel =
         viewModel(
+            key = focusSessionId ?: "map-guest",
             factory = TocMapViewModelFactory(
                 facade,
                 appContext,
-                currentSession?.sessionId,
+                focusSessionId,
             ),
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -167,17 +169,6 @@ fun TocMapScreen(
                             overlays.filter { it is Marker || it is Polygon || it is Polyline },
                         )
                         val selfId = currentSession?.sessionId
-                        uiState.activeRoute?.let { route ->
-                            if (route.points.size >= 2) {
-                                val polyline = Polyline(map)
-                                polyline.setPoints(
-                                    route.points.map { (lat, lng) -> GeoPoint(lat, lng) },
-                                )
-                                polyline.outlinePaint.color = route.colorArgb.toInt()
-                                polyline.outlinePaint.strokeWidth = 12f
-                                overlays.add(polyline)
-                            }
-                        }
                         for (wp in uiState.waypoints) {
                             val marker = Marker(map)
                             marker.position = GeoPoint(wp.latitude, wp.longitude)
@@ -212,6 +203,18 @@ fun TocMapScreen(
                                 circle.outlinePaint.color = base.copy(alpha = 0.55f).toArgb()
                                 circle.outlinePaint.strokeWidth = 1f
                                 overlays.add(circle)
+                            }
+                        }
+                        uiState.activeRoute?.let { route ->
+                            if (route.points.size >= 2) {
+                                val polyline = Polyline(map)
+                                polyline.setPoints(
+                                    route.points.map { (lat, lng) -> GeoPoint(lat, lng) },
+                                )
+                                polyline.outlinePaint.color = route.colorArgb.toInt()
+                                polyline.outlinePaint.strokeWidth = 14f
+                                polyline.outlinePaint.isAntiAlias = true
+                                overlays.add(polyline)
                             }
                         }
                         map.invalidate()

@@ -1,5 +1,8 @@
 -- Vie percorribili (.trk Garmin / TwoNav) per campo golf
 -- Eseguire su Supabase dopo golf_courses_campo.sql
+--
+-- Opzionale (aggiornamenti mappa in tempo reale): in Dashboard → Database →
+-- Replication aggiungi squad_route_assignments alla publication supabase_realtime.
 
 create table if not exists map_routes (
   id uuid primary key default gen_random_uuid(),

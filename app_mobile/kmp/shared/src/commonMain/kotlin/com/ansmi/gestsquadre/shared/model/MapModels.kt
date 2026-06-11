@@ -2,6 +2,11 @@ package com.ansmi.gestsquadre.shared.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @Serializable
 data class ActiveSquadSummaryRow(
@@ -82,18 +87,12 @@ fun MapWaypointRow.toMapWaypointPin(): MapWaypointPin? {
 }
 
 @Serializable
-data class MapRoutePointRow(
-    val lat: Double,
-    val lng: Double,
-)
-
-@Serializable
 data class MapRouteRow(
     val id: String,
     @SerialName("route_code") val routeCode: String,
     @SerialName("route_name") val routeName: String? = null,
     @SerialName("color_hex") val colorHex: String? = null,
-    val points: List<MapRoutePointRow> = emptyList(),
+    val points: JsonElement? = null,
 )
 
 @Serializable
@@ -120,11 +119,22 @@ data class ActiveRouteAssignment(
     val targetLabel: String? = null,
 )
 
-fun MapRouteRow.toMapRoutePin(): MapRoutePin? {
-    val coords =
-        points.mapNotNull { p ->
-            if (p.lat.isFinite() && p.lng.isFinite()) p.lat to p.lng else null
+fun parseRoutePointsJson(points: JsonElement?): List<Pair<Double, Double>> {
+    val array = points?.jsonArray ?: return emptyList()
+    return array.mapNotNull { element ->
+        val obj = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+        val lat = runCatching { obj["lat"]?.jsonPrimitive?.double }.getOrNull()
+        val lng = runCatching { obj["lng"]?.jsonPrimitive?.double }.getOrNull()
+        if (lat != null && lng != null && lat.isFinite() && lng.isFinite()) {
+            lat to lng
+        } else {
+            null
         }
+    }
+}
+
+fun MapRouteRow.toMapRoutePin(): MapRoutePin? {
+    val coords = parseRoutePointsJson(points)
     if (coords.size < 2) {
         return null
     }
