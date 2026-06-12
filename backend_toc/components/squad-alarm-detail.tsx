@@ -23,10 +23,8 @@ export function SquadAlarmRequestDetail({ row }: { row: AlarmDetailRow }) {
       {parts.map((part, index) => (
         <Fragment key={part.code}>
           {index > 0 ? <span className={styles.sep}> · </span> : null}
-          {part.variant === "forze_ordine" ? (
-            <span className={styles.flagForzeOrdine}>FORZE DELL&apos;ORDINE</span>
-          ) : part.variant === "vvf" ? (
-            <span className={styles.flagVvf}>V.V.F.</span>
+          {part.variant === "forze_ordine" || part.variant === "vvf" ? (
+            <span className={styles.flagHighlight}>{part.label}</span>
           ) : (
             <span>{part.label}</span>
           )}

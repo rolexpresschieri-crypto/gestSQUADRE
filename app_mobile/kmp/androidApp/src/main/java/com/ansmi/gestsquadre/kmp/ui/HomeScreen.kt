@@ -493,7 +493,7 @@ private fun SquadAlarmRequestDialog(
                         validationError = null
                     },
                     labelColor = Color.Black,
-                    labelBackground = Color(0xFFFF00),
+                    highlightBackground = Color(0xFFFF00),
                 )
                 AlarmRequestCheckboxRow(
                     label = "5. V.V.F.",
@@ -503,7 +503,7 @@ private fun SquadAlarmRequestDialog(
                         validationError = null
                     },
                     labelColor = Color.Black,
-                    labelBackground = Color(0xFFFF00),
+                    highlightBackground = Color(0xFFFF00),
                 )
                 AlarmRequestCheckboxRow(
                     label = "6. Altro",
@@ -581,15 +581,23 @@ private fun AlarmRequestCheckboxRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     labelColor: Color = Color.White,
-    labelBackground: Color? = null,
+    highlightBackground: Color? = null,
     labelUppercase: Boolean = false,
 ) {
+    val highlighted = highlightBackground != null
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable { onCheckedChange(!checked) }
-                .padding(vertical = 2.dp),
+                .padding(vertical = 2.dp)
+                .then(
+                    highlightBackground?.let { bg ->
+                        Modifier
+                            .background(bg, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    } ?: Modifier,
+                )
+                .clickable { onCheckedChange(!checked) },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Checkbox(
@@ -598,7 +606,7 @@ private fun AlarmRequestCheckboxRow(
             colors =
                 CheckboxDefaults.colors(
                     checkedColor = TacticalRed,
-                    uncheckedColor = TacticalMuted,
+                    uncheckedColor = if (highlighted) Color.Black else TacticalMuted,
                     checkmarkColor = Color.White,
                 ),
         )
@@ -607,18 +615,13 @@ private fun AlarmRequestCheckboxRow(
         Text(
             text = displayLabel,
             color = labelColor,
-            fontWeight = if (labelBackground != null || labelColor == TacticalRed) {
-                FontWeight.Black
-            } else {
-                FontWeight.SemiBold
-            },
+            fontWeight =
+                if (highlighted || labelColor == TacticalRed) {
+                    FontWeight.Black
+                } else {
+                    FontWeight.SemiBold
+                },
             fontSize = 15.sp,
-            modifier =
-                labelBackground?.let { bg ->
-                    Modifier
-                        .background(bg, RoundedCornerShape(4.dp))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                } ?: Modifier,
         )
     }
 }
