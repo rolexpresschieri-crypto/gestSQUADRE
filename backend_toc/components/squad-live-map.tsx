@@ -95,23 +95,29 @@ type DrawnRoute = {
 /** Dopo pan/zoom manuale non ri-inquadrare automaticamente la mappa. */
 const MapUserNavContext = createContext<RefObject<boolean> | null>(null);
 
+function useMapUserNavRef() {
+  return useContext(MapUserNavContext);
+}
+
 function MapUserNavProvider({ children }: { children: ReactNode }) {
   const map = useMap();
   const userNavRef = useRef(false);
 
   useEffect(() => {
-    const onDrag = () => {
+    const markUserNav = () => {
       userNavRef.current = true;
     };
     const onZoom = (event: L.LeafletEvent) => {
       if (event.originalEvent) {
-        userNavRef.current = true;
+        markUserNav();
       }
     };
-    map.on("dragstart", onDrag);
+    map.on("dragstart", markUserNav);
+    map.on("movestart", markUserNav);
     map.on("zoomstart", onZoom);
     return () => {
-      map.off("dragstart", onDrag);
+      map.off("dragstart", markUserNav);
+      map.off("movestart", markUserNav);
       map.off("zoomstart", onZoom);
     };
   }, [map]);
@@ -119,6 +125,28 @@ function MapUserNavProvider({ children }: { children: ReactNode }) {
   return (
     <MapUserNavContext.Provider value={userNavRef}>{children}</MapUserNavContext.Provider>
   );
+}
+
+/** Evita che vie TRK spariscano per un refresh vuoto del polling. */
+function useStableRoutes(routes: DrawnRoute[]): DrawnRoute[] {
+  const cacheRef = useRef<DrawnRoute[]>([]);
+  const lastSeenMsRef = useRef(0);
+
+  return useMemo(() => {
+    if (routes.length > 0) {
+      cacheRef.current = routes;
+      lastSeenMsRef.current = Date.now();
+      return routes;
+    }
+    if (
+      cacheRef.current.length > 0 &&
+      Date.now() - lastSeenMsRef.current < 30_000
+    ) {
+      return cacheRef.current;
+    }
+    cacheRef.current = [];
+    return [];
+  }, [routes]);
 }
 
 function MapBoundsController({
@@ -134,7 +162,8 @@ function MapBoundsController({
   preferOperationalArea: boolean;
 }) {
   const map = useMap();
-  const userNavRef = useContext(MapUserNavContext);
+  const userNavRef = useMapUserNavRef();
+  const autoFitDoneRef = useRef(false);
   const lastBoundsSignatureRef = useRef<string | null>(null);
 
   const boundsSignature = useMemo(() => {
@@ -180,65 +209,23 @@ function MapBoundsController({
     if (boundsSignature === lastBoundsSignatureRef.current) {
       return;
     }
-    if (userNavRef?.current) {
-      lastBoundsSignatureRef.current = boundsSignature;
+    lastBoundsSignatureRef.current = boundsSignature;
+
+    if (autoFitDoneRef.current || userNavRef?.current) {
       return;
     }
-    lastBoundsSignatureRef.current = boundsSignature;
 
     if (points.length === 0) {
       return;
     }
     if (points.length === 1) {
       map.setView(points[0], 15);
+      autoFitDoneRef.current = true;
       return;
     }
     map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
-  }, [map, boundsSignature, points]);
-
-  return null;
-}
-
-function MapFocusSelected({
-  squads,
-  selectedSessionId,
-  enabled,
-}: {
-  squads: LiveSquad[];
-  selectedSessionId: string | null;
-  enabled: boolean;
-}) {
-  const map = useMap();
-  const userNavRef = useContext(MapUserNavContext);
-  const lastFocusedSessionRef = useRef<string | null>(null);
-  const prevSelectedSessionRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!enabled) {
-      return;
-    }
-    if (!selectedSessionId) {
-      prevSelectedSessionRef.current = null;
-      return;
-    }
-    const selectionChanged = prevSelectedSessionRef.current !== selectedSessionId;
-    prevSelectedSessionRef.current = selectedSessionId;
-
-    if (!selectionChanged && lastFocusedSessionRef.current === selectedSessionId) {
-      return;
-    }
-    if (!selectionChanged && userNavRef?.current) {
-      return;
-    }
-    const squad = squads.find((s) => s.sessionId === selectedSessionId);
-    if (!squad || !hasCoordinates(squad)) {
-      return;
-    }
-    lastFocusedSessionRef.current = selectedSessionId;
-    map.flyTo([squad.lastLatitude!, squad.lastLongitude!], Math.max(map.getZoom(), 15), {
-      duration: 0.5,
-    });
-  }, [map, enabled, selectedSessionId, squads, userNavRef]);
+    autoFitDoneRef.current = true;
+  }, [map, boundsSignature, points, userNavRef]);
 
   return null;
 }
@@ -289,26 +276,41 @@ function ActiveRoutePolylines({
 
 function LeafletInvalidateOnLayout() {
   const map = useMap();
+  const userNavRef = useMapUserNavRef();
 
   useEffect(() => {
     const el = map.getContainer();
-    const invalidate = () => map.invalidateSize({ animate: false });
+    let resizeTimer: number | null = null;
+
+    const invalidate = () => {
+      if (userNavRef?.current) {
+        return;
+      }
+      map.invalidateSize({ animate: false });
+    };
 
     invalidate();
-    const raf = requestAnimationFrame(() => {
-      invalidate();
-      requestAnimationFrame(invalidate);
+    const mountTimer = window.setTimeout(invalidate, 120);
+
+    const ro = new ResizeObserver(() => {
+      if (userNavRef?.current) {
+        return;
+      }
+      if (resizeTimer != null) {
+        window.clearTimeout(resizeTimer);
+      }
+      resizeTimer = window.setTimeout(invalidate, 250);
     });
-    const timeouts = [40, 120, 350, 800].map((ms) => window.setTimeout(invalidate, ms));
-    const ro = new ResizeObserver(() => invalidate());
     ro.observe(el);
 
     return () => {
-      cancelAnimationFrame(raf);
-      timeouts.forEach(clearTimeout);
+      window.clearTimeout(mountTimer);
+      if (resizeTimer != null) {
+        window.clearTimeout(resizeTimer);
+      }
       ro.disconnect();
     };
-  }, [map]);
+  }, [map, userNavRef]);
 
   return null;
 }
@@ -353,7 +355,7 @@ export default function SquadLiveMap({
 }: SquadLiveMapProps) {
   const withCoords = squads.filter(hasCoordinates);
   const tile = getMapTileConfig(layerMode);
-  const routesToDraw = useMemo(() => {
+  const rawRoutesToDraw = useMemo(() => {
     if (activeRoutes.length > 0) {
       return activeRoutes.filter((route) => route.points.length >= 2);
     }
@@ -362,6 +364,7 @@ export default function SquadLiveMap({
     }
     return [];
   }, [activeRoute, activeRoutes]);
+  const routesToDraw = useStableRoutes(rawRoutesToDraw);
 
   return (
     <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
@@ -376,18 +379,13 @@ export default function SquadLiveMap({
           attribution={tile.attribution}
           url={tile.url}
         />
-        <LeafletInvalidateOnLayout />
         <MapUserNavProvider>
+          <LeafletInvalidateOnLayout />
           <MapBoundsController
             squads={withCoords}
             waypoints={waypoints}
             activeRoutes={routesToDraw}
             preferOperationalArea={routesToDraw.length > 0}
-          />
-          <MapFocusSelected
-            squads={withCoords}
-            selectedSessionId={selectedSessionId}
-            enabled={routesToDraw.length === 0}
           />
         </MapUserNavProvider>
         {waypoints.map((wp) => (

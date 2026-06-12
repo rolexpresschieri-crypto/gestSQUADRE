@@ -339,7 +339,6 @@ function MapFullscreenContent() {
     const timer = window.setInterval(() => {
       void loadSquads();
       void loadActiveAlarms();
-      void loadRouteAssignments();
     }, MAP_SQUAD_POLL_MS);
 
     return () => {
