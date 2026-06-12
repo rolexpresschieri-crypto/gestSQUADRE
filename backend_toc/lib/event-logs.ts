@@ -28,9 +28,23 @@ export type TocPushLogRow = {
   is_alarm: boolean;
   route_code?: string | null;
   target_waypoint_label?: string | null;
+  mobile_dismissed_at?: string | null;
+  closed_at?: string | null;
+  closed_by?: string | null;
   fcm_message_id: string | null;
   status: string;
   error_message: string | null;
+  created_at: string;
+};
+
+export type SquadMobileDismissLogRow = {
+  id: string;
+  event_id: string;
+  session_id: string;
+  squad_id: string;
+  squad_code: string;
+  squad_name: string;
+  panel_message: string | null;
   created_at: string;
 };
 
@@ -77,7 +91,13 @@ function formatTocPushDetail(p: TocPushLogRow): string {
 
 export type UnifiedEventLog = {
   id: string;
-  kind: "squad_alarm" | "fine_evento" | "toc_push" | "toc_mission_close";
+  kind:
+    | "squad_alarm"
+    | "fine_evento"
+    | "toc_push"
+    | "toc_push_close"
+    | "toc_mission_close"
+    | "mobile_dismiss";
   createdAt: string;
   squadCode: string;
   squadName: string;
@@ -91,6 +111,7 @@ export function mergeEventLogs(
   alarms: SquadAlarmLogRow[],
   pushes: TocPushLogRow[],
   missionCloses: TocMissionCloseLogRow[] = [],
+  mobileDismisses: SquadMobileDismissLogRow[] = [],
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
@@ -102,7 +123,7 @@ export function mergeEventLogs(
       squadName: a.squad_name,
       summary: "Allarme volontario → TOC",
       detail: formatAlarmRequestDetail(a),
-      status: a.acknowledged_at ? "chiuso" : "attivo",
+      status: a.acknowledged_at ? "chiuso" : "inviato",
       actor: "—",
     });
     if (a.acknowledged_at) {
@@ -112,41 +133,85 @@ export function mergeEventLogs(
         createdAt: a.acknowledged_at,
         squadCode: a.squad_code,
         squadName: a.squad_name,
-        summary: "Fine evento",
+        summary: "Fine evento (TOC)",
         detail: formatAlarmRequestDetail(a),
-        status: "registrato",
+        status: "chiuso",
         actor: a.acknowledged_by?.trim() || "—",
+      });
+    }
+  }
+
+  const pushRows: UnifiedEventLog[] = [];
+  for (const p of pushes) {
+    const failed = p.status === "failed";
+    const isMission =
+      Boolean(p.route_code?.trim()) || Boolean(p.target_waypoint_label?.trim());
+    const summary = isMission
+      ? "Missione TOC → volontario"
+      : p.is_alarm
+        ? "Allarme TOC → volontario"
+        : "Messaggio TOC → volontario";
+    const detail = formatTocPushDetail(p);
+    const actor = p.admin_code;
+
+    if (failed) {
+      pushRows.push({
+        id: p.id,
+        kind: "toc_push",
+        createdAt: p.created_at,
+        squadCode: p.squad_code?.trim() || "—",
+        squadName: p.squad_name?.trim() || "—",
+        summary,
+        detail,
+        status: `fallito${p.error_message?.trim() ? `: ${p.error_message.trim()}` : ""}`,
+        actor,
+      });
+      continue;
+    }
+
+    pushRows.push({
+      id: p.id,
+      kind: "toc_push",
+      createdAt: p.created_at,
+      squadCode: p.squad_code?.trim() || "—",
+      squadName: p.squad_name?.trim() || "—",
+      summary,
+      detail,
+      status: "inviato",
+      actor,
+    });
+
+    if (p.closed_at) {
+      pushRows.push({
+        id: `${p.id}-toc-close`,
+        kind: "toc_push_close",
+        createdAt: p.closed_at,
+        squadCode: p.squad_code?.trim() || "—",
+        squadName: p.squad_name?.trim() || "—",
+        summary: "Fine evento messaggio TOC",
+        detail,
+        status: "chiuso",
+        actor: p.closed_by?.trim() || "—",
       });
     }
   }
 
   const rows: UnifiedEventLog[] = [
     ...alarmRows,
-    ...pushes.map((p) => {
-      const failed = p.status === "failed";
-      const statusLabel = failed
-        ? `fallito${p.error_message?.trim() ? `: ${p.error_message.trim()}` : ""}`
-        : p.status === "sent"
-          ? "inviato"
-          : p.status;
-      const isMission =
-        Boolean(p.route_code?.trim()) || Boolean(p.target_waypoint_label?.trim());
-      return {
-        id: p.id,
-        kind: "toc_push" as const,
-        createdAt: p.created_at,
-        squadCode: p.squad_code?.trim() || "—",
-        squadName: p.squad_name?.trim() || "—",
-        summary: isMission
-          ? "Missione TOC → volontario"
-          : p.is_alarm
-            ? "Allarme TOC → volontario"
-            : "Messaggio TOC → volontario",
-        detail: formatTocPushDetail(p),
-        status: statusLabel,
-        actor: p.admin_code,
-      };
-    }),
+    ...pushRows,
+    ...mobileDismisses.map((d) => ({
+      id: d.id,
+      kind: "mobile_dismiss" as const,
+      createdAt: d.created_at,
+      squadCode: d.squad_code,
+      squadName: d.squad_name,
+      summary: "Reset notifica mobile",
+      detail:
+        d.panel_message?.trim() ||
+        "Pannello TOC azzerato sul telefono; evento ancora aperto sul TOC.",
+      status: "registrato" as const,
+      actor: d.squad_code,
+    })),
     ...missionCloses.map((m) => ({
       id: m.id,
       kind: "toc_mission_close" as const,
@@ -155,7 +220,7 @@ export function mergeEventLogs(
       squadName: m.squad_name?.trim() || "—",
       summary: "Fine evento missione TOC",
       detail: formatMissionDetail(m.route_code, m.target_waypoint_label),
-      status: "registrato",
+      status: "chiuso",
       actor: m.admin_code,
     })),
   ];

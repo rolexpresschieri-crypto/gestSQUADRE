@@ -58,6 +58,14 @@ class GestSquadreFacade(
         request: SquadAlarmRequest,
     ) = repository.sendAlarm(session, request)
 
+    suspend fun dismissTocNotification(
+        session: SquadSession,
+        panelMessage: String?,
+    ) = repository.dismissTocNotification(session, panelMessage)
+
+    suspend fun isTocPanelClosedByToc(sessionId: String): Boolean =
+        repository.isTocPanelClosedByToc(sessionId)
+
     suspend fun loadMapSquads(): List<LiveSquadPin> = mapRepository.loadLiveSquads()
 
     suspend fun loadMapWaypoints(): List<MapWaypointPin> = mapRepository.loadWaypoints()

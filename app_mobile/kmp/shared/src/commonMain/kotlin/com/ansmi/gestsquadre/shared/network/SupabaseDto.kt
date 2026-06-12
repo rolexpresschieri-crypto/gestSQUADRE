@@ -79,6 +79,31 @@ internal data class FcmTokenUpsertBody(
 )
 
 @Serializable
+internal data class MobileDismissInsertBody(
+    @SerialName("event_id") val eventId: String,
+    @SerialName("session_id") val sessionId: String,
+    @SerialName("squad_id") val squadId: String,
+    @SerialName("squad_code") val squadCode: String,
+    @SerialName("squad_name") val squadName: String,
+    @SerialName("panel_message") val panelMessage: String? = null,
+)
+
+@Serializable
+internal data class TocPushIdRow(
+    val id: String,
+)
+
+@Serializable
+internal data class TocPushClosedRow(
+    @SerialName("closed_at") val closedAt: String? = null,
+)
+
+@Serializable
+internal data class MobileDismissedAtPatch(
+    @SerialName("mobile_dismissed_at") val mobileDismissedAt: String,
+)
+
+@Serializable
 internal data class AlarmInsertBody(
     @SerialName("event_id") val eventId: String,
     @SerialName("session_id") val sessionId: String,

@@ -8,7 +8,11 @@ import com.ansmi.gestsquadre.shared.network.AlarmInsertBody
 import com.ansmi.gestsquadre.shared.network.EventRow
 import com.ansmi.gestsquadre.shared.network.FcmTokenUpsertBody
 import com.ansmi.gestsquadre.shared.network.LogoutPatchBody
+import com.ansmi.gestsquadre.shared.network.MobileDismissInsertBody
+import com.ansmi.gestsquadre.shared.network.MobileDismissedAtPatch
 import com.ansmi.gestsquadre.shared.network.PositionPatchBody
+import com.ansmi.gestsquadre.shared.network.TocPushClosedRow
+import com.ansmi.gestsquadre.shared.network.TocPushIdRow
 import com.ansmi.gestsquadre.shared.network.SessionInsertBody
 import com.ansmi.gestsquadre.shared.network.SessionOnlineRow
 import com.ansmi.gestsquadre.shared.network.SessionRestoreRow
@@ -177,6 +181,53 @@ class GestSquadreRepository(
                     updatedAt = nowIso(),
                 ),
         )
+    }
+
+    suspend fun dismissTocNotification(
+        session: SquadSession,
+        panelMessage: String?,
+    ) {
+        val message = panelMessage?.trim()?.takeIf { it.isNotEmpty() }
+        rest.insert(
+            table = "squad_mobile_dismiss_logs",
+            body =
+                MobileDismissInsertBody(
+                    eventId = session.eventId,
+                    sessionId = session.sessionId,
+                    squadId = session.squadId,
+                    squadCode = session.squadCode,
+                    squadName = session.squadName,
+                    panelMessage = message,
+                ),
+        )
+        val latest =
+            rest.getList<TocPushIdRow>(
+                table = "toc_push_logs",
+                select = "id",
+                eqFilters = listOf("session_id" to session.sessionId),
+                isNullColumns = listOf("mobile_dismissed_at"),
+                order = "created_at.desc",
+                limit = 1,
+            ).firstOrNull()
+        if (latest != null) {
+            rest.patch(
+                table = "toc_push_logs",
+                filters = listOf("id" to latest.id),
+                body = MobileDismissedAtPatch(mobileDismissedAt = nowIso()),
+            )
+        }
+    }
+
+    suspend fun isTocPanelClosedByToc(sessionId: String): Boolean {
+        val row =
+            rest.getList<TocPushClosedRow>(
+                table = "toc_push_logs",
+                select = "closed_at",
+                eqFilters = listOf("session_id" to sessionId),
+                order = "created_at.desc",
+                limit = 1,
+            ).firstOrNull() ?: return false
+        return !row.closedAt.isNullOrBlank()
     }
 
     suspend fun sendAlarm(

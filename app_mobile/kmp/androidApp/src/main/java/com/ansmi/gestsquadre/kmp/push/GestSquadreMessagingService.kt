@@ -1,10 +1,17 @@
 package com.ansmi.gestsquadre.kmp.push
 
+import com.ansmi.gestsquadre.kmp.data.TocMessageStorage
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 class GestSquadreMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
+        if (message.data["type"] == "toc_clear_panel") {
+            TocMessageStorage(applicationContext).clear()
+            FcmPushBus.emitPanelClear()
+            return
+        }
+
         val title = message.tocTitle()
         val body = message.tocBody()
         val isAlarm = message.isTocAlarm()

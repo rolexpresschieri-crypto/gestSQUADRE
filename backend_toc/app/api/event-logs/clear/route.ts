@@ -68,5 +68,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: missionCloseErr.message }, { status: 500 });
   }
 
+  const { error: mobileDismissErr } = await admin
+    .from("squad_mobile_dismiss_logs")
+    .delete()
+    .eq("event_id", eventId);
+
+  if (mobileDismissErr && !mobileDismissErr.message.includes("squad_mobile_dismiss_logs")) {
+    return NextResponse.json({ error: mobileDismissErr.message }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }

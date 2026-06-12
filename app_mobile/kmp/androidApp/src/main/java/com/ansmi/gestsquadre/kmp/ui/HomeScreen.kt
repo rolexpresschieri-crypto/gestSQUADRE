@@ -260,6 +260,13 @@ fun HomeScreen(
                     modifier = Modifier.padding(bottom = 12.dp),
                 )
 
+                TacticalBodyText(
+                    text =
+                        "Reset notifica: solo sul telefono (registrato su log). " +
+                            "La chiusura evento è solo dal TOC.",
+                    fontSize = 12,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
                 MainButton(
                     label = "Reset notifica",
                     backgroundColor = TacticalNavy,

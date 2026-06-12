@@ -540,6 +540,21 @@ export default function TocDashboard() {
     await forceLogoutSquad(picked);
   }
 
+  async function closeSquadPanelOnMobile(sessionId: string) {
+    if (!session) {
+      return;
+    }
+    try {
+      await fetch("/api/close-toc-squad-panel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, sessionId }),
+      });
+    } catch {
+      /* best effort: il pannello mobile si aggiorna anche al prossimo poll */
+    }
+  }
+
   async function endTocMission(
     assignment: SquadRouteAssignment,
     squad: LiveSquad,
@@ -577,6 +592,7 @@ export default function TocDashboard() {
     if (selectedSessionId === assignment.sessionId) {
       setSelectedRouteAssignment(null);
     }
+    await closeSquadPanelOnMobile(assignment.sessionId);
 
     const routeHint = ` Via ${assignment.routeCode} rimossa dalla mappa.`;
     if (logErr) {
@@ -616,6 +632,7 @@ export default function TocDashboard() {
     );
     await loadAlarms();
     await loadSelectedRouteAssignment();
+    await closeSquadPanelOnMobile(alarm.session_id);
     const routeHint = activeRoute ? ` Via ${activeRoute.routeCode} rimossa dalla mappa.` : "";
     setStatusMessage(
       routeClear.error

@@ -17,6 +17,7 @@ import {
   mergeEventLogs,
   printEventLogsAsPdf,
   type SquadAlarmLogRow,
+  type SquadMobileDismissLogRow,
   type TocMissionCloseLogRow,
   type TocPushLogRow,
 } from "@/lib/event-logs";
@@ -32,6 +33,7 @@ export default function EventLogsPage() {
   const [alarms, setAlarms] = useState<SquadAlarmLogRow[]>([]);
   const [pushes, setPushes] = useState<TocPushLogRow[]>([]);
   const [missionCloses, setMissionCloses] = useState<TocMissionCloseLogRow[]>([]);
+  const [mobileDismisses, setMobileDismisses] = useState<SquadMobileDismissLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
@@ -57,6 +59,7 @@ export default function EventLogsPage() {
       setAlarms([]);
       setPushes([]);
       setMissionCloses([]);
+      setMobileDismisses([]);
       return;
     }
 
@@ -68,6 +71,7 @@ export default function EventLogsPage() {
         setAlarms([]);
         setPushes([]);
         setMissionCloses([]);
+        setMobileDismisses([]);
         return;
       }
     }
@@ -90,17 +94,25 @@ export default function EventLogsPage() {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500);
+    let mobileDismissQuery = supabase
+      .from("squad_mobile_dismiss_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (squadIds) {
       alarmQuery = alarmQuery.in("squad_id", squadIds);
       pushQuery = pushQuery.in("squad_id", squadIds);
       missionCloseQuery = missionCloseQuery.in("squad_id", squadIds);
+      mobileDismissQuery = mobileDismissQuery.in("squad_id", squadIds);
     }
 
-    const [alarmRes, pushRes, missionCloseRes] = await Promise.all([
+    const [alarmRes, pushRes, missionCloseRes, mobileDismissRes] = await Promise.all([
       alarmQuery,
       pushQuery,
       missionCloseQuery,
+      mobileDismissQuery,
     ]);
 
     if (alarmRes.error) {
@@ -129,6 +141,15 @@ export default function EventLogsPage() {
       setMissionCloses([]);
     } else {
       setMissionCloses((missionCloseRes.data ?? []) as TocMissionCloseLogRow[]);
+    }
+
+    if (mobileDismissRes.error) {
+      if (mobileDismissRes.error.message.includes("squad_mobile_dismiss_logs")) {
+        setStatus("Esegui sql/squad_event_flow.sql su Supabase per i log reset mobile.");
+      }
+      setMobileDismisses([]);
+    } else {
+      setMobileDismisses((mobileDismissRes.data ?? []) as SquadMobileDismissLogRow[]);
     }
   }, [supabase, eventId, session?.golfCourseId]);
 
@@ -167,8 +188,8 @@ export default function EventLogsPage() {
   }, [eventId, refreshLogs]);
 
   const unified = useMemo(
-    () => mergeEventLogs(alarms, pushes, missionCloses),
-    [alarms, pushes, missionCloses],
+    () => mergeEventLogs(alarms, pushes, missionCloses, mobileDismisses),
+    [alarms, pushes, missionCloses, mobileDismisses],
   );
 
   function exportCsv() {
@@ -257,8 +278,8 @@ export default function EventLogsPage() {
 
       <div className={styles.panel}>
         <p className={styles.hint}>
-          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Missioni TOC
-          (via TRK + target) · Fine evento · Push TOC → volontari
+          Evento: <strong>{eventTitle || "—"}</strong> · Stati: inviato → registrato (reset mobile) →
+          chiuso (solo TOC) · Allarmi volontario ↔ TOC · Missioni · Push
           {session && isCampoGolfSession(session) ? (
             <>
               {" "}

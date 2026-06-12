@@ -80,16 +80,29 @@ class SquadViewModel(
                 _uiState.update { it.copy(lastTocMessage = message) }
             }
         }
+        viewModelScope.launch {
+            FcmPushBus.panelClears.collect {
+                tocMessageStorage.clear()
+                _uiState.update { it.copy(lastTocMessage = null) }
+                val sessionId = _uiState.value.session?.sessionId
+                if (sessionId != null) {
+                    RouteRefreshBus.emitCleared(sessionId)
+                }
+            }
+        }
         startSessionWatchdog()
     }
 
     fun clearLastTocMessage() {
+        val session = _uiState.value.session
+        val panelMessage = _uiState.value.lastTocMessage
         tocMessageStorage.clear()
         _uiState.update { it.copy(lastTocMessage = null) }
-        val sessionId = _uiState.value.session?.sessionId ?: return
+        if (session == null) {
+            return
+        }
         viewModelScope.launch {
-            runCatching { facade.clearActiveRouteAssignment(sessionId) }
-                .onSuccess { RouteRefreshBus.emitCleared(sessionId) }
+            runCatching { facade.dismissTocNotification(session, panelMessage) }
         }
     }
 
@@ -322,6 +335,17 @@ class SquadViewModel(
                             .getOrDefault(true)
                     if (!online) {
                         handleRemoteLogout()
+                        continue
+                    }
+                    if (_uiState.value.lastTocMessage != null) {
+                        val closedByToc =
+                            runCatching { facade.isTocPanelClosedByToc(session.sessionId) }
+                                .getOrDefault(false)
+                        if (closedByToc) {
+                            tocMessageStorage.clear()
+                            _uiState.update { it.copy(lastTocMessage = null) }
+                            RouteRefreshBus.emitCleared(session.sessionId)
+                        }
                     }
                 }
             }

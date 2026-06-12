@@ -13,10 +13,17 @@ object FcmPushBus {
     private val _messages = MutableSharedFlow<TocPushMessage>(extraBufferCapacity = 8)
     val messages: SharedFlow<TocPushMessage> = _messages.asSharedFlow()
 
+    private val _panelClears = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val panelClears: SharedFlow<Unit> = _panelClears.asSharedFlow()
+
     fun emit(
         title: String,
         body: String,
     ) {
         _messages.tryEmit(TocPushMessage(title = title, body = body))
+    }
+
+    fun emitPanelClear() {
+        _panelClears.tryEmit(Unit)
     }
 }
