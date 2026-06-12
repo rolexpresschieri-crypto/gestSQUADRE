@@ -59,6 +59,7 @@ import com.ansmi.gestsquadre.kmp.ui.theme.TacticalDisabled
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalGreen
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalMuted
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalNavy
+import com.ansmi.gestsquadre.kmp.ui.theme.TacticalOrange
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalRed
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
@@ -349,7 +350,7 @@ fun HomeScreen(
 
                 MainButton(
                     label = "Log-out",
-                    backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
+                    backgroundColor = if (isLogged) TacticalOrange else TacticalDisabled,
                     foregroundColor = if (isLogged) Color.White else TacticalMuted,
                     onClick =
                         if (isLogged) {
