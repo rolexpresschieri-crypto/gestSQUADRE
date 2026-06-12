@@ -65,6 +65,16 @@ function formatMissionDetail(
   return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
+function formatTocPushDetail(p: TocPushLogRow): string {
+  const title = p.title?.trim() || "—";
+  const body = p.body?.trim() || "—";
+  return formatMissionDetail(
+    p.route_code,
+    p.target_waypoint_label,
+    `Titolo: ${title} · Messaggio: ${body}`,
+  );
+}
+
 export type UnifiedEventLog = {
   id: string;
   kind: "squad_alarm" | "fine_evento" | "toc_push" | "toc_mission_close";
@@ -113,20 +123,14 @@ export function mergeEventLogs(
   const rows: UnifiedEventLog[] = [
     ...alarmRows,
     ...pushes.map((p) => {
-      const title = p.title?.trim() || "—";
-      const body = p.body?.trim() || "—";
       const failed = p.status === "failed";
       const statusLabel = failed
         ? `fallito${p.error_message?.trim() ? `: ${p.error_message.trim()}` : ""}`
         : p.status === "sent"
           ? "inviato"
           : p.status;
-      const isMission = Boolean(p.route_code?.trim());
-      const missionDetail = formatMissionDetail(
-        p.route_code,
-        p.target_waypoint_label,
-        `Titolo: ${title} · Messaggio: ${body}`,
-      );
+      const isMission =
+        Boolean(p.route_code?.trim()) || Boolean(p.target_waypoint_label?.trim());
       return {
         id: p.id,
         kind: "toc_push" as const,
@@ -138,7 +142,7 @@ export function mergeEventLogs(
           : p.is_alarm
             ? "Allarme TOC → volontario"
             : "Messaggio TOC → volontario",
-        detail: isMission ? missionDetail : `Titolo: ${title} · Messaggio: ${body}`,
+        detail: formatTocPushDetail(p),
         status: statusLabel,
         actor: p.admin_code,
       };

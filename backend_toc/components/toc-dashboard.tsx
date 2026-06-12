@@ -834,26 +834,24 @@ export default function TocDashboard() {
     <main className={styles.screen}>
       <header className={styles.header}>
         <div className={styles.headerTop}>
-          <div className={styles.headerBrand}>
-            <div className={styles.headerLogoWrap}>
-              <Image
-                className={styles.headerLogo}
-                src="/logo_open_golf_2026.png"
-                alt="83 Open d'Italia 2026 — DS Automobiles"
-                width={420}
-                height={100}
-                priority
-              />
-            </div>
-            <div className={styles.headerTitleBlock}>
-              <h1>
-                gestSQUADRE — TOC
-                {session.golfCourseCode ? (
-                  <span className={styles.courseTag}> · {session.golfCourseCode}</span>
-                ) : null}
-              </h1>
-              <p className={styles.message}>{statusMessage}</p>
-            </div>
+          <div className={styles.headerLogoWrap}>
+            <Image
+              className={styles.headerLogo}
+              src="/logo_open_golf_2026.png"
+              alt="83 Open d'Italia 2026 — DS Automobiles"
+              width={420}
+              height={100}
+              priority
+            />
+          </div>
+          <div className={styles.headerTitleBlock}>
+            <h1>
+              gestSQUADRE — TOC
+              {session.golfCourseCode ? (
+                <span className={styles.courseTag}> · {session.golfCourseCode}</span>
+              ) : null}
+            </h1>
+            <p className={styles.message}>{statusMessage}</p>
           </div>
           <div className={styles.headerLogoWrapRight}>
             <Image

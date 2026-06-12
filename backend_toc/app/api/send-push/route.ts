@@ -136,11 +136,16 @@ export async function POST(request: Request) {
     targetWaypointLabel = (waypointRow?.label as string | null)?.trim() || null;
   }
 
+  let logBody = bodyText;
+  if (targetWaypointLabel && !logBody.includes(targetWaypointLabel)) {
+    logBody = tocPushTextUpper(`${logBody} — TARGET ${targetWaypointLabel}`);
+  }
+
   async function writePushLog(status: "sent" | "failed", extra: {
     fcmMessageId?: string;
     errorMessage?: string;
   }) {
-    await admin.from("toc_push_logs").insert({
+    const baseRow = {
       event_id: eventId,
       session_id: sessionId,
       squad_id: session.squad_id as string,
@@ -148,14 +153,29 @@ export async function POST(request: Request) {
       squad_name: squadInfo?.squad_name ?? null,
       admin_code: adminSession.code,
       title,
-      body: bodyText,
+      body: logBody,
       is_alarm: useAlarm,
-      route_code: routeCode || null,
-      target_waypoint_label: targetWaypointLabel,
       fcm_message_id: extra.fcmMessageId ?? null,
       status,
       error_message: extra.errorMessage ?? null,
-    });
+    };
+
+    const withMission = {
+      ...baseRow,
+      route_code: routeCode || null,
+      target_waypoint_label: targetWaypointLabel,
+    };
+
+    let insertErr = (await admin.from("toc_push_logs").insert(withMission)).error;
+    if (
+      insertErr &&
+      /route_code|target_waypoint_label|column/i.test(insertErr.message)
+    ) {
+      insertErr = (await admin.from("toc_push_logs").insert(baseRow)).error;
+    }
+    if (insertErr) {
+      console.error("toc_push_logs insert failed:", insertErr.message);
+    }
   }
 
   const { data: tokenRow, error: tokenErr } = await admin

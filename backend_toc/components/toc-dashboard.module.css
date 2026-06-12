@@ -117,23 +117,26 @@
 }
 
 .headerTop {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   width: 100%;
 }
 
-.headerBrand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex: 1;
+.headerTitleBlock {
+  justify-self: center;
+  text-align: center;
   min-width: 0;
+  max-width: 100%;
 }
 
-.headerTitleBlock {
-  min-width: 0;
+.headerLogoWrap {
+  justify-self: start;
+}
+
+.headerLogoWrapRight {
+  justify-self: end;
 }
 
 .headerLogoWrap,
@@ -155,6 +158,11 @@
 .header h1 {
   margin: 0;
   font-size: 1.5rem;
+  text-align: center;
+}
+
+.header .message {
+  text-align: center;
 }
 
 .actions {
@@ -555,10 +563,12 @@
 
 @media (max-width: 700px) {
   .headerTop {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
+    justify-items: center;
   }
 
+  .headerLogoWrap,
   .headerLogoWrapRight {
-    margin-left: auto;
+    justify-self: center;
   }
 }
