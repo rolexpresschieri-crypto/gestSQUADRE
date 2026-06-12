@@ -486,28 +486,27 @@ private fun SquadAlarmRequestDialog(
                     },
                 )
                 AlarmRequestCheckboxRow(
-                    label = "FORZE DELL'ORDINE",
+                    label = "4. FORZE DELL'ORDINE",
                     checked = forzeOrdine,
                     onCheckedChange = {
                         forzeOrdine = it
                         validationError = null
                     },
-                    labelColor = Color.White,
-                    labelBackground = TacticalNavy,
-                    labelUppercase = true,
+                    labelColor = Color.Black,
+                    labelBackground = Color(0xFFFF00),
                 )
                 AlarmRequestCheckboxRow(
-                    label = "V.V.F.",
+                    label = "5. V.V.F.",
                     checked = vvf,
                     onCheckedChange = {
                         vvf = it
                         validationError = null
                     },
-                    labelColor = TacticalRed,
-                    labelUppercase = true,
+                    labelColor = Color.Black,
+                    labelBackground = Color(0xFFFF00),
                 )
                 AlarmRequestCheckboxRow(
-                    label = "4. Altro",
+                    label = "6. Altro",
                     checked = altro,
                     onCheckedChange = {
                         altro = it
