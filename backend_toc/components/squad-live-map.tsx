@@ -13,21 +13,16 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
-import {
-  MapContainer,
-  Marker,
-  Polyline,
-  Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import type { MapRoutePoint } from "@/lib/map-routes";
 import type { LatLngExpression } from "leaflet";
 import { ALARM_RED } from "@/lib/alarm-styles";
 import { getMapTileConfig, type LayerMode } from "@/lib/map-layers";
+import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import {
   formatGpsAccuracyMeters,
   hasCoordinates,
+  liveSquadsPollSig,
   type LiveSquad,
 } from "@/lib/live-squads";
 import {
@@ -39,52 +34,9 @@ import {
 import { waypointIconMapUrl } from "@/lib/waypoint-icons";
 
 const defaultCenter: LatLngExpression = [45.0703, 7.6869];
-
-function waypointDivIcon(waypoint: SquadWaypoint): L.DivIcon {
-  const name = escapeHtml(waypointDisplayName(waypoint).slice(0, 22).toUpperCase());
-  const iconUrl = waypointIconMapUrl(waypoint.iconKey);
-  return L.divIcon({
-    className: "gs-wp-divicon",
-    html: `<div class="gs-wp-pin"><img class="gs-wp-icon" src="${iconUrl}" width="28" height="28" alt="" /><div class="gs-wp-chip">${name}</div></div>`,
-    iconSize: [96, 46],
-    iconAnchor: [48, 14],
-    popupAnchor: [0, -18],
-  });
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function squadDivIcon(
-  squad: LiveSquad,
-  selected: boolean,
-  isAlarming: boolean,
-): L.DivIcon {
-  const chip = escapeHtml((squad.squadName || squad.squadCode).slice(0, 18).toUpperCase());
-  const sel = selected ? " gs-dot--selected" : "";
-  if (isAlarming) {
-    return L.divIcon({
-      className: "gs-squad-divicon",
-      html: `<div class="gs-pin"><div class="gs-dot gs-dot--alarm${sel}"></div><div class="gs-chip gs-chip--alarm">${chip}</div></div>`,
-      iconSize: [96, 44],
-      iconAnchor: [48, 10],
-      popupAnchor: [0, -30],
-    });
-  }
-  const fill = squad.mapColor;
-  return L.divIcon({
-    className: "gs-squad-divicon",
-    html: `<div class="gs-pin"><div class="gs-dot${sel}" style="background:${fill}"></div><div class="gs-chip">${chip}</div></div>`,
-    iconSize: [96, 44],
-    iconAnchor: [48, 10],
-    popupAnchor: [0, -30],
-  });
-}
+const ROUTE_HALO_WEIGHT = 5;
+const ROUTE_LINE_WEIGHT = 3;
+const MAP_SYNC_MS = MAP_SQUAD_POLL_MS;
 
 type DrawnRoute = {
   routeCode: string;
@@ -93,11 +45,20 @@ type DrawnRoute = {
   highlighted?: boolean;
 };
 
+type MapLiveData = {
+  squads: LiveSquad[];
+  routes: DrawnRoute[];
+  waypoints: SquadWaypoint[];
+  alarmingSessionIds: ReadonlySet<string>;
+  selectedSessionId: string | null;
+  recenterNonce: number;
+  onSelect: (squad: LiveSquad) => void;
+};
+
 type MapUserNavApi = {
   userNavRef: RefObject<boolean>;
 };
 
-/** Dopo pan/zoom manuale non ri-inquadrare automaticamente la mappa. */
 const MapUserNavContext = createContext<MapUserNavApi | null>(null);
 
 function useMapUserNav() {
@@ -150,26 +111,50 @@ function MapUserInteractionTracker() {
   return null;
 }
 
-/** Evita che vie TRK spariscano per un refresh vuoto del polling. */
-function useStableRoutes(routes: DrawnRoute[]): DrawnRoute[] {
-  const cacheRef = useRef<DrawnRoute[]>([]);
-  const lastSeenMsRef = useRef(0);
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
-  return useMemo(() => {
-    if (routes.length > 0) {
-      cacheRef.current = routes;
-      lastSeenMsRef.current = Date.now();
-      return routes;
-    }
-    if (
-      cacheRef.current.length > 0 &&
-      Date.now() - lastSeenMsRef.current < 30_000
-    ) {
-      return cacheRef.current;
-    }
-    cacheRef.current = [];
-    return [];
-  }, [routes]);
+function waypointDivIcon(waypoint: SquadWaypoint): L.DivIcon {
+  const name = escapeHtml(waypointDisplayName(waypoint).slice(0, 22).toUpperCase());
+  const iconUrl = waypointIconMapUrl(waypoint.iconKey);
+  return L.divIcon({
+    className: "gs-wp-divicon",
+    html: `<div class="gs-wp-pin"><img class="gs-wp-icon" src="${iconUrl}" width="28" height="28" alt="" /><div class="gs-wp-chip">${name}</div></div>`,
+    iconSize: [96, 46],
+    iconAnchor: [48, 14],
+    popupAnchor: [0, -18],
+  });
+}
+
+function squadDivIcon(
+  squad: LiveSquad,
+  selected: boolean,
+  isAlarming: boolean,
+): L.DivIcon {
+  const chip = escapeHtml((squad.squadName || squad.squadCode).slice(0, 18).toUpperCase());
+  const sel = selected ? " gs-dot--selected" : "";
+  if (isAlarming) {
+    return L.divIcon({
+      className: "gs-squad-divicon",
+      html: `<div class="gs-pin"><div class="gs-dot gs-dot--alarm${sel}"></div><div class="gs-chip gs-chip--alarm">${chip}</div></div>`,
+      iconSize: [96, 44],
+      iconAnchor: [48, 10],
+      popupAnchor: [0, -30],
+    });
+  }
+  const fill = squad.mapColor;
+  return L.divIcon({
+    className: "gs-squad-divicon",
+    html: `<div class="gs-pin"><div class="gs-dot${sel}" style="background:${fill}"></div><div class="gs-chip">${chip}</div></div>`,
+    iconSize: [96, 44],
+    iconAnchor: [48, 10],
+    popupAnchor: [0, -30],
+  });
 }
 
 function squadMarkerIconKey(
@@ -193,23 +178,49 @@ function squadMarkerPopupHtml(squad: LiveSquad, isAlarming: boolean): string {
   return html;
 }
 
-function ImperativeSquadMarkersLayer({
-  squads,
-  alarmingSessionIds,
-  selectedSessionId,
-  onSelect,
-}: {
-  squads: LiveSquad[];
-  alarmingSessionIds: ReadonlySet<string>;
-  selectedSessionId: string | null;
-  onSelect: (squad: LiveSquad) => void;
-}) {
+function routesDrawSig(routes: DrawnRoute[]): string {
+  return routes
+    .map(
+      (route) =>
+        `${route.routeCode}:${route.colorHex}:${route.highlighted ? 1 : 0}:${route.points
+          .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
+          .join(";")}`,
+    )
+    .join("|");
+}
+
+function waypointsSig(waypoints: SquadWaypoint[]): string {
+  return waypoints
+    .map((wp) => `${wp.id}:${wp.latitude.toFixed(5)},${wp.longitude.toFixed(5)}`)
+    .join("|");
+}
+
+function alarmingSig(ids: ReadonlySet<string>): string {
+  return [...ids].sort().join(",");
+}
+
+function MapImperativeLayers({ dataRef }: { dataRef: RefObject<MapLiveData> }) {
   const map = useMap();
-  const squadsRef = useRef(squads);
-  squadsRef.current = squads;
-  const onSelectRef = useRef(onSelect);
-  onSelectRef.current = onSelect;
-  const markersRef = useRef(
+  const routeCacheRef = useRef<{ routes: DrawnRoute[]; lastSeenMs: number }>({
+    routes: [],
+    lastSeenMs: 0,
+  });
+
+  const getStableRoutes = useCallback((): DrawnRoute[] => {
+    const routes = dataRef.current?.routes ?? [];
+    const cache = routeCacheRef.current;
+    if (routes.length > 0) {
+      cache.routes = routes;
+      cache.lastSeenMs = Date.now();
+      return routes;
+    }
+    if (cache.routes.length > 0 && Date.now() - cache.lastSeenMs < 30_000) {
+      return cache.routes;
+    }
+    cache.routes = [];
+    return [];
+  }, [dataRef]);
+  const squadMarkersRef = useRef(
     new Map<
       string,
       {
@@ -219,102 +230,274 @@ function ImperativeSquadMarkersLayer({
       }
     >(),
   );
-
-  useEffect(() => {
-    const markers = markersRef.current;
-    const alive = new Set(squads.map((s) => s.sessionId));
-
-    for (const [sessionId, entry] of markers) {
-      if (!alive.has(sessionId)) {
-        entry.circle?.remove();
-        entry.marker.remove();
-        markers.delete(sessionId);
+  const routeLayersRef = useRef(
+    new Map<
+      string,
+      {
+        halo: L.Polyline;
+        line: L.Polyline;
+        styleKey: string;
       }
-    }
+    >(),
+  );
+  const waypointMarkersRef = useRef(new Map<string, L.Marker>());
+  const lastSquadPosSigRef = useRef("");
+  const lastSquadMetaSigRef = useRef("");
+  const lastRoutesSigRef = useRef("");
+  const lastWaypointsSigRef = useRef("");
 
-    for (const squad of squads) {
-      if (!hasCoordinates(squad)) {
-        continue;
-      }
-      const position: L.LatLngExpression = [
-        squad.lastLatitude!,
-        squad.lastLongitude!,
-      ];
-      const isAlarming = alarmingSessionIds.has(squad.sessionId);
-      const selected = selectedSessionId === squad.sessionId;
-      const iconKey = squadMarkerIconKey(squad, selected, isAlarming);
-      let entry = markers.get(squad.sessionId);
+  const syncSquads = useCallback(
+    (data: MapLiveData) => {
+      const squads = data.squads.filter(hasCoordinates);
+      const markers = squadMarkersRef.current;
+      const alive = new Set(squads.map((s) => s.sessionId));
 
-      if (!entry) {
-        const marker = L.marker(position, {
-          icon: squadDivIcon(squad, selected, isAlarming),
-        });
-        marker.bindPopup(squadMarkerPopupHtml(squad, isAlarming));
-        marker.on("click", () => {
-          const current = squadsRef.current.find(
-            (row) => row.sessionId === squad.sessionId,
-          );
-          if (current) {
-            onSelectRef.current(current);
-          }
-        });
-        marker.addTo(map);
-        entry = { marker, circle: null, iconKey };
-        markers.set(squad.sessionId, entry);
-      } else {
-        const nextLatLng = L.latLng(position);
-        if (!entry.marker.getLatLng().equals(nextLatLng)) {
-          entry.marker.setLatLng(nextLatLng);
-        }
-        if (entry.iconKey !== iconKey) {
-          entry.marker.setIcon(squadDivIcon(squad, selected, isAlarming));
-          entry.iconKey = iconKey;
-          entry.marker.setPopupContent(squadMarkerPopupHtml(squad, isAlarming));
+      for (const [sessionId, entry] of markers) {
+        if (!alive.has(sessionId)) {
+          entry.circle?.remove();
+          entry.marker.remove();
+          markers.delete(sessionId);
         }
       }
 
-      const acc = squad.lastAccuracy;
-      const showAccuracyCircle =
-        acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
-      const circleColor = isAlarming ? ALARM_RED : squad.mapColor;
+      for (const squad of squads) {
+        const position: L.LatLngExpression = [
+          squad.lastLatitude!,
+          squad.lastLongitude!,
+        ];
+        const isAlarming = data.alarmingSessionIds.has(squad.sessionId);
+        const selected = data.selectedSessionId === squad.sessionId;
+        const iconKey = squadMarkerIconKey(squad, selected, isAlarming);
+        let entry = markers.get(squad.sessionId);
 
-      if (showAccuracyCircle) {
-        if (!entry.circle) {
-          entry.circle = L.circle(position, {
-            radius: acc,
-            color: circleColor,
-            fillColor: circleColor,
-            fillOpacity: 0.12,
-            weight: 1,
-          }).addTo(map);
-        } else {
-          const circleLatLng = L.latLng(position);
-          if (!entry.circle.getLatLng().equals(circleLatLng)) {
-            entry.circle.setLatLng(circleLatLng);
-          }
-          if (Math.abs(entry.circle.getRadius() - acc) >= 1) {
-            entry.circle.setRadius(acc);
-          }
-          entry.circle.setStyle({
-            color: circleColor,
-            fillColor: circleColor,
+        if (!entry) {
+          const marker = L.marker(position, {
+            icon: squadDivIcon(squad, selected, isAlarming),
           });
+          marker.bindPopup(squadMarkerPopupHtml(squad, isAlarming));
+          marker.on("click", () => {
+            const current = dataRef.current?.squads.find(
+              (row) => row.sessionId === squad.sessionId,
+            );
+            if (current) {
+              dataRef.current?.onSelect(current);
+            }
+          });
+          marker.addTo(map);
+          entry = { marker, circle: null, iconKey };
+          markers.set(squad.sessionId, entry);
+        } else {
+          const nextLatLng = L.latLng(position);
+          if (!entry.marker.getLatLng().equals(nextLatLng)) {
+            entry.marker.setLatLng(nextLatLng);
+          }
+          if (entry.iconKey !== iconKey) {
+            entry.marker.setIcon(squadDivIcon(squad, selected, isAlarming));
+            entry.iconKey = iconKey;
+            entry.marker.setPopupContent(squadMarkerPopupHtml(squad, isAlarming));
+          }
         }
-      } else if (entry.circle) {
-        entry.circle.remove();
-        entry.circle = null;
+
+        const acc = squad.lastAccuracy;
+        const showAccuracyCircle =
+          acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
+        const circleColor = isAlarming ? ALARM_RED : squad.mapColor;
+
+        if (showAccuracyCircle) {
+          if (!entry.circle) {
+            entry.circle = L.circle(position, {
+              radius: acc,
+              color: circleColor,
+              fillColor: circleColor,
+              fillOpacity: 0.12,
+              weight: 1,
+            }).addTo(map);
+          } else {
+            const circleLatLng = L.latLng(position);
+            if (!entry.circle.getLatLng().equals(circleLatLng)) {
+              entry.circle.setLatLng(circleLatLng);
+            }
+            if (Math.abs(entry.circle.getRadius() - acc) >= 2) {
+              entry.circle.setRadius(acc);
+            }
+            entry.circle.setStyle({
+              color: circleColor,
+              fillColor: circleColor,
+            });
+          }
+        } else if (entry.circle) {
+          entry.circle.remove();
+          entry.circle = null;
+        }
       }
+    },
+    [dataRef, map],
+  );
+
+  const syncRoutes = useCallback(
+    (routes: DrawnRoute[]) => {
+      const layers = routeLayersRef.current;
+      const alive = new Set(routes.map((route) => route.routeCode));
+
+      for (const [routeCode, entry] of layers) {
+        if (!alive.has(routeCode)) {
+          entry.halo.remove();
+          entry.line.remove();
+          layers.delete(routeCode);
+        }
+      }
+
+      for (const route of routes) {
+        if (route.points.length < 2) {
+          continue;
+        }
+        const positions = route.points.map(
+          (p) => [p.lat, p.lng] as [number, number],
+        );
+        const highlighted = Boolean(route.highlighted);
+        const styleKey = `${route.colorHex}:${highlighted ? 1 : 0}`;
+        const haloOpacity = highlighted ? 0.98 : 0.9;
+        const lineOpacity = highlighted ? 0.98 : 0.82;
+        let entry = layers.get(route.routeCode);
+
+        if (!entry) {
+          const halo = L.polyline(positions, {
+            color: "#ffffff",
+            weight: ROUTE_HALO_WEIGHT,
+            opacity: haloOpacity,
+            lineCap: "round",
+            lineJoin: "round",
+          }).addTo(map);
+          const line = L.polyline(positions, {
+            color: route.colorHex,
+            weight: ROUTE_LINE_WEIGHT,
+            opacity: lineOpacity,
+            lineCap: "round",
+            lineJoin: "round",
+          }).addTo(map);
+          layers.set(route.routeCode, { halo, line, styleKey });
+          continue;
+        }
+
+        entry.halo.setLatLngs(positions);
+        entry.line.setLatLngs(positions);
+        if (entry.styleKey !== styleKey) {
+          entry.halo.setStyle({ opacity: haloOpacity });
+          entry.line.setStyle({
+            color: route.colorHex,
+            opacity: lineOpacity,
+          });
+          entry.styleKey = styleKey;
+        }
+      }
+    },
+    [map],
+  );
+
+  const syncWaypoints = useCallback(
+    (waypoints: SquadWaypoint[]) => {
+      const markers = waypointMarkersRef.current;
+      const alive = new Set(waypoints.map((wp) => wp.id));
+
+      for (const [id, marker] of markers) {
+        if (!alive.has(id)) {
+          marker.remove();
+          markers.delete(id);
+        }
+      }
+
+      for (const waypoint of waypoints) {
+        const position: L.LatLngExpression = [
+          waypoint.latitude,
+          waypoint.longitude,
+        ];
+        let marker = markers.get(waypoint.id);
+        const popupHtml =
+          `<div style="color:#111827">` +
+          `<strong>${escapeHtml(waypointDisplayName(waypoint))}</strong><br/>` +
+          `${waypoint.latitude.toFixed(5)}, ${waypoint.longitude.toFixed(5)}<br/>` +
+          `${escapeHtml(waypointSourceLabel(waypoint.source))} · ` +
+          `${escapeHtml(formatWaypointTimestamp(waypoint.createdAt))}` +
+          `</div>`;
+
+        if (!marker) {
+          marker = L.marker(position, {
+            icon: waypointDivIcon(waypoint),
+            zIndexOffset: 800,
+          });
+          marker.bindPopup(popupHtml, { minWidth: 220 });
+          marker.addTo(map);
+          markers.set(waypoint.id, marker);
+        } else {
+          const nextLatLng = L.latLng(position);
+          if (!marker.getLatLng().equals(nextLatLng)) {
+            marker.setLatLng(nextLatLng);
+          }
+          marker.setPopupContent(popupHtml);
+        }
+      }
+    },
+    [map],
+  );
+
+  const runSync = useCallback(() => {
+    const data = dataRef.current;
+    if (!data) {
+      return;
     }
-  }, [squads, alarmingSessionIds, selectedSessionId, map]);
+
+    const stableRoutes = getStableRoutes();
+    const withCoords = data.squads.filter(hasCoordinates);
+    const posSig = liveSquadsPollSig(withCoords);
+    const metaSig = `${posSig}|${data.selectedSessionId ?? ""}|${alarmingSig(data.alarmingSessionIds)}`;
+    const routesSig = routesDrawSig(stableRoutes);
+    const wpSig = waypointsSig(data.waypoints);
+
+    if (metaSig !== lastSquadMetaSigRef.current) {
+      syncSquads(data);
+      lastSquadMetaSigRef.current = metaSig;
+      lastSquadPosSigRef.current = posSig;
+    } else if (posSig !== lastSquadPosSigRef.current) {
+      syncSquads(data);
+      lastSquadPosSigRef.current = posSig;
+    }
+
+    if (routesSig !== lastRoutesSigRef.current) {
+      syncRoutes(stableRoutes);
+      lastRoutesSigRef.current = routesSig;
+    }
+
+    if (wpSig !== lastWaypointsSigRef.current) {
+      syncWaypoints(data.waypoints);
+      lastWaypointsSigRef.current = wpSig;
+    }
+  }, [dataRef, getStableRoutes, syncRoutes, syncSquads, syncWaypoints]);
 
   useEffect(() => {
-    const markers = markersRef.current;
+    runSync();
+    const timer = window.setInterval(runSync, MAP_SYNC_MS);
+    return () => window.clearInterval(timer);
+  }, [runSync]);
+
+  useEffect(() => {
+    const squadMarkers = squadMarkersRef.current;
+    const routeLayers = routeLayersRef.current;
+    const waypointMarkers = waypointMarkersRef.current;
     return () => {
-      for (const entry of markers.values()) {
+      for (const entry of squadMarkers.values()) {
         entry.circle?.remove();
         entry.marker.remove();
       }
-      markers.clear();
+      squadMarkers.clear();
+      for (const entry of routeLayers.values()) {
+        entry.halo.remove();
+        entry.line.remove();
+      }
+      routeLayers.clear();
+      for (const marker of waypointMarkers.values()) {
+        marker.remove();
+      }
+      waypointMarkers.clear();
     };
   }, [map]);
 
@@ -322,30 +505,49 @@ function ImperativeSquadMarkersLayer({
 }
 
 function MapBoundsController({
-  waypoints,
-  activeRoutes,
-  recenterNonce = 0,
+  dataRef,
+  recenterNonce,
 }: {
-  waypoints: SquadWaypoint[];
-  activeRoutes: DrawnRoute[];
-  recenterNonce?: number;
+  dataRef: RefObject<MapLiveData>;
+  recenterNonce: number;
 }) {
   const map = useMap();
   const api = useMapUserNav();
   const initialFitDoneRef = useRef(false);
   const lastRecenterNonceRef = useRef(0);
+  const routeCacheRef = useRef<{ routes: DrawnRoute[]; lastSeenMs: number }>({
+    routes: [],
+    lastSeenMs: 0,
+  });
 
-  const fitPoints = useMemo(() => {
-    const wpPts = waypoints.map(
-      (w) => [w.latitude, w.longitude] as [number, number],
-    );
-    const routePts = activeRoutes.flatMap((route) =>
-      route.points.map((p) => [p.lat, p.lng] as [number, number]),
-    );
-    return [...wpPts, ...routePts];
-  }, [waypoints, activeRoutes]);
+  const getStableRoutes = useCallback((): DrawnRoute[] => {
+    const routes = dataRef.current?.routes ?? [];
+    const cache = routeCacheRef.current;
+    if (routes.length > 0) {
+      cache.routes = routes;
+      cache.lastSeenMs = Date.now();
+      return routes;
+    }
+    if (cache.routes.length > 0 && Date.now() - cache.lastSeenMs < 30_000) {
+      return cache.routes;
+    }
+    cache.routes = [];
+    return [];
+  }, [dataRef]);
 
   const fitToOperationalArea = useCallback(() => {
+    const data = dataRef.current;
+    if (!data) {
+      return;
+    }
+    const stableRoutes = getStableRoutes();
+    const wpPts = data.waypoints.map(
+      (w) => [w.latitude, w.longitude] as [number, number],
+    );
+    const routePts = stableRoutes.flatMap((route) =>
+      route.points.map((p) => [p.lat, p.lng] as [number, number]),
+    );
+    const fitPoints = [...wpPts, ...routePts];
     if (fitPoints.length === 0) {
       return;
     }
@@ -354,15 +556,31 @@ function MapBoundsController({
       return;
     }
     map.fitBounds(L.latLngBounds(fitPoints), { padding: [40, 40], animate: false });
-  }, [fitPoints, map]);
+  }, [dataRef, getStableRoutes, map]);
 
   useEffect(() => {
-    if (initialFitDoneRef.current || fitPoints.length === 0) {
-      return;
-    }
-    fitToOperationalArea();
-    initialFitDoneRef.current = true;
-  }, [fitPoints.length, fitToOperationalArea]);
+    const tryInitialFit = () => {
+      if (initialFitDoneRef.current || api?.userNavRef.current) {
+        return;
+      }
+      const data = dataRef.current;
+      if (!data) {
+        return;
+      }
+      const stableRoutes = getStableRoutes();
+      const hasArea =
+        data.waypoints.length > 0 ||
+        stableRoutes.some((route) => route.points.length > 0);
+      if (!hasArea) {
+        return;
+      }
+      fitToOperationalArea();
+      initialFitDoneRef.current = true;
+    };
+    tryInitialFit();
+    const timer = window.setInterval(tryInitialFit, MAP_SYNC_MS);
+    return () => window.clearInterval(timer);
+  }, [api, dataRef, fitToOperationalArea, getStableRoutes]);
 
   useEffect(() => {
     if (recenterNonce <= 0 || recenterNonce === lastRecenterNonceRef.current) {
@@ -378,133 +596,44 @@ function MapBoundsController({
   return null;
 }
 
-const ROUTE_HALO_WEIGHT = 5;
-const ROUTE_LINE_WEIGHT = 3;
-
-const ActiveRoutePolylines = memo(function ActiveRoutePolylines({
-  route,
-  highlighted = false,
+const StableMapShell = memo(function StableMapShell({
+  layerMode,
+  height,
+  dataRef,
+  recenterNonce,
 }: {
-  route: DrawnRoute;
-  highlighted?: boolean;
+  layerMode: LayerMode;
+  height: string;
+  dataRef: RefObject<MapLiveData>;
+  recenterNonce: number;
 }) {
-  const positions = useMemo(
-    () =>
-      route.points.length < 2
-        ? []
-        : route.points.map((p) => [p.lat, p.lng] as [number, number]),
-    [route.points],
-  );
-  const haloOptions = useMemo(
-    () => ({
-      color: "#ffffff",
-      weight: ROUTE_HALO_WEIGHT,
-      opacity: highlighted ? 0.98 : 0.9,
-      lineCap: "round" as const,
-      lineJoin: "round" as const,
-    }),
-    [highlighted],
-  );
-  const lineOptions = useMemo(
-    () => ({
-      color: route.colorHex,
-      weight: ROUTE_LINE_WEIGHT,
-      opacity: highlighted ? 0.98 : 0.82,
-      lineCap: "round" as const,
-      lineJoin: "round" as const,
-    }),
-    [route.colorHex, highlighted],
-  );
-
-  if (positions.length < 2) {
-    return null;
-  }
+  const tile = getMapTileConfig(layerMode);
 
   return (
-    <>
-      <Polyline
-        key={`${route.routeCode}-halo`}
-        positions={positions}
-        pathOptions={haloOptions}
-      />
-      <Polyline
-        key={`${route.routeCode}-line`}
-        positions={positions}
-        pathOptions={lineOptions}
-      />
-    </>
-  );
-});
-
-function LeafletInvalidateOnLayout() {
-  const map = useMap();
-  const doneRef = useRef(false);
-
-  useEffect(() => {
-    if (doneRef.current) {
-      return;
-    }
-    doneRef.current = true;
-    const mountTimer = window.setTimeout(() => {
-      map.invalidateSize({ animate: false });
-    }, 250);
-    return () => window.clearTimeout(mountTimer);
-  }, [map]);
-
-  return null;
-}
-
-const WaypointMapMarker = memo(function WaypointMapMarker({
-  waypoint,
-  canManageWaypoints,
-  onEditWaypoint,
-  onDeleteWaypoint,
-}: {
-  waypoint: SquadWaypoint;
-  canManageWaypoints: boolean;
-  onEditWaypoint?: (waypoint: SquadWaypoint) => void;
-  onDeleteWaypoint?: (waypoint: SquadWaypoint) => void;
-}) {
-  const icon = useMemo(
-    () => waypointDivIcon(waypoint),
-    [waypoint.id, waypoint.iconKey, waypoint.label],
-  );
-
-  return (
-    <Marker
-      position={[waypoint.latitude, waypoint.longitude]}
-      icon={icon}
-      zIndexOffset={800}
-    >
-      <Popup minWidth={220}>
-        <div style={{ color: "#111827" }}>
-          <strong>{waypointDisplayName(waypoint)}</strong>
-          <br />
-          {waypoint.latitude.toFixed(5)}, {waypoint.longitude.toFixed(5)}
-          <br />
-          {waypointSourceLabel(waypoint.source)} ·{" "}
-          {formatWaypointTimestamp(waypoint.createdAt)}
-          {canManageWaypoints && (onEditWaypoint || onDeleteWaypoint) ? (
-            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-              {onEditWaypoint ? (
-                <button type="button" onClick={() => onEditWaypoint(waypoint)}>
-                  Modifica
-                </button>
-              ) : null}
-              {onDeleteWaypoint ? (
-                <button
-                  type="button"
-                  onClick={() => onDeleteWaypoint(waypoint)}
-                  style={{ color: "#c62828" }}
-                >
-                  Elimina
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </Popup>
-    </Marker>
+    <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
+      <MapContainer
+        center={defaultCenter}
+        zoom={13}
+        style={{ height: "100%", width: "100%" }}
+        scrollWheelZoom
+      >
+        <TileLayer
+          key={layerMode}
+          attribution={tile.attribution}
+          url={tile.url}
+          updateWhenZooming={false}
+          updateWhenIdle
+          keepBuffer={4}
+          maxNativeZoom={19}
+          maxZoom={20}
+        />
+        <MapUserNavProvider>
+          <MapUserInteractionTracker />
+          <MapBoundsController dataRef={dataRef} recenterNonce={recenterNonce} />
+          <MapImperativeLayers dataRef={dataRef} />
+        </MapUserNavProvider>
+      </MapContainer>
+    </div>
   );
 });
 
@@ -542,15 +671,20 @@ export default function SquadLiveMap({
   alarmingSessionIds,
   selectedSessionId,
   onSelect,
-  canManageWaypoints = false,
-  onEditWaypoint,
-  onDeleteWaypoint,
   height = "100%",
   recenterNonce = 0,
 }: SquadLiveMapProps) {
-  const withCoords = squads.filter(hasCoordinates);
-  const tile = getMapTileConfig(layerMode);
-  const rawRoutesToDraw = useMemo(() => {
+  const dataRef = useRef<MapLiveData>({
+    squads: [],
+    routes: [],
+    waypoints: [],
+    alarmingSessionIds: new Set(),
+    selectedSessionId: null,
+    recenterNonce: 0,
+    onSelect,
+  });
+
+  const routes = useMemo(() => {
     if (activeRoutes.length > 0) {
       return activeRoutes.filter((route) => route.points.length >= 2);
     }
@@ -559,57 +693,23 @@ export default function SquadLiveMap({
     }
     return [];
   }, [activeRoute, activeRoutes]);
-  const routesToDraw = useStableRoutes(rawRoutesToDraw);
+
+  dataRef.current = {
+    squads,
+    routes,
+    waypoints,
+    alarmingSessionIds,
+    selectedSessionId,
+    recenterNonce,
+    onSelect,
+  };
 
   return (
-    <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
-      <MapContainer
-        center={defaultCenter}
-        zoom={13}
-        style={{ height: "100%", width: "100%" }}
-        scrollWheelZoom
-        preferCanvas
-      >
-        <TileLayer
-          key={layerMode}
-          attribution={tile.attribution}
-          url={tile.url}
-          updateWhenZooming={false}
-          updateWhenIdle
-          keepBuffer={2}
-        />
-        <MapUserNavProvider>
-          <LeafletInvalidateOnLayout />
-          <MapUserInteractionTracker />
-          <MapBoundsController
-            waypoints={waypoints}
-            activeRoutes={routesToDraw}
-            recenterNonce={recenterNonce}
-          />
-          <ImperativeSquadMarkersLayer
-            squads={withCoords}
-            alarmingSessionIds={alarmingSessionIds}
-            selectedSessionId={selectedSessionId}
-            onSelect={onSelect}
-          />
-        </MapUserNavProvider>
-        {waypoints.map((wp) => (
-          <WaypointMapMarker
-            key={`wp-${wp.id}`}
-            waypoint={wp}
-            canManageWaypoints={canManageWaypoints}
-            onEditWaypoint={onEditWaypoint}
-            onDeleteWaypoint={onDeleteWaypoint}
-          />
-        ))}
-        {routesToDraw.map((route) => (
-          <ActiveRoutePolylines
-            key={route.routeCode}
-            route={route}
-            highlighted={route.highlighted}
-          />
-        ))}
-      </MapContainer>
-    </div>
+    <StableMapShell
+      layerMode={layerMode}
+      height={height}
+      dataRef={dataRef}
+      recenterNonce={recenterNonce}
+    />
   );
 }

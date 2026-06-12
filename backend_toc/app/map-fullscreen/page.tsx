@@ -64,9 +64,16 @@ function MapFullscreenContent() {
   const [mapRecenterNonce, setMapRecenterNonce] = useState(0);
   const [hint, setHint] = useState("");
   const mapRef = useRef<HTMLDivElement | null>(null);
+  const squadsRef = useRef(squads);
+  squadsRef.current = squads;
 
   const onlineSessionIds = useMemo(
     () => new Set(squads.map((s) => s.sessionId)),
+    [squads],
+  );
+
+  const onlineSessionIdsSig = useMemo(
+    () => squads.map((s) => s.sessionId).sort().join("|"),
     [squads],
   );
 
@@ -198,7 +205,10 @@ function MapFullscreenContent() {
   }, [supabase, golfCourseId]);
 
   const loadRouteAssignments = useCallback(
-    async (extraSessionIds: string[] = [], squadsSnapshot: LiveSquad[] = squads) => {
+    async (
+      extraSessionIds: string[] = [],
+      squadsSnapshot: LiveSquad[] = squadsRef.current,
+    ) => {
       if (!supabase) {
         setRouteAssignmentsBySession(new Map());
         return;
@@ -236,7 +246,7 @@ function MapFullscreenContent() {
         }
       }
     },
-    [supabase, selectedSessionId, squads, alarmSessionIds],
+    [supabase, selectedSessionId, alarmSessionIds],
   );
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
@@ -285,7 +295,7 @@ function MapFullscreenContent() {
 
   useEffect(() => {
     void loadRouteAssignments();
-  }, [loadRouteAssignments, squads, alarmSessionIds]);
+  }, [loadRouteAssignments, onlineSessionIdsSig, alarmSessionIds]);
 
   useEffect(() => {
     if (!session || !supabase) {

@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
   canManageWaypoints,
@@ -130,8 +130,16 @@ export default function TocDashboard() {
     [alarms],
   );
 
+  const squadsRef = useRef(squads);
+  squadsRef.current = squads;
+
   const onlineSessionIds = useMemo(
     () => new Set(squads.map((s) => s.sessionId)),
+    [squads],
+  );
+
+  const onlineSessionIdsSig = useMemo(
+    () => squads.map((s) => s.sessionId).sort().join("|"),
     [squads],
   );
 
@@ -304,10 +312,11 @@ export default function TocDashboard() {
       setSelectedRouteAssignment(null);
       return;
     }
-    const onlineIds = new Set(squads.map((s) => s.sessionId));
+    const squadsSnapshot = squadsRef.current;
+    const onlineIds = new Set(squadsSnapshot.map((s) => s.sessionId));
     const sessionIds = [
       ...new Set([
-        ...squads.map((s) => s.sessionId),
+        ...squadsSnapshot.map((s) => s.sessionId),
         ...pendingAlarmSessionIds.filter((id) => onlineIds.has(id)),
         ...extraSessionIds,
       ]),
@@ -358,7 +367,7 @@ export default function TocDashboard() {
       }
       return nextSelectedRoute;
     });
-  }, [supabase, selectedSessionId, squads, pendingAlarmSessionIds]);
+  }, [supabase, selectedSessionId, pendingAlarmSessionIds]);
 
   useEffect(() => {
     void loadMapRoutes();
@@ -366,7 +375,7 @@ export default function TocDashboard() {
 
   useEffect(() => {
     void loadSelectedRouteAssignment();
-  }, [loadSelectedRouteAssignment, squads, pendingAlarmSessionIds]);
+  }, [loadSelectedRouteAssignment, onlineSessionIdsSig, pendingAlarmSessionIds]);
 
   const pushSingleTarget = useMemo(() => {
     if (pushTargetAll) {
