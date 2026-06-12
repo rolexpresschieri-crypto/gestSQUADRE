@@ -1,13 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
-  canManageWaypoints,
   canViewEventLogs,
   isCampoGolfSession,
   type AdminSessionData,
@@ -29,8 +27,6 @@ import {
 } from "@/lib/golf-course-scope";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { openExternalMapWindow } from "@/lib/open-external-map";
-import { layerOptions, type LayerMode } from "@/lib/map-layers";
-import { readStoredLayerMode, writeStoredLayerMode } from "@/lib/map-layer-storage";
 import {
   readStoredPushBody,
   readStoredPushTitle,
@@ -46,11 +42,6 @@ import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
 import { waypointDisplayName, type SquadWaypoint } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
-import "./squad-live-map.css";
-
-const SquadLiveMap = dynamic(() => import("@/components/squad-live-map"), {
-  ssr: false,
-});
 
 const TOC_PUSH_TITLE = "TOC — ALLARME";
 const TOC_PUSH_BODY =
@@ -77,8 +68,6 @@ export default function TocDashboard() {
   const [squads, setSquads] = useState<LiveSquad[]>([]);
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  const [layerMode, setLayerMode] = useState<LayerMode>("standard");
-  const [mapRecenterNonce, setMapRecenterNonce] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [pushOpen, setPushOpen] = useState(false);
   const [pushTitle, setPushTitle] = useState(TOC_PUSH_TITLE);
@@ -111,7 +100,6 @@ export default function TocDashboard() {
   const [squadLogoutBusy, setSquadLogoutBusy] = useState(false);
   const [onlineSessionsLogout, setOnlineSessionsLogout] = useState<LiveSquad[]>([]);
 
-  const canEditWaypointsOnMap = session ? canManageWaypoints(session.role) : false;
   const canForceSquadLogout = session?.role === "admin";
   const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
 
@@ -153,19 +141,6 @@ export default function TocDashboard() {
     return ids;
   }, [alarmingSessionIds, onlineSessionIds]);
 
-  const mapActiveRoutes = useMemo(
-    () =>
-      Array.from(routeAssignmentsBySession.values())
-        .filter((assignment) => onlineSessionIds.has(assignment.sessionId))
-        .map((assignment) => ({
-          routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
-          colorHex: assignment.colorHex,
-          points: assignment.points,
-          highlighted: assignment.sessionId === selectedSessionId,
-        })),
-    [routeAssignmentsBySession, selectedSessionId, onlineSessionIds],
-  );
-
   const activeTocMissions = useMemo(
     () =>
       Array.from(routeAssignmentsBySession.values())
@@ -186,7 +161,7 @@ export default function TocDashboard() {
     [routeAssignmentsBySession, squads, onlineSessionIds],
   );
 
-  const handleMapSquadSelect = useCallback((squad: LiveSquad) => {
+  const handleSquadRowSelect = useCallback((squad: LiveSquad) => {
     setSelectedSessionId(squad.sessionId);
     setSelectedRouteAssignment((prev) => {
       const next = routeAssignmentsBySession.get(squad.sessionId) ?? null;
@@ -201,7 +176,6 @@ export default function TocDashboard() {
   }, [routeAssignmentsBySession]);
 
   useEffect(() => {
-    setLayerMode(readStoredLayerMode());
     setSupabase(getSupabaseBrowserClient());
     const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
     if (raw) {
@@ -384,29 +358,6 @@ export default function TocDashboard() {
     const picked = squads.filter((s) => pushSelected[s.sessionId]);
     return picked.length === 1 ? picked[0]! : null;
   }, [pushTargetAll, pushSelected, squads]);
-
-  async function handleDeleteWaypointFromMap(waypoint: SquadWaypoint) {
-    if (!supabase || !canEditWaypointsOnMap) {
-      return;
-    }
-    if (
-      !window.confirm(
-        `Eliminare la buca "${waypointDisplayName(waypoint)}"?`,
-      )
-    ) {
-      return;
-    }
-    const { error } = await supabase
-      .from("squad_map_points")
-      .delete()
-      .eq("id", waypoint.id);
-    if (error) {
-      setStatusMessage(error.message);
-      return;
-    }
-    await loadActiveEventAndWaypoints();
-    setStatusMessage("Waypoint eliminato.");
-  }
 
   const loadPushHealth = useCallback(async () => {
     if (!session) {
@@ -882,14 +833,37 @@ export default function TocDashboard() {
   return (
     <main className={styles.screen}>
       <header className={styles.header}>
-        <div>
-          <h1>
-            gestSQUADRE — TOC
-            {session.golfCourseCode ? (
-              <span className={styles.courseTag}> · {session.golfCourseCode}</span>
-            ) : null}
-          </h1>
-          <p className={styles.message}>{statusMessage}</p>
+        <div className={styles.headerTop}>
+          <div className={styles.headerBrand}>
+            <div className={styles.headerLogoWrap}>
+              <Image
+                className={styles.headerLogo}
+                src="/logo_open_golf_2026.png"
+                alt="83 Open d'Italia 2026 — DS Automobiles"
+                width={420}
+                height={100}
+                priority
+              />
+            </div>
+            <div className={styles.headerTitleBlock}>
+              <h1>
+                gestSQUADRE — TOC
+                {session.golfCourseCode ? (
+                  <span className={styles.courseTag}> · {session.golfCourseCode}</span>
+                ) : null}
+              </h1>
+              <p className={styles.message}>{statusMessage}</p>
+            </div>
+          </div>
+          <div className={styles.headerLogoWrapRight}>
+            <Image
+              className={styles.headerLogo}
+              src="/logo_open_golf_2026.png"
+              alt="83 Open d'Italia 2026 — DS Automobiles"
+              width={420}
+              height={100}
+            />
+          </div>
         </div>
         <div className={styles.actions}>
           <button className={`${styles.btn} ${styles.btnPrimary}`} type="button" onClick={() => void loadSquads()}>
@@ -942,103 +916,104 @@ export default function TocDashboard() {
         </div>
       </header>
 
-      <div className={styles.grid}>
-        <div className={styles.mapColumn}>
-        <section className={styles.mapBox}>
-          <div className={styles.mapToolbar}>
-            <label className={styles.layerLabel}>
-              Layer mappa
-              <select
-                className={styles.layerSelect}
-                value={layerMode}
-                onChange={(e) => {
-                  const mode = e.target.value as LayerMode;
-                  setLayerMode(mode);
-                  writeStoredLayerMode(mode);
-                }}
-                aria-label="Layer mappa"
-              >
-                {layerOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              className={styles.btnSmall}
-              type="button"
-              onClick={() => setMapRecenterNonce((n) => n + 1)}
-            >
-              Ricentra mappa
-            </button>
-            {mapActiveRoutes.length > 0 ? (
-              <span className={styles.pushHint}>
-                Vie attive: <strong>{mapActiveRoutes.length}</strong>
-                {selectedRouteAssignment ? (
-                  <>
-                    {" "}
-                    — selezionata{" "}
-                    <strong>{selectedRouteAssignment.routeCode}</strong>
-                    {selectedRouteAssignment.targetLabel
-                      ? ` → ${selectedRouteAssignment.targetLabel}`
-                      : ""}
-                  </>
-                ) : null}
-              </span>
-            ) : selectedSessionId ? (
-              <span className={styles.pushHint} style={{ color: "#ffb74d" }}>
-                Squadra selezionata: nessuna via assegnata (invia push con via + target).
-              </span>
-            ) : null}
-          </div>
-          <SquadLiveMap
-            layerMode={layerMode}
-            squads={squads}
-            waypoints={waypoints}
-            activeRoutes={mapActiveRoutes}
-            alarmingSessionIds={mapAlarmingSessionIds}
-            selectedSessionId={selectedSessionId}
-            onSelect={handleMapSquadSelect}
-            canManageWaypoints={canEditWaypointsOnMap && Boolean(activeEventId)}
-            onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}
-            onDeleteWaypoint={(wp) => void handleDeleteWaypointFromMap(wp)}
-            height="400px"
-            recenterNonce={mapRecenterNonce}
-          />
-        </section>
-        <footer className={styles.dashboardFooter}>
-          <div className={styles.footerLogoWrap}>
-            <Image
-              className={styles.footerLogo}
-              src="/logo_open_golf_2026.png"
-              alt="83 Open d'Italia 2026 — DS Automobiles"
-              width={840}
-              height={200}
-            />
-          </div>
-          <div className={styles.footerLogoWrap}>
-            <Image
-              className={styles.footerLogo}
-              src="/logo_open_golf_2026.png"
-              alt="83 Open d'Italia 2026 — DS Automobiles"
-              width={840}
-              height={200}
-            />
-          </div>
-        </footer>
-        </div>
-        <aside className={styles.sidePanel}>
-          <h2>Allarmi mappa ({pendingAlarms.length} in rosso)</h2>
-          <p className={styles.pushHint}>
-            La squadra segnala solo per evidenziare il punto sulla mappa. Nessuna push verso il TOC.
+      <div className={styles.opsGrid}>
+        <section className={styles.opsColumn}>
+          <h2 className={styles.opsColumnTitle}>Squadre online ({squads.length})</h2>
+          <p className={styles.opsColumnHint}>
+            Clicca una squadra per evidenziarla negli altri elenchi.
           </p>
-          <div className={styles.alarmList}>
+          <div className={styles.opsColumnBody}>
+            <ul className={styles.squadList}>
+              {squads.length === 0 ? (
+                <li className={styles.squadRowMuted}>Nessuna squadra online.</li>
+              ) : (
+                squads.map((s) => {
+                  const alarming = mapAlarmingSessionIds.has(s.sessionId);
+                  const selected = selectedSessionId === s.sessionId;
+                  return (
+                    <li
+                      key={s.sessionId}
+                      className={
+                        selected
+                          ? `${styles.squadRow} ${styles.squadRowClickable} ${styles.opsRowSelected}`
+                          : `${styles.squadRow} ${styles.squadRowClickable}`
+                      }
+                      onClick={() => handleSquadRowSelect(s)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handleSquadRowSelect(s);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <span
+                        className={
+                          alarming
+                            ? `${styles.squadBadge} ${styles.squadBadgeAlarm}`
+                            : styles.squadBadge
+                        }
+                      />
+                      <span
+                        className={
+                          alarming ? styles.squadLabelAlarm : styles.squadLabel
+                        }
+                      >
+                        {alarming ? "ALLARME — " : ""}
+                        {s.squadCode} — {s.squadName}
+                      </span>
+                      {canForceSquadLogout ? (
+                        <button
+                          type="button"
+                          className={styles.btnLogoutSquad}
+                          disabled={squadLogoutBusy}
+                          title="Forza logout solo per questa squadra"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void forceLogoutSquad(s);
+                          }}
+                        >
+                          Logout
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })
+              )}
+            </ul>
+          </div>
+        </section>
+
+        <section className={styles.opsColumn}>
+          <h2 className={styles.opsColumnTitle}>
+            Allarmi volontario ({pendingAlarms.length} aperti)
+          </h2>
+          <p className={styles.opsColumnHint}>
+            Segnalazioni dalla squadra sul campo. Nessuna push verso il TOC.
+          </p>
+          <div className={styles.opsColumnBody}>
             {pendingAlarms.length === 0 ? (
-              <p>Nessun allarme attivo.</p>
+              <p className={styles.opsEmpty}>Nessun allarme attivo.</p>
             ) : (
               pendingAlarms.map((a) => (
-                <div key={a.id} className={styles.alarmItem}>
+                <div
+                  key={a.id}
+                  className={
+                    selectedSessionId === a.session_id
+                      ? `${styles.alarmItem} ${styles.opsRowSelected}`
+                      : styles.alarmItem
+                  }
+                  onClick={() => {
+                    setSelectedSessionId(a.session_id);
+                    const squad = squads.find((s) => s.sessionId === a.session_id);
+                    if (squad) {
+                      handleSquadRowSelect(squad);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                >
                   <div className={styles.alarmDot} aria-hidden>
                     !
                   </div>
@@ -1055,7 +1030,10 @@ export default function TocDashboard() {
                     <button
                       className={styles.btnSmall}
                       type="button"
-                      onClick={() => void acknowledgeAlarm(a)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void acknowledgeAlarm(a);
+                      }}
                     >
                       Fine evento
                     </button>
@@ -1064,17 +1042,32 @@ export default function TocDashboard() {
               ))
             )}
           </div>
-          <h3>Missioni TOC attive ({activeTocMissions.length})</h3>
-          <p className={styles.pushHint}>
-            Invia squadra verso un target con via TRK: push → una sola squadra, scegli via e
-            target. La TRK resta sulla mappa fino a «Fine evento».
+        </section>
+
+        <section className={styles.opsColumn}>
+          <h2 className={styles.opsColumnTitle}>
+            Missioni TOC attive ({activeTocMissions.length})
+          </h2>
+          <p className={styles.opsColumnHint}>
+            Push verso una squadra con via TRK e target. La via resta sulla mappa fino a «Fine
+            evento».
           </p>
-          <div className={styles.alarmList}>
+          <div className={styles.opsColumnBody}>
             {activeTocMissions.length === 0 ? (
-              <p>Nessuna missione attiva (nessuna via assegnata).</p>
+              <p className={styles.opsEmpty}>Nessuna missione attiva (nessuna via assegnata).</p>
             ) : (
               activeTocMissions.map(({ assignment, squad }) => (
-                <div key={assignment.id} className={styles.missionItem}>
+                <div
+                  key={assignment.id}
+                  className={
+                    selectedSessionId === squad.sessionId
+                      ? `${styles.missionItem} ${styles.opsRowSelected}`
+                      : styles.missionItem
+                  }
+                  onClick={() => handleSquadRowSelect(squad)}
+                  role="button"
+                  tabIndex={0}
+                >
                   <div className={styles.missionDot} aria-hidden>
                     →
                   </div>
@@ -1092,13 +1085,13 @@ export default function TocDashboard() {
                       ) : null}
                     </p>
                     <p className={styles.alarmMeta}>
-                      Assegnata{" "}
-                      {new Date(assignment.assignedAt).toLocaleString("it-IT")}
+                      Assegnata {new Date(assignment.assignedAt).toLocaleString("it-IT")}
                     </p>
                     <button
                       className={styles.btnSmall}
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setSelectedSessionId(squad.sessionId);
                         setSelectedRouteAssignment(assignment);
                         void endTocMission(assignment, squad);
@@ -1111,49 +1104,7 @@ export default function TocDashboard() {
               ))
             )}
           </div>
-          <h3>Squadre online</h3>
-          <div className={styles.squadListWrap}>
-            <ul className={styles.squadList}>
-            {squads.length === 0 ? (
-              <li className={styles.squadRowMuted}>Nessuna squadra online.</li>
-            ) : (
-              squads.map((s) => {
-                const alarming = mapAlarmingSessionIds.has(s.sessionId);
-                return (
-                  <li key={s.sessionId} className={styles.squadRow}>
-                    <span
-                      className={
-                        alarming
-                          ? `${styles.squadBadge} ${styles.squadBadgeAlarm}`
-                          : styles.squadBadge
-                      }
-                    />
-                    <span
-                      className={
-                        alarming ? styles.squadLabelAlarm : styles.squadLabel
-                      }
-                    >
-                      {alarming ? "ALLARME — " : ""}
-                      {s.squadCode} — {s.squadName}
-                    </span>
-                    {canForceSquadLogout ? (
-                      <button
-                        type="button"
-                        className={styles.btnLogoutSquad}
-                        disabled={squadLogoutBusy}
-                        title="Forza logout solo per questa squadra"
-                        onClick={() => void forceLogoutSquad(s)}
-                      >
-                        Logout
-                      </button>
-                    ) : null}
-                  </li>
-                );
-              })
-            )}
-            </ul>
-          </div>
-        </aside>
+        </section>
       </div>
 
       {squadLogoutOpen ? (
