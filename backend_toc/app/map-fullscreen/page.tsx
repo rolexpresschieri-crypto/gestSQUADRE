@@ -126,6 +126,18 @@ function MapFullscreenContent() {
   }, [displayMode, searchParams]);
 
   useEffect(() => {
+    if (!displayMode) {
+      return;
+    }
+    window.__gestMapDisplayWin = window;
+    return () => {
+      if (window.__gestMapDisplayWin === window) {
+        window.__gestMapDisplayWin = null;
+      }
+    };
+  }, [displayMode]);
+
+  useEffect(() => {
     const onStorage = (event: StorageEvent) => {
       if (event.key !== ADMIN_SESSION_STORAGE_KEY) {
         return;

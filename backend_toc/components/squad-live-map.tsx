@@ -8,7 +8,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
@@ -29,7 +28,6 @@ import { getMapTileConfig, type LayerMode } from "@/lib/map-layers";
 import {
   formatGpsAccuracyMeters,
   hasCoordinates,
-  liveSquadsPollSig,
   type LiveSquad,
 } from "@/lib/live-squads";
 import {
@@ -195,42 +193,6 @@ function squadMarkerPopupHtml(squad: LiveSquad, isAlarming: boolean): string {
   return html;
 }
 
-/** Ripristina centro/zoom dopo aggiornamenti layer React-Leaflet (poll GPS). */
-function MapViewGuard({ lockKey }: { lockKey: string }) {
-  const map = useMap();
-  const api = useMapUserNav();
-  const pendingRestoreRef = useRef<{
-    lat: number;
-    lng: number;
-    zoom: number;
-  } | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (api?.userNavRef.current) {
-        return;
-      }
-      const center = map.getCenter();
-      pendingRestoreRef.current = {
-        lat: center.lat,
-        lng: center.lng,
-        zoom: map.getZoom(),
-      };
-    };
-  }, [lockKey, map, api]);
-
-  useLayoutEffect(() => {
-    const pending = pendingRestoreRef.current;
-    if (!pending || api?.userNavRef.current) {
-      return;
-    }
-    pendingRestoreRef.current = null;
-    map.setView([pending.lat, pending.lng], pending.zoom, { animate: false });
-  }, [lockKey, map, api]);
-
-  return null;
-}
-
 function ImperativeSquadMarkersLayer({
   squads,
   alarmingSessionIds,
@@ -300,12 +262,15 @@ function ImperativeSquadMarkersLayer({
         entry = { marker, circle: null, iconKey };
         markers.set(squad.sessionId, entry);
       } else {
-        entry.marker.setLatLng(position);
+        const nextLatLng = L.latLng(position);
+        if (!entry.marker.getLatLng().equals(nextLatLng)) {
+          entry.marker.setLatLng(nextLatLng);
+        }
         if (entry.iconKey !== iconKey) {
           entry.marker.setIcon(squadDivIcon(squad, selected, isAlarming));
           entry.iconKey = iconKey;
+          entry.marker.setPopupContent(squadMarkerPopupHtml(squad, isAlarming));
         }
-        entry.marker.setPopupContent(squadMarkerPopupHtml(squad, isAlarming));
       }
 
       const acc = squad.lastAccuracy;
@@ -323,8 +288,13 @@ function ImperativeSquadMarkersLayer({
             weight: 1,
           }).addTo(map);
         } else {
-          entry.circle.setLatLng(position);
-          entry.circle.setRadius(acc);
+          const circleLatLng = L.latLng(position);
+          if (!entry.circle.getLatLng().equals(circleLatLng)) {
+            entry.circle.setLatLng(circleLatLng);
+          }
+          if (Math.abs(entry.circle.getRadius() - acc) >= 1) {
+            entry.circle.setRadius(acc);
+          }
           entry.circle.setStyle({
             color: circleColor,
             fillColor: circleColor,
@@ -408,49 +378,60 @@ function MapBoundsController({
   return null;
 }
 
-function ActiveRoutePolylines({
+const ActiveRoutePolylines = memo(function ActiveRoutePolylines({
   route,
   highlighted = false,
 }: {
   route: DrawnRoute;
   highlighted?: boolean;
 }) {
-  if (route.points.length < 2) {
+  const positions = useMemo(
+    () =>
+      route.points.length < 2
+        ? []
+        : route.points.map((p) => [p.lat, p.lng] as [number, number]),
+    [route.points],
+  );
+  const haloOptions = useMemo(
+    () => ({
+      color: "#ffffff",
+      weight: highlighted ? 7 : 5,
+      opacity: 0.95,
+      lineCap: "round" as const,
+      lineJoin: "round" as const,
+    }),
+    [highlighted],
+  );
+  const lineOptions = useMemo(
+    () => ({
+      color: route.colorHex,
+      weight: highlighted ? 4 : 3,
+      opacity: 0.98,
+      lineCap: "round" as const,
+      lineJoin: "round" as const,
+    }),
+    [route.colorHex, highlighted],
+  );
+
+  if (positions.length < 2) {
     return null;
   }
-  const positions = route.points.map(
-    (p) => [p.lat, p.lng] as [number, number],
-  );
-  const haloWeight = highlighted ? 7 : 5;
-  const lineWeight = highlighted ? 4 : 3;
 
   return (
     <>
       <Polyline
         key={`${route.routeCode}-halo`}
         positions={positions}
-        pathOptions={{
-          color: "#ffffff",
-          weight: haloWeight,
-          opacity: 0.95,
-          lineCap: "round",
-          lineJoin: "round",
-        }}
+        pathOptions={haloOptions}
       />
       <Polyline
         key={`${route.routeCode}-line`}
         positions={positions}
-        pathOptions={{
-          color: route.colorHex,
-          weight: lineWeight,
-          opacity: 0.98,
-          lineCap: "round",
-          lineJoin: "round",
-        }}
+        pathOptions={lineOptions}
       />
     </>
   );
-}
+});
 
 function LeafletInvalidateOnLayout() {
   const map = useMap();
@@ -576,13 +557,6 @@ export default function SquadLiveMap({
     return [];
   }, [activeRoute, activeRoutes]);
   const routesToDraw = useStableRoutes(rawRoutesToDraw);
-  const viewLockKey = useMemo(() => {
-    const alarmingSig = [...alarmingSessionIds].sort().join(",");
-    const routeSig = routesToDraw
-      .map((route) => `${route.routeCode}:${route.highlighted ? 1 : 0}`)
-      .join("|");
-    return `${liveSquadsPollSig(withCoords)}|${selectedSessionId ?? ""}|${alarmingSig}|${routeSig}`;
-  }, [withCoords, selectedSessionId, alarmingSessionIds, routesToDraw]);
 
   return (
     <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
@@ -591,16 +565,19 @@ export default function SquadLiveMap({
         zoom={13}
         style={{ height: "100%", width: "100%" }}
         scrollWheelZoom
+        preferCanvas
       >
         <TileLayer
           key={layerMode}
           attribution={tile.attribution}
           url={tile.url}
+          updateWhenZooming={false}
+          updateWhenIdle
+          keepBuffer={2}
         />
         <MapUserNavProvider>
           <LeafletInvalidateOnLayout />
           <MapUserInteractionTracker />
-          <MapViewGuard lockKey={viewLockKey} />
           <MapBoundsController
             waypoints={waypoints}
             activeRoutes={routesToDraw}
