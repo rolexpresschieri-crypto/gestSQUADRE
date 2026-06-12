@@ -34,7 +34,7 @@ export type TocPushLogRow = {
 
 export type UnifiedEventLog = {
   id: string;
-  kind: "squad_alarm" | "toc_push";
+  kind: "squad_alarm" | "fine_evento" | "toc_push";
   createdAt: string;
   squadCode: string;
   squadName: string;
@@ -48,18 +48,36 @@ export function mergeEventLogs(
   alarms: SquadAlarmLogRow[],
   pushes: TocPushLogRow[],
 ): UnifiedEventLog[] {
-  const rows: UnifiedEventLog[] = [
-    ...alarms.map((a) => ({
+  const alarmRows: UnifiedEventLog[] = [];
+  for (const a of alarms) {
+    alarmRows.push({
       id: a.id,
-      kind: "squad_alarm" as const,
+      kind: "squad_alarm",
       createdAt: a.created_at,
       squadCode: a.squad_code,
       squadName: a.squad_name,
       summary: "Allarme volontario → TOC",
       detail: formatAlarmRequestDetail(a),
-      status: a.acknowledged_at ? "preso in carico" : "attivo",
-      actor: a.acknowledged_by?.trim() || "—",
-    })),
+      status: a.acknowledged_at ? "chiuso" : "attivo",
+      actor: "—",
+    });
+    if (a.acknowledged_at) {
+      alarmRows.push({
+        id: `${a.id}-fine-evento`,
+        kind: "fine_evento",
+        createdAt: a.acknowledged_at,
+        squadCode: a.squad_code,
+        squadName: a.squad_name,
+        summary: "Fine evento",
+        detail: formatAlarmRequestDetail(a),
+        status: "registrato",
+        actor: a.acknowledged_by?.trim() || "—",
+      });
+    }
+  }
+
+  const rows: UnifiedEventLog[] = [
+    ...alarmRows,
     ...pushes.map((p) => {
       const title = p.title?.trim() || "—";
       const body = p.body?.trim() || "—";

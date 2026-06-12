@@ -70,7 +70,7 @@ private const val SquadAlarmHint =
     "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
 private const val SquadAlarmDialogTitle = "Segnala allarme su mappa TOC"
 private const val SquadAlarmDialogBody =
-    "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Preso in carico»."
+    "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
 private const val SquadAlarmSentOk =
     "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
 

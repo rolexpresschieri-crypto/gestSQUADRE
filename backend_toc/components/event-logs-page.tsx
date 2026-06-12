@@ -231,8 +231,8 @@ export default function EventLogsPage() {
 
       <div className={styles.panel}>
         <p className={styles.hint}>
-          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Messaggi e
-          allarmi TOC → volontari (titolo e testo completi)
+          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Fine evento ·
+          Messaggi e allarmi TOC → volontari (titolo e testo completi)
           {session && isCampoGolfSession(session) ? (
             <>
               {" "}

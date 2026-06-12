@@ -63,9 +63,11 @@ function MapFullscreenContent() {
         routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
         colorHex: assignment.colorHex,
         points: assignment.points,
-        highlighted: assignment.sessionId === selectedSessionId,
+        highlighted:
+          assignment.sessionId === selectedSessionId ||
+          alarmingSessionIds.has(assignment.sessionId),
       })),
-    [routeAssignmentsBySession, selectedSessionId],
+    [routeAssignmentsBySession, selectedSessionId, alarmingSessionIds],
   );
 
   const canManageWaypoints = session?.role === "admin";
@@ -127,13 +129,20 @@ function MapFullscreenContent() {
   }, [supabase, golfCourseId]);
 
   const loadRouteAssignments = useCallback(async () => {
-    if (!supabase || squads.length === 0) {
+    if (!supabase) {
+      setRouteAssignmentsBySession(new Map());
+      return;
+    }
+    const sessionIds = [
+      ...new Set([...squads.map((s) => s.sessionId), ...alarmSessionIds]),
+    ];
+    if (sessionIds.length === 0) {
       setRouteAssignmentsBySession(new Map());
       return;
     }
     const { assignments } = await fetchActiveRouteAssignmentsForSessions(
       supabase,
-      squads.map((s) => s.sessionId),
+      sessionIds,
     );
     setRouteAssignmentsBySession(assignments);
     if (!selectedSessionId) {
@@ -142,7 +151,7 @@ function MapFullscreenContent() {
         setSelectedSessionId(firstWithRoute.sessionId);
       }
     }
-  }, [supabase, selectedSessionId, squads]);
+  }, [supabase, selectedSessionId, squads, alarmSessionIds]);
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
@@ -215,7 +224,10 @@ function MapFullscreenContent() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "squad_alarms" },
-        () => void loadActiveAlarms(),
+        () => {
+          void loadActiveAlarms();
+          void loadRouteAssignments();
+        },
       )
       .subscribe();
 

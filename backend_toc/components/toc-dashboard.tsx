@@ -123,15 +123,22 @@ export default function TocDashboard() {
     return ids;
   }, [alarms]);
 
+  const pendingAlarmSessionIds = useMemo(
+    () => alarms.filter((a) => !a.acknowledged_at).map((a) => a.session_id),
+    [alarms],
+  );
+
   const mapActiveRoutes = useMemo(
     () =>
       Array.from(routeAssignmentsBySession.values()).map((assignment) => ({
         routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
         colorHex: assignment.colorHex,
         points: assignment.points,
-        highlighted: assignment.sessionId === selectedSessionId,
+        highlighted:
+          assignment.sessionId === selectedSessionId ||
+          alarmingSessionIds.has(assignment.sessionId),
       })),
-    [routeAssignmentsBySession, selectedSessionId],
+    [routeAssignmentsBySession, selectedSessionId, alarmingSessionIds],
   );
 
   useEffect(() => {
@@ -240,12 +247,22 @@ export default function TocDashboard() {
   }, [supabase, golfCourseId]);
 
   const loadSelectedRouteAssignment = useCallback(async () => {
-    if (!supabase || squads.length === 0) {
+    if (!supabase) {
       setRouteAssignmentsBySession(new Map());
       setSelectedRouteAssignment(null);
       return;
     }
-    const sessionIds = squads.map((s) => s.sessionId);
+    const sessionIds = [
+      ...new Set([
+        ...squads.map((s) => s.sessionId),
+        ...pendingAlarmSessionIds,
+      ]),
+    ];
+    if (sessionIds.length === 0) {
+      setRouteAssignmentsBySession(new Map());
+      setSelectedRouteAssignment(null);
+      return;
+    }
     const { assignments, error } = await fetchActiveRouteAssignmentsForSessions(
       supabase,
       sessionIds,
@@ -267,7 +284,7 @@ export default function TocDashboard() {
     setSelectedRouteAssignment(
       routeSessionId ? (assignments.get(routeSessionId) ?? null) : null,
     );
-  }, [supabase, selectedSessionId, squads]);
+  }, [supabase, selectedSessionId, squads, pendingAlarmSessionIds]);
 
   useEffect(() => {
     void loadMapRoutes();
@@ -363,8 +380,10 @@ export default function TocDashboard() {
             setStatusMessage(
               `ALLARME: ${row.squad_code} — ${formatAlarmRequestDetail(row)}`,
             );
+            void loadSelectedRouteAssignment();
           } else {
             void loadAlarms();
+            void loadSelectedRouteAssignment();
           }
         },
       )
@@ -485,6 +504,7 @@ export default function TocDashboard() {
     if (!supabase || !session) {
       return;
     }
+    const activeRoute = routeAssignmentsBySession.get(alarm.session_id);
     const { error } = await supabase
       .from("squad_alarms")
       .update({
@@ -502,10 +522,11 @@ export default function TocDashboard() {
     );
     await loadAlarms();
     await loadSelectedRouteAssignment();
+    const routeHint = activeRoute ? ` Via ${activeRoute.routeCode} rimossa dalla mappa.` : "";
     setStatusMessage(
       routeClear.error
-        ? `Allarme preso in carico — squadra non più in rosso (via: ${routeClear.error}).`
-        : "Allarme preso in carico — squadra non più in rosso, via rimossa dalla mappa.",
+        ? `Fine evento — squadra non più in rosso (errore via: ${routeClear.error}).`
+        : `Fine evento registrato — squadra non più in rosso.${routeHint}`,
     );
   }
 
@@ -883,7 +904,7 @@ export default function TocDashboard() {
                       type="button"
                       onClick={() => void acknowledgeAlarm(a)}
                     >
-                      Preso in carico
+                      Fine evento
                     </button>
                   </div>
                 </div>
