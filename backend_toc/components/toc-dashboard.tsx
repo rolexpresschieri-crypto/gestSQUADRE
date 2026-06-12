@@ -128,17 +128,34 @@ export default function TocDashboard() {
     [alarms],
   );
 
+  const onlineSessionIds = useMemo(
+    () => new Set(squads.map((s) => s.sessionId)),
+    [squads],
+  );
+
+  const mapAlarmingSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const id of alarmingSessionIds) {
+      if (onlineSessionIds.has(id)) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  }, [alarmingSessionIds, onlineSessionIds]);
+
   const mapActiveRoutes = useMemo(
     () =>
-      Array.from(routeAssignmentsBySession.values()).map((assignment) => ({
-        routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
-        colorHex: assignment.colorHex,
-        points: assignment.points,
-        highlighted:
-          assignment.sessionId === selectedSessionId ||
-          alarmingSessionIds.has(assignment.sessionId),
-      })),
-    [routeAssignmentsBySession, selectedSessionId, alarmingSessionIds],
+      Array.from(routeAssignmentsBySession.values())
+        .filter((assignment) => onlineSessionIds.has(assignment.sessionId))
+        .map((assignment) => ({
+          routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
+          colorHex: assignment.colorHex,
+          points: assignment.points,
+          highlighted:
+            assignment.sessionId === selectedSessionId ||
+            mapAlarmingSessionIds.has(assignment.sessionId),
+        })),
+    [routeAssignmentsBySession, selectedSessionId, mapAlarmingSessionIds, onlineSessionIds],
   );
 
   useEffect(() => {
@@ -246,16 +263,18 @@ export default function TocDashboard() {
     setMapRoutes(await fetchMapRoutes(supabase, golfCourseId));
   }, [supabase, golfCourseId]);
 
-  const loadSelectedRouteAssignment = useCallback(async () => {
+  const loadSelectedRouteAssignment = useCallback(async (extraSessionIds: string[] = []) => {
     if (!supabase) {
       setRouteAssignmentsBySession(new Map());
       setSelectedRouteAssignment(null);
       return;
     }
+    const onlineIds = new Set(squads.map((s) => s.sessionId));
     const sessionIds = [
       ...new Set([
         ...squads.map((s) => s.sessionId),
-        ...pendingAlarmSessionIds,
+        ...pendingAlarmSessionIds.filter((id) => onlineIds.has(id)),
+        ...extraSessionIds,
       ]),
     ];
     if (sessionIds.length === 0) {
@@ -267,22 +286,25 @@ export default function TocDashboard() {
       supabase,
       sessionIds,
     );
-    setRouteAssignmentsBySession(assignments);
+    const visibleAssignments = new Map(
+      [...assignments].filter(([sessionId]) => onlineIds.has(sessionId)),
+    );
+    setRouteAssignmentsBySession(visibleAssignments);
     if (error) {
       setStatusMessage(`Via mappa: ${error}`);
     }
     const routeSessionId =
-      (selectedSessionId && assignments.has(selectedSessionId)
+      (selectedSessionId && visibleAssignments.has(selectedSessionId)
         ? selectedSessionId
         : null) ??
-      sessionIds.find((id) => assignments.has(id)) ??
+      sessionIds.find((id) => visibleAssignments.has(id)) ??
       selectedSessionId ??
       null;
-    if (!selectedSessionId && routeSessionId && assignments.has(routeSessionId)) {
+    if (!selectedSessionId && routeSessionId && visibleAssignments.has(routeSessionId)) {
       setSelectedSessionId(routeSessionId);
     }
     setSelectedRouteAssignment(
-      routeSessionId ? (assignments.get(routeSessionId) ?? null) : null,
+      routeSessionId ? (visibleAssignments.get(routeSessionId) ?? null) : null,
     );
   }, [supabase, selectedSessionId, squads, pendingAlarmSessionIds]);
 
@@ -292,7 +314,7 @@ export default function TocDashboard() {
 
   useEffect(() => {
     void loadSelectedRouteAssignment();
-  }, [loadSelectedRouteAssignment, squads]);
+  }, [loadSelectedRouteAssignment, squads, pendingAlarmSessionIds]);
 
   const pushSingleTarget = useMemo(() => {
     if (pushTargetAll) {
@@ -364,7 +386,10 @@ export default function TocDashboard() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "squad_sessions" },
-        () => void loadSquads(),
+        () => {
+          void loadSquads();
+          void loadSelectedRouteAssignment();
+        },
       )
       .subscribe();
 
@@ -380,7 +405,7 @@ export default function TocDashboard() {
             setStatusMessage(
               `ALLARME: ${row.squad_code} — ${formatAlarmRequestDetail(row)}`,
             );
-            void loadSelectedRouteAssignment();
+            void loadSelectedRouteAssignment([row.session_id]);
           } else {
             void loadAlarms();
             void loadSelectedRouteAssignment();
@@ -484,10 +509,13 @@ export default function TocDashboard() {
       return;
     }
 
+    await clearRouteAssignmentForSession(supabase, squad.sessionId);
     await loadSquads();
+    await loadSelectedRouteAssignment();
     await loadOnlineSessionsForLogout();
     if (selectedSessionId === squad.sessionId) {
       setSelectedSessionId(null);
+      setSelectedRouteAssignment(null);
     }
     setStatusMessage(`Logout forzato: ${squad.squadCode} — ${squad.squadName}.`);
   }
@@ -840,7 +868,7 @@ export default function TocDashboard() {
             squads={squads}
             waypoints={waypoints}
             activeRoutes={mapActiveRoutes}
-            alarmingSessionIds={alarmingSessionIds}
+            alarmingSessionIds={mapAlarmingSessionIds}
             selectedSessionId={selectedSessionId}
             onSelect={(s) => {
               setSelectedSessionId(s.sessionId);
@@ -918,7 +946,7 @@ export default function TocDashboard() {
               <li className={styles.squadRowMuted}>Nessuna squadra online.</li>
             ) : (
               squads.map((s) => {
-                const alarming = alarmingSessionIds.has(s.sessionId);
+                const alarming = mapAlarmingSessionIds.has(s.sessionId);
                 return (
                   <li key={s.sessionId} className={styles.squadRow}>
                     <span

@@ -33,6 +33,17 @@ const SquadLiveMap = dynamic(() => import("@/components/squad-live-map"), {
   ssr: false,
 });
 
+function readAdminSession(): AdminSessionData | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+  return restoreAdminSessionFromStorage(raw);
+}
+
 function MapFullscreenContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,25 +63,48 @@ function MapFullscreenContent() {
   const [hint, setHint] = useState("");
   const mapRef = useRef<HTMLDivElement | null>(null);
 
-  const alarmingSessionIds = useMemo(
-    () => new Set(alarmSessionIds),
-    [alarmSessionIds],
+  const onlineSessionIds = useMemo(
+    () => new Set(squads.map((s) => s.sessionId)),
+    [squads],
   );
+
+  const mapAlarmingSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const id of alarmSessionIds) {
+      if (onlineSessionIds.has(id)) {
+        ids.add(id);
+      }
+    }
+    return ids;
+  }, [alarmSessionIds, onlineSessionIds]);
 
   const mapActiveRoutes = useMemo(
     () =>
-      Array.from(routeAssignmentsBySession.values()).map((assignment) => ({
-        routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
-        colorHex: assignment.colorHex,
-        points: assignment.points,
-        highlighted:
-          assignment.sessionId === selectedSessionId ||
-          alarmingSessionIds.has(assignment.sessionId),
-      })),
-    [routeAssignmentsBySession, selectedSessionId, alarmingSessionIds],
+      Array.from(routeAssignmentsBySession.values())
+        .filter((assignment) => onlineSessionIds.has(assignment.sessionId))
+        .map((assignment) => ({
+          routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
+          colorHex: assignment.colorHex,
+          points: assignment.points,
+          highlighted:
+            assignment.sessionId === selectedSessionId ||
+            mapAlarmingSessionIds.has(assignment.sessionId),
+        })),
+    [routeAssignmentsBySession, selectedSessionId, mapAlarmingSessionIds, onlineSessionIds],
   );
 
   const canManageWaypoints = session?.role === "admin";
+
+  const endDisplaySession = useCallback(() => {
+    setSession(null);
+    setSquads([]);
+    setAlarmSessionIds([]);
+    setRouteAssignmentsBySession(new Map());
+    setSelectedSessionId(null);
+    if (displayMode) {
+      window.close();
+    }
+  }, [displayMode]);
 
   useEffect(() => {
     const layerParam = searchParams.get("layer");
@@ -81,15 +115,7 @@ function MapFullscreenContent() {
       setLayerMode(readStoredLayerMode());
     }
     setSupabase(getSupabaseBrowserClient());
-    const raw = window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
-    if (raw) {
-      const restored = restoreAdminSessionFromStorage(raw);
-      if (restored) {
-        setSession(restored);
-      } else {
-        window.localStorage.removeItem(ADMIN_SESSION_STORAGE_KEY);
-      }
-    }
+    setSession(readAdminSession());
     if (displayMode) {
       setHint(
         "Trascina questa finestra sul secondo monitor. Poi F11 o «Schermo intero» per massimizzare la mappa.",
@@ -97,13 +123,44 @@ function MapFullscreenContent() {
     }
   }, [displayMode, searchParams]);
 
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== ADMIN_SESSION_STORAGE_KEY) {
+        return;
+      }
+      if (!event.newValue) {
+        endDisplaySession();
+        return;
+      }
+      setSession(readAdminSession());
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [endDisplaySession]);
+
+  useEffect(() => {
+    if (!displayMode) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      if (!window.localStorage.getItem(ADMIN_SESSION_STORAGE_KEY)) {
+        endDisplaySession();
+      }
+    }, MAP_SQUAD_POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [displayMode, endDisplaySession]);
+
   const golfCourseId = session?.golfCourseId ?? null;
 
   const loadSquads = useCallback(async () => {
     if (!supabase) {
       return;
     }
-    setSquads(await fetchLiveSquads(supabase, golfCourseId));
+    const rows = await fetchLiveSquads(supabase, golfCourseId);
+    setSquads(rows);
+    setSelectedSessionId((prev) =>
+      prev && rows.some((s) => s.sessionId === prev) ? prev : null,
+    );
   }, [supabase, golfCourseId]);
 
   const loadActiveAlarms = useCallback(async () => {
@@ -128,30 +185,43 @@ function MapFullscreenContent() {
     );
   }, [supabase, golfCourseId]);
 
-  const loadRouteAssignments = useCallback(async () => {
-    if (!supabase) {
-      setRouteAssignmentsBySession(new Map());
-      return;
-    }
-    const sessionIds = [
-      ...new Set([...squads.map((s) => s.sessionId), ...alarmSessionIds]),
-    ];
-    if (sessionIds.length === 0) {
-      setRouteAssignmentsBySession(new Map());
-      return;
-    }
-    const { assignments } = await fetchActiveRouteAssignmentsForSessions(
-      supabase,
-      sessionIds,
-    );
-    setRouteAssignmentsBySession(assignments);
-    if (!selectedSessionId) {
-      const firstWithRoute = squads.find((s) => assignments.has(s.sessionId));
-      if (firstWithRoute) {
-        setSelectedSessionId(firstWithRoute.sessionId);
+  const loadRouteAssignments = useCallback(
+    async (extraSessionIds: string[] = [], squadsSnapshot: LiveSquad[] = squads) => {
+      if (!supabase) {
+        setRouteAssignmentsBySession(new Map());
+        return;
       }
-    }
-  }, [supabase, selectedSessionId, squads, alarmSessionIds]);
+      const onlineIds = new Set(squadsSnapshot.map((s) => s.sessionId));
+      const sessionIds = [
+        ...new Set([
+          ...squadsSnapshot.map((s) => s.sessionId),
+          ...alarmSessionIds.filter((id) => onlineIds.has(id)),
+          ...extraSessionIds,
+        ]),
+      ];
+      if (sessionIds.length === 0) {
+        setRouteAssignmentsBySession(new Map());
+        return;
+      }
+      const { assignments } = await fetchActiveRouteAssignmentsForSessions(
+        supabase,
+        sessionIds,
+      );
+      const visibleAssignments = new Map(
+        [...assignments].filter(([sessionId]) => onlineIds.has(sessionId)),
+      );
+      setRouteAssignmentsBySession(visibleAssignments);
+      if (!selectedSessionId) {
+        const firstWithRoute = squadsSnapshot.find((s) =>
+          visibleAssignments.has(s.sessionId),
+        );
+        if (firstWithRoute) {
+          setSelectedSessionId(firstWithRoute.sessionId);
+        }
+      }
+    },
+    [supabase, selectedSessionId, squads, alarmSessionIds],
+  );
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
@@ -199,7 +269,7 @@ function MapFullscreenContent() {
 
   useEffect(() => {
     void loadRouteAssignments();
-  }, [loadRouteAssignments, squads]);
+  }, [loadRouteAssignments, squads, alarmSessionIds]);
 
   useEffect(() => {
     if (!session || !supabase) {
@@ -215,7 +285,19 @@ function MapFullscreenContent() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "squad_sessions" },
-        () => void loadSquads(),
+        () => {
+          void (async () => {
+            if (!supabase) {
+              return;
+            }
+            const rows = await fetchLiveSquads(supabase, golfCourseId);
+            setSquads(rows);
+            setSelectedSessionId((prev) =>
+              prev && rows.some((s) => s.sessionId === prev) ? prev : null,
+            );
+            await loadRouteAssignments([], rows);
+          })();
+        },
       )
       .subscribe();
 
@@ -224,9 +306,15 @@ function MapFullscreenContent() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "squad_alarms" },
-        () => {
-          void loadActiveAlarms();
-          void loadRouteAssignments();
+        (payload) => {
+          const sessionId =
+            payload.eventType === "INSERT" && payload.new
+              ? String((payload.new as { session_id?: string }).session_id ?? "")
+              : "";
+          void (async () => {
+            await loadActiveAlarms();
+            await loadRouteAssignments(sessionId ? [sessionId] : []);
+          })();
         },
       )
       .subscribe();
@@ -251,6 +339,7 @@ function MapFullscreenContent() {
 
     const timer = window.setInterval(() => {
       void loadSquads();
+      void loadActiveAlarms();
       void loadRouteAssignments();
     }, MAP_SQUAD_POLL_MS);
 
@@ -264,6 +353,7 @@ function MapFullscreenContent() {
   }, [
     session,
     supabase,
+    golfCourseId,
     loadSquads,
     loadActiveAlarms,
     loadActiveEventAndWaypoints,
@@ -294,8 +384,14 @@ function MapFullscreenContent() {
       >
         <h1>Accesso richiesto</h1>
         <p>
-          <Link href="/">Effettua il login TOC</Link> nella finestra principale, poi riapri
-          questa mappa.
+          {displayMode ? (
+            <>Sessione TOC chiusa nella dashboard. Puoi chiudere questa finestra.</>
+          ) : (
+            <>
+              <Link href="/">Effettua il login TOC</Link> nella finestra principale, poi riapri
+              questa mappa.
+            </>
+          )}
         </p>
       </main>
     );
@@ -342,6 +438,11 @@ function MapFullscreenContent() {
         <button type="button" onClick={() => void loadSquads()}>
           Aggiorna
         </button>
+        {mapActiveRoutes.length > 0 ? (
+          <span style={{ color: "#8fe88f", fontWeight: 700 }}>
+            Vie TRK: {mapActiveRoutes.length}
+          </span>
+        ) : null}
         <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
           Layer
           <select
@@ -379,7 +480,7 @@ function MapFullscreenContent() {
           squads={squads}
           waypoints={waypoints}
           activeRoutes={mapActiveRoutes}
-          alarmingSessionIds={alarmingSessionIds}
+          alarmingSessionIds={mapAlarmingSessionIds}
           selectedSessionId={selectedSessionId}
           onSelect={(s) => setSelectedSessionId(s.sessionId)}
           canManageWaypoints={canManageWaypoints && Boolean(activeEventId)}
@@ -391,7 +492,7 @@ function MapFullscreenContent() {
       {!displayMode ? (
         <footer style={{ padding: 8, color: "#ccc", fontSize: 12, flexShrink: 0 }}>
           {squads.map((s) => {
-            const alarming = alarmingSessionIds.has(s.sessionId);
+            const alarming = mapAlarmingSessionIds.has(s.sessionId);
             return (
               <button
                 key={s.sessionId}
