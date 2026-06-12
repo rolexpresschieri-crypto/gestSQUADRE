@@ -61,6 +61,7 @@ import com.ansmi.gestsquadre.kmp.ui.theme.TacticalMuted
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalNavy
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalOrange
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalRed
+import com.ansmi.gestsquadre.kmp.ui.theme.AlarmHighlightYellow
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
@@ -493,7 +494,7 @@ private fun SquadAlarmRequestDialog(
                         validationError = null
                     },
                     labelColor = Color.Black,
-                    highlightBackground = Color(0xFFFF00),
+                    highlightBackground = AlarmHighlightYellow,
                 )
                 AlarmRequestCheckboxRow(
                     label = "5. V.V.F.",
@@ -503,7 +504,7 @@ private fun SquadAlarmRequestDialog(
                         validationError = null
                     },
                     labelColor = Color.Black,
-                    highlightBackground = Color(0xFFFF00),
+                    highlightBackground = AlarmHighlightYellow,
                 )
                 AlarmRequestCheckboxRow(
                     label = "6. Altro",
@@ -589,12 +590,13 @@ private fun AlarmRequestCheckboxRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(vertical = 2.dp)
+                .padding(vertical = 3.dp)
                 .then(
                     highlightBackground?.let { bg ->
                         Modifier
+                            .border(1.5.dp, Color.Black, RoundedCornerShape(6.dp))
                             .background(bg, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 8.dp)
                     } ?: Modifier,
                 )
                 .clickable { onCheckedChange(!checked) },

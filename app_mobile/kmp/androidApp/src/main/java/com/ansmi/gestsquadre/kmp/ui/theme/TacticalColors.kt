@@ -9,6 +9,8 @@ const val BrandBackgroundAlpha = 0.48f
 val TacticalFrame = Color(0xFF14295D)
 val TacticalGreen = Color(0xFF079B42)
 val TacticalYellow = Color(0xFFE0BE3A)
+/** #FFFF00 — evidenziazione voci 4–5 dialog allarme (FORZE / V.V.F.). */
+val AlarmHighlightYellow = Color(255, 255, 0)
 val TacticalRed = Color(0xFFC62828)
 val TacticalOrange = Color(0xFFFF9A05)
 val TacticalNavy = Color(0xFF1A3066)
