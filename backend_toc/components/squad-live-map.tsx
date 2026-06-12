@@ -93,20 +93,43 @@ type DrawnRoute = {
   highlighted?: boolean;
 };
 
-/** Dopo pan/zoom manuale non ri-inquadrare automaticamente la mappa. */
-const MapUserNavContext = createContext<RefObject<boolean> | null>(null);
+type MapUserNavApi = {
+  userNavRef: RefObject<boolean>;
+};
 
-function useMapUserNavRef() {
+/** Dopo pan/zoom manuale non ri-inquadrare automaticamente la mappa. */
+const MapUserNavContext = createContext<MapUserNavApi | null>(null);
+
+function useMapUserNav() {
   return useContext(MapUserNavContext);
 }
 
 function MapUserNavProvider({ children }: { children: ReactNode }) {
-  const map = useMap();
   const userNavRef = useRef(false);
 
   useEffect(() => {
+    return () => {
+      userNavRef.current = false;
+    };
+  }, []);
+
+  return (
+    <MapUserNavContext.Provider value={{ userNavRef }}>
+      {children}
+    </MapUserNavContext.Provider>
+  );
+}
+
+function MapUserInteractionTracker() {
+  const map = useMap();
+  const api = useMapUserNav();
+
+  useEffect(() => {
+    if (!api) {
+      return;
+    }
     const markUserNav = () => {
-      userNavRef.current = true;
+      api.userNavRef.current = true;
     };
     const onZoom = (event: L.LeafletEvent) => {
       const originalEvent = (event as L.LeafletEvent & { originalEvent?: Event })
@@ -116,18 +139,68 @@ function MapUserNavProvider({ children }: { children: ReactNode }) {
       }
     };
     map.on("dragstart", markUserNav);
-    map.on("movestart", markUserNav);
     map.on("zoomstart", onZoom);
     return () => {
       map.off("dragstart", markUserNav);
-      map.off("movestart", markUserNav);
       map.off("zoomstart", onZoom);
     };
-  }, [map]);
+  }, [map, api]);
 
-  return (
-    <MapUserNavContext.Provider value={userNavRef}>{children}</MapUserNavContext.Provider>
+  return null;
+}
+
+/** Ripristina centro/zoom dopo aggiornamenti GPS se l'operatore ha mosso la mappa. */
+function MapViewPreserver({ squads }: { squads: LiveSquad[] }) {
+  const map = useMap();
+  const api = useMapUserNav();
+  const lockedViewRef = useRef<{ lat: number; lng: number; zoom: number } | null>(
+    null,
   );
+
+  const squadsSig = useMemo(
+    () =>
+      squads
+        .map((s) =>
+          hasCoordinates(s)
+            ? `${s.sessionId}:${s.lastLatitude!.toFixed(5)},${s.lastLongitude!.toFixed(5)}`
+            : s.sessionId,
+        )
+        .join("|"),
+    [squads],
+  );
+
+  useEffect(() => {
+    if (!api) {
+      return;
+    }
+    const persistLock = () => {
+      if (!api.userNavRef.current) {
+        return;
+      }
+      const center = map.getCenter();
+      lockedViewRef.current = {
+        lat: center.lat,
+        lng: center.lng,
+        zoom: map.getZoom(),
+      };
+    };
+    map.on("moveend", persistLock);
+    map.on("zoomend", persistLock);
+    return () => {
+      map.off("moveend", persistLock);
+      map.off("zoomend", persistLock);
+    };
+  }, [map, api]);
+
+  useEffect(() => {
+    if (!api?.userNavRef.current || !lockedViewRef.current) {
+      return;
+    }
+    const view = lockedViewRef.current;
+    map.setView([view.lat, view.lng], view.zoom, { animate: false });
+  }, [squadsSig, map, api]);
+
+  return null;
 }
 
 /** Evita che vie TRK spariscano per un refresh vuoto del polling. */
@@ -157,17 +230,20 @@ function MapBoundsController({
   waypoints,
   activeRoutes,
   preferOperationalArea,
+  recenterNonce = 0,
 }: {
   squads: LiveSquad[];
   waypoints: SquadWaypoint[];
   activeRoutes: DrawnRoute[];
   /** Con vie attive: inquadra percorso/waypoint, non inseguire il GPS squadra. */
   preferOperationalArea: boolean;
+  recenterNonce?: number;
 }) {
   const map = useMap();
-  const userNavRef = useMapUserNavRef();
+  const api = useMapUserNav();
   const autoFitDoneRef = useRef(false);
   const lastBoundsSignatureRef = useRef<string | null>(null);
+  const lastRecenterNonceRef = useRef(0);
 
   const boundsSignature = useMemo(() => {
     const squadPart = squads
@@ -206,6 +282,17 @@ function MapBoundsController({
   }, [squads, waypoints, activeRoutes, preferOperationalArea]);
 
   useEffect(() => {
+    if (recenterNonce > 0 && recenterNonce !== lastRecenterNonceRef.current) {
+      lastRecenterNonceRef.current = recenterNonce;
+      if (api) {
+        api.userNavRef.current = false;
+      }
+      autoFitDoneRef.current = false;
+      lastBoundsSignatureRef.current = null;
+    }
+  }, [recenterNonce, api]);
+
+  useEffect(() => {
     if (!boundsSignature) {
       return;
     }
@@ -214,7 +301,7 @@ function MapBoundsController({
     }
     lastBoundsSignatureRef.current = boundsSignature;
 
-    if (autoFitDoneRef.current || userNavRef?.current) {
+    if (autoFitDoneRef.current || api?.userNavRef.current) {
       return;
     }
 
@@ -228,7 +315,7 @@ function MapBoundsController({
     }
     map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
     autoFitDoneRef.current = true;
-  }, [map, boundsSignature, points, userNavRef]);
+  }, [map, boundsSignature, points, api]);
 
   return null;
 }
@@ -279,41 +366,13 @@ function ActiveRoutePolylines({
 
 function LeafletInvalidateOnLayout() {
   const map = useMap();
-  const userNavRef = useMapUserNavRef();
 
   useEffect(() => {
-    const el = map.getContainer();
-    let resizeTimer: number | null = null;
-
-    const invalidate = () => {
-      if (userNavRef?.current) {
-        return;
-      }
-      map.invalidateSize({ animate: false });
-    };
-
-    invalidate();
-    const mountTimer = window.setTimeout(invalidate, 120);
-
-    const ro = new ResizeObserver(() => {
-      if (userNavRef?.current) {
-        return;
-      }
-      if (resizeTimer != null) {
-        window.clearTimeout(resizeTimer);
-      }
-      resizeTimer = window.setTimeout(invalidate, 250);
-    });
-    ro.observe(el);
-
-    return () => {
-      window.clearTimeout(mountTimer);
-      if (resizeTimer != null) {
-        window.clearTimeout(resizeTimer);
-      }
-      ro.disconnect();
-    };
-  }, [map, userNavRef]);
+    const run = () => map.invalidateSize({ animate: false });
+    run();
+    const mountTimer = window.setTimeout(run, 150);
+    return () => window.clearTimeout(mountTimer);
+  }, [map]);
 
   return null;
 }
@@ -340,6 +399,7 @@ type SquadLiveMapProps = {
   onEditWaypoint?: (waypoint: SquadWaypoint) => void;
   onDeleteWaypoint?: (waypoint: SquadWaypoint) => void;
   height?: string;
+  recenterNonce?: number;
 };
 
 export default function SquadLiveMap({
@@ -355,6 +415,7 @@ export default function SquadLiveMap({
   onEditWaypoint,
   onDeleteWaypoint,
   height = "100%",
+  recenterNonce = 0,
 }: SquadLiveMapProps) {
   const withCoords = squads.filter(hasCoordinates);
   const tile = getMapTileConfig(layerMode);
@@ -384,11 +445,14 @@ export default function SquadLiveMap({
         />
         <MapUserNavProvider>
           <LeafletInvalidateOnLayout />
+          <MapUserInteractionTracker />
+          <MapViewPreserver squads={withCoords} />
           <MapBoundsController
             squads={withCoords}
             waypoints={waypoints}
             activeRoutes={routesToDraw}
             preferOperationalArea={routesToDraw.length > 0}
+            recenterNonce={recenterNonce}
           />
         </MapUserNavProvider>
         {waypoints.map((wp) => (

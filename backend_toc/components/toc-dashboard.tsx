@@ -77,6 +77,7 @@ export default function TocDashboard() {
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [layerMode, setLayerMode] = useState<LayerMode>("standard");
+  const [mapRecenterNonce, setMapRecenterNonce] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [pushOpen, setPushOpen] = useState(false);
   const [pushTitle, setPushTitle] = useState(TOC_PUSH_TITLE);
@@ -841,6 +842,13 @@ export default function TocDashboard() {
                 ))}
               </select>
             </label>
+            <button
+              className={styles.btnSmall}
+              type="button"
+              onClick={() => setMapRecenterNonce((n) => n + 1)}
+            >
+              Ricentra mappa
+            </button>
             {mapActiveRoutes.length > 0 ? (
               <span className={styles.pushHint}>
                 Vie attive: <strong>{mapActiveRoutes.length}</strong>
@@ -878,6 +886,7 @@ export default function TocDashboard() {
             onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}
             onDeleteWaypoint={(wp) => void handleDeleteWaypointFromMap(wp)}
             height="400px"
+            recenterNonce={mapRecenterNonce}
           />
         </section>
         <footer className={styles.dashboardFooter}>

@@ -60,6 +60,7 @@ function MapFullscreenContent() {
     Map<string, SquadRouteAssignment>
   >(new Map());
   const [layerMode, setLayerMode] = useState<LayerMode>("standard");
+  const [mapRecenterNonce, setMapRecenterNonce] = useState(0);
   const [hint, setHint] = useState("");
   const mapRef = useRef<HTMLDivElement | null>(null);
 
@@ -436,6 +437,9 @@ function MapFullscreenContent() {
         <button type="button" onClick={() => void loadSquads()}>
           Aggiorna
         </button>
+        <button type="button" onClick={() => setMapRecenterNonce((n) => n + 1)}>
+          Ricentra mappa
+        </button>
         {mapActiveRoutes.length > 0 ? (
           <span style={{ color: "#8fe88f", fontWeight: 700 }}>
             Vie TRK: {mapActiveRoutes.length}
@@ -485,6 +489,7 @@ function MapFullscreenContent() {
           onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}
           onDeleteWaypoint={(wp) => void handleDeleteWaypointFromMap(wp)}
           height="100%"
+          recenterNonce={mapRecenterNonce}
         />
       </div>
       {!displayMode ? (
