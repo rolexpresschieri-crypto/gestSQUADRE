@@ -13,7 +13,7 @@ import { fetchGolfCourseSquadIds, fetchLiveSquads } from "@/lib/golf-course-scop
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { layerOptions, type LayerMode } from "@/lib/map-layers";
 import { readStoredLayerMode, writeStoredLayerMode } from "@/lib/map-layer-storage";
-import type { LiveSquad } from "@/lib/live-squads";
+import { liveSquadsEqual, type LiveSquad } from "@/lib/live-squads";
 import {
   fetchActiveRouteAssignmentsForSessions,
   routeAssignmentsSig,
@@ -159,7 +159,7 @@ function MapFullscreenContent() {
       return;
     }
     const rows = await fetchLiveSquads(supabase, golfCourseId);
-    setSquads(rows);
+    setSquads((prev) => (liveSquadsEqual(prev, rows) ? prev : rows));
     setSelectedSessionId((prev) =>
       prev && rows.some((s) => s.sessionId === prev) ? prev : null,
     );
@@ -297,7 +297,7 @@ function MapFullscreenContent() {
               return;
             }
             const rows = await fetchLiveSquads(supabase, golfCourseId);
-            setSquads(rows);
+            setSquads((prev) => (liveSquadsEqual(prev, rows) ? prev : rows));
             setSelectedSessionId((prev) =>
               prev && rows.some((s) => s.sessionId === prev) ? prev : null,
             );

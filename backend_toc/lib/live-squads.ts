@@ -30,6 +30,25 @@ export function hasCoordinates(squad: LiveSquad): boolean {
   );
 }
 
+/** Firma posizioni GPS per aggiornamenti mappa senza re-render inutili. */
+export function liveSquadsPollSig(squads: LiveSquad[]): string {
+  return squads
+    .filter(hasCoordinates)
+    .map(
+      (s) =>
+        `${s.sessionId}:${s.lastLatitude!.toFixed(6)},${s.lastLongitude!.toFixed(6)}:${s.lastAccuracy ?? ""}`,
+    )
+    .sort()
+    .join("|");
+}
+
+export function liveSquadsEqual(a: LiveSquad[], b: LiveSquad[]): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  return liveSquadsPollSig(a) === liveSquadsPollSig(b);
+}
+
 export function normalizeMapColor(raw: string | null | undefined): string {
   const v = (raw ?? "").trim();
   if (/^#[0-9A-Fa-f]{6}$/.test(v)) {

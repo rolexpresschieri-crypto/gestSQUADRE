@@ -37,7 +37,7 @@ import {
   writeStoredPushMessage,
 } from "@/lib/push-message-storage";
 import { tocPushTextUpper } from "@/lib/toc-push-text";
-import type { LiveSquad } from "@/lib/live-squads";
+import { liveSquadsEqual, type LiveSquad } from "@/lib/live-squads";
 import {
   fetchActiveEvent,
   fetchSquadMapPoints,
@@ -160,6 +160,20 @@ export default function TocDashboard() {
     [routeAssignmentsBySession, selectedSessionId, mapAlarmingSessionIds, onlineSessionIds],
   );
 
+  const handleMapSquadSelect = useCallback((squad: LiveSquad) => {
+    setSelectedSessionId(squad.sessionId);
+    setSelectedRouteAssignment((prev) => {
+      const next = routeAssignmentsBySession.get(squad.sessionId) ?? null;
+      if (!prev && !next) {
+        return prev;
+      }
+      if (prev && next && prev.id === next.id) {
+        return prev;
+      }
+      return next;
+    });
+  }, [routeAssignmentsBySession]);
+
   useEffect(() => {
     setLayerMode(readStoredLayerMode());
     setSupabase(getSupabaseBrowserClient());
@@ -182,7 +196,7 @@ export default function TocDashboard() {
       return;
     }
     const rows = await fetchLiveSquads(supabase, golfCourseId);
-    setSquads(rows);
+    setSquads((prev) => (liveSquadsEqual(prev, rows) ? prev : rows));
     const squadCountLabel = `${rows.length} squadre online`;
     setStatusMessage((prev) => (prev === squadCountLabel ? prev : squadCountLabel));
   }, [supabase, golfCourseId]);
@@ -897,12 +911,7 @@ export default function TocDashboard() {
             activeRoutes={mapActiveRoutes}
             alarmingSessionIds={mapAlarmingSessionIds}
             selectedSessionId={selectedSessionId}
-            onSelect={(s) => {
-              setSelectedSessionId(s.sessionId);
-              setSelectedRouteAssignment(
-                routeAssignmentsBySession.get(s.sessionId) ?? null,
-              );
-            }}
+            onSelect={handleMapSquadSelect}
             canManageWaypoints={canEditWaypointsOnMap && Boolean(activeEventId)}
             onEditWaypoint={(wp) => router.push(`/waypoints?edit=${wp.id}`)}
             onDeleteWaypoint={(wp) => void handleDeleteWaypointFromMap(wp)}

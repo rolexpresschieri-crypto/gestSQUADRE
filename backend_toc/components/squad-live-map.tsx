@@ -4,18 +4,17 @@ import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import {
   createContext,
-  Fragment,
   memo,
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   type ReactNode,
   type RefObject,
 } from "react";
 import {
-  Circle,
   MapContainer,
   Marker,
   Polyline,
@@ -30,6 +29,7 @@ import { getMapTileConfig, type LayerMode } from "@/lib/map-layers";
 import {
   formatGpsAccuracyMeters,
   hasCoordinates,
+  liveSquadsPollSig,
   type LiveSquad,
 } from "@/lib/live-squads";
 import {
@@ -174,6 +174,183 @@ function useStableRoutes(routes: DrawnRoute[]): DrawnRoute[] {
   }, [routes]);
 }
 
+function squadMarkerIconKey(
+  squad: LiveSquad,
+  selected: boolean,
+  isAlarming: boolean,
+): string {
+  return `${squad.sessionId}:${selected}:${isAlarming}:${squad.mapColor}:${squad.squadCode}:${squad.squadName}`;
+}
+
+function squadMarkerPopupHtml(squad: LiveSquad, isAlarming: boolean): string {
+  const accLabel = formatGpsAccuracyMeters(squad.lastAccuracy);
+  const title = isAlarming ? `ALLARME — ${squad.squadCode}` : squad.squadCode;
+  const titleColor = isAlarming ? ALARM_RED : "inherit";
+  let html =
+    `<strong style="color:${titleColor}">${escapeHtml(title)}</strong>` +
+    `<br/>${escapeHtml(squad.squadName)}`;
+  if (accLabel) {
+    html += `<br/>Precisione GPS ${escapeHtml(accLabel)}`;
+  }
+  return html;
+}
+
+/** Ripristina centro/zoom dopo aggiornamenti layer React-Leaflet (poll GPS). */
+function MapViewGuard({ lockKey }: { lockKey: string }) {
+  const map = useMap();
+  const api = useMapUserNav();
+  const pendingRestoreRef = useRef<{
+    lat: number;
+    lng: number;
+    zoom: number;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (api?.userNavRef.current) {
+        return;
+      }
+      const center = map.getCenter();
+      pendingRestoreRef.current = {
+        lat: center.lat,
+        lng: center.lng,
+        zoom: map.getZoom(),
+      };
+    };
+  }, [lockKey, map, api]);
+
+  useLayoutEffect(() => {
+    const pending = pendingRestoreRef.current;
+    if (!pending || api?.userNavRef.current) {
+      return;
+    }
+    pendingRestoreRef.current = null;
+    map.setView([pending.lat, pending.lng], pending.zoom, { animate: false });
+  }, [lockKey, map, api]);
+
+  return null;
+}
+
+function ImperativeSquadMarkersLayer({
+  squads,
+  alarmingSessionIds,
+  selectedSessionId,
+  onSelect,
+}: {
+  squads: LiveSquad[];
+  alarmingSessionIds: ReadonlySet<string>;
+  selectedSessionId: string | null;
+  onSelect: (squad: LiveSquad) => void;
+}) {
+  const map = useMap();
+  const squadsRef = useRef(squads);
+  squadsRef.current = squads;
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const markersRef = useRef(
+    new Map<
+      string,
+      {
+        marker: L.Marker;
+        circle: L.Circle | null;
+        iconKey: string;
+      }
+    >(),
+  );
+
+  useEffect(() => {
+    const markers = markersRef.current;
+    const alive = new Set(squads.map((s) => s.sessionId));
+
+    for (const [sessionId, entry] of markers) {
+      if (!alive.has(sessionId)) {
+        entry.circle?.remove();
+        entry.marker.remove();
+        markers.delete(sessionId);
+      }
+    }
+
+    for (const squad of squads) {
+      if (!hasCoordinates(squad)) {
+        continue;
+      }
+      const position: L.LatLngExpression = [
+        squad.lastLatitude!,
+        squad.lastLongitude!,
+      ];
+      const isAlarming = alarmingSessionIds.has(squad.sessionId);
+      const selected = selectedSessionId === squad.sessionId;
+      const iconKey = squadMarkerIconKey(squad, selected, isAlarming);
+      let entry = markers.get(squad.sessionId);
+
+      if (!entry) {
+        const marker = L.marker(position, {
+          icon: squadDivIcon(squad, selected, isAlarming),
+        });
+        marker.bindPopup(squadMarkerPopupHtml(squad, isAlarming));
+        marker.on("click", () => {
+          const current = squadsRef.current.find(
+            (row) => row.sessionId === squad.sessionId,
+          );
+          if (current) {
+            onSelectRef.current(current);
+          }
+        });
+        marker.addTo(map);
+        entry = { marker, circle: null, iconKey };
+        markers.set(squad.sessionId, entry);
+      } else {
+        entry.marker.setLatLng(position);
+        if (entry.iconKey !== iconKey) {
+          entry.marker.setIcon(squadDivIcon(squad, selected, isAlarming));
+          entry.iconKey = iconKey;
+        }
+        entry.marker.setPopupContent(squadMarkerPopupHtml(squad, isAlarming));
+      }
+
+      const acc = squad.lastAccuracy;
+      const showAccuracyCircle =
+        acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
+      const circleColor = isAlarming ? ALARM_RED : squad.mapColor;
+
+      if (showAccuracyCircle) {
+        if (!entry.circle) {
+          entry.circle = L.circle(position, {
+            radius: acc,
+            color: circleColor,
+            fillColor: circleColor,
+            fillOpacity: 0.12,
+            weight: 1,
+          }).addTo(map);
+        } else {
+          entry.circle.setLatLng(position);
+          entry.circle.setRadius(acc);
+          entry.circle.setStyle({
+            color: circleColor,
+            fillColor: circleColor,
+          });
+        }
+      } else if (entry.circle) {
+        entry.circle.remove();
+        entry.circle = null;
+      }
+    }
+  }, [squads, alarmingSessionIds, selectedSessionId, map]);
+
+  useEffect(() => {
+    const markers = markersRef.current;
+    return () => {
+      for (const entry of markers.values()) {
+        entry.circle?.remove();
+        entry.marker.remove();
+      }
+      markers.clear();
+    };
+  }, [map]);
+
+  return null;
+}
+
 function MapBoundsController({
   waypoints,
   activeRoutes,
@@ -293,71 +470,6 @@ function LeafletInvalidateOnLayout() {
   return null;
 }
 
-const SquadMapMarker = memo(function SquadMapMarker({
-  squad,
-  selected,
-  isAlarming,
-  onSelect,
-}: {
-  squad: LiveSquad;
-  selected: boolean;
-  isAlarming: boolean;
-  onSelect: (squad: LiveSquad) => void;
-}) {
-  const icon = useMemo(
-    () => squadDivIcon(squad, selected, isAlarming),
-    [
-      squad.sessionId,
-      squad.squadCode,
-      squad.squadName,
-      squad.mapColor,
-      selected,
-      isAlarming,
-    ],
-  );
-  const acc = squad.lastAccuracy;
-  const accLabel = formatGpsAccuracyMeters(acc);
-  const showAccuracyCircle =
-    acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
-
-  return (
-    <Fragment>
-      {showAccuracyCircle ? (
-        <Circle
-          center={[squad.lastLatitude!, squad.lastLongitude!]}
-          radius={acc}
-          pathOptions={{
-            color: isAlarming ? ALARM_RED : squad.mapColor,
-            fillColor: isAlarming ? ALARM_RED : squad.mapColor,
-            fillOpacity: 0.12,
-            weight: 1,
-          }}
-        />
-      ) : null}
-      <Marker
-        position={[squad.lastLatitude!, squad.lastLongitude!]}
-        icon={icon}
-        eventHandlers={{ click: () => onSelect(squad) }}
-      >
-        <Popup>
-          <strong style={{ color: isAlarming ? ALARM_RED : undefined }}>
-            {isAlarming ? "ALLARME — " : ""}
-            {squad.squadCode}
-          </strong>
-          <br />
-          {squad.squadName}
-          {accLabel ? (
-            <>
-              <br />
-              Precisione GPS {accLabel}
-            </>
-          ) : null}
-        </Popup>
-      </Marker>
-    </Fragment>
-  );
-});
-
 const WaypointMapMarker = memo(function WaypointMapMarker({
   waypoint,
   canManageWaypoints,
@@ -464,6 +576,13 @@ export default function SquadLiveMap({
     return [];
   }, [activeRoute, activeRoutes]);
   const routesToDraw = useStableRoutes(rawRoutesToDraw);
+  const viewLockKey = useMemo(() => {
+    const alarmingSig = [...alarmingSessionIds].sort().join(",");
+    const routeSig = routesToDraw
+      .map((route) => `${route.routeCode}:${route.highlighted ? 1 : 0}`)
+      .join("|");
+    return `${liveSquadsPollSig(withCoords)}|${selectedSessionId ?? ""}|${alarmingSig}|${routeSig}`;
+  }, [withCoords, selectedSessionId, alarmingSessionIds, routesToDraw]);
 
   return (
     <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
@@ -481,10 +600,17 @@ export default function SquadLiveMap({
         <MapUserNavProvider>
           <LeafletInvalidateOnLayout />
           <MapUserInteractionTracker />
+          <MapViewGuard lockKey={viewLockKey} />
           <MapBoundsController
             waypoints={waypoints}
             activeRoutes={routesToDraw}
             recenterNonce={recenterNonce}
+          />
+          <ImperativeSquadMarkersLayer
+            squads={withCoords}
+            alarmingSessionIds={alarmingSessionIds}
+            selectedSessionId={selectedSessionId}
+            onSelect={onSelect}
           />
         </MapUserNavProvider>
         {waypoints.map((wp) => (
@@ -494,15 +620,6 @@ export default function SquadLiveMap({
             canManageWaypoints={canManageWaypoints}
             onEditWaypoint={onEditWaypoint}
             onDeleteWaypoint={onDeleteWaypoint}
-          />
-        ))}
-        {withCoords.map((squad) => (
-          <SquadMapMarker
-            key={squad.sessionId}
-            squad={squad}
-            selected={selectedSessionId === squad.sessionId}
-            isAlarming={alarmingSessionIds.has(squad.sessionId)}
-            onSelect={onSelect}
           />
         ))}
         {routesToDraw.map((route) => (
