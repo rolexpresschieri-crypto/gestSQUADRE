@@ -88,9 +88,7 @@ function MapFullscreenContent() {
           routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
           colorHex: assignment.colorHex,
           points: assignment.points,
-          highlighted:
-            assignment.sessionId === selectedSessionId ||
-            mapAlarmingSessionIds.has(assignment.sessionId),
+          highlighted: assignment.sessionId === selectedSessionId,
         })),
     [routeAssignmentsBySession, selectedSessionId, mapAlarmingSessionIds, onlineSessionIds],
   );

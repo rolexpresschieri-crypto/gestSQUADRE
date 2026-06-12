@@ -26,15 +26,48 @@ export type TocPushLogRow = {
   title: string;
   body: string;
   is_alarm: boolean;
+  route_code?: string | null;
+  target_waypoint_label?: string | null;
   fcm_message_id: string | null;
   status: string;
   error_message: string | null;
   created_at: string;
 };
 
+export type TocMissionCloseLogRow = {
+  id: string;
+  event_id: string;
+  session_id: string | null;
+  squad_id: string | null;
+  squad_code: string | null;
+  squad_name: string | null;
+  route_code: string | null;
+  target_waypoint_label: string | null;
+  admin_code: string;
+  created_at: string;
+};
+
+function formatMissionDetail(
+  routeCode: string | null | undefined,
+  targetLabel: string | null | undefined,
+  extra?: string,
+): string {
+  const parts: string[] = [];
+  if (routeCode?.trim()) {
+    parts.push(`Via TRK: ${routeCode.trim()}`);
+  }
+  if (targetLabel?.trim()) {
+    parts.push(`Target: ${targetLabel.trim()}`);
+  }
+  if (extra?.trim()) {
+    parts.push(extra.trim());
+  }
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
 export type UnifiedEventLog = {
   id: string;
-  kind: "squad_alarm" | "fine_evento" | "toc_push";
+  kind: "squad_alarm" | "fine_evento" | "toc_push" | "toc_mission_close";
   createdAt: string;
   squadCode: string;
   squadName: string;
@@ -47,6 +80,7 @@ export type UnifiedEventLog = {
 export function mergeEventLogs(
   alarms: SquadAlarmLogRow[],
   pushes: TocPushLogRow[],
+  missionCloses: TocMissionCloseLogRow[] = [],
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
@@ -87,20 +121,39 @@ export function mergeEventLogs(
         : p.status === "sent"
           ? "inviato"
           : p.status;
+      const isMission = Boolean(p.route_code?.trim());
+      const missionDetail = formatMissionDetail(
+        p.route_code,
+        p.target_waypoint_label,
+        `Titolo: ${title} · Messaggio: ${body}`,
+      );
       return {
         id: p.id,
         kind: "toc_push" as const,
         createdAt: p.created_at,
         squadCode: p.squad_code?.trim() || "—",
         squadName: p.squad_name?.trim() || "—",
-        summary: p.is_alarm
-          ? "Allarme TOC → volontario"
-          : "Messaggio TOC → volontario",
-        detail: `Titolo: ${title} · Messaggio: ${body}`,
+        summary: isMission
+          ? "Missione TOC → volontario"
+          : p.is_alarm
+            ? "Allarme TOC → volontario"
+            : "Messaggio TOC → volontario",
+        detail: isMission ? missionDetail : `Titolo: ${title} · Messaggio: ${body}`,
         status: statusLabel,
         actor: p.admin_code,
       };
     }),
+    ...missionCloses.map((m) => ({
+      id: m.id,
+      kind: "toc_mission_close" as const,
+      createdAt: m.created_at,
+      squadCode: m.squad_code?.trim() || "—",
+      squadName: m.squad_name?.trim() || "—",
+      summary: "Fine evento missione TOC",
+      detail: formatMissionDetail(m.route_code, m.target_waypoint_label),
+      status: "registrato",
+      actor: m.admin_code,
+    })),
   ];
 
   return rows.sort(
@@ -193,7 +246,7 @@ export function eventLogsPrintHtml(rows: UnifiedEventLog[], eventTitle: string):
 </head>
 <body>
   <h1>Log evento: ${escapeHtml(eventTitle)}</h1>
-  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Allarmi volontario↔TOC e messaggi TOC→volontari</p>
+  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Allarmi volontario↔TOC · missioni TOC · messaggi push</p>
   <table>
     <thead>
       <tr>

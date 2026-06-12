@@ -153,11 +153,29 @@ export default function TocDashboard() {
           routeCode: `${assignment.routeCode}-${assignment.sessionId.slice(0, 8)}`,
           colorHex: assignment.colorHex,
           points: assignment.points,
-          highlighted:
-            assignment.sessionId === selectedSessionId ||
-            mapAlarmingSessionIds.has(assignment.sessionId),
+          highlighted: assignment.sessionId === selectedSessionId,
         })),
-    [routeAssignmentsBySession, selectedSessionId, mapAlarmingSessionIds, onlineSessionIds],
+    [routeAssignmentsBySession, selectedSessionId, onlineSessionIds],
+  );
+
+  const activeTocMissions = useMemo(
+    () =>
+      Array.from(routeAssignmentsBySession.values())
+        .filter((assignment) => onlineSessionIds.has(assignment.sessionId))
+        .map((assignment) => {
+          const squad = squads.find((s) => s.sessionId === assignment.sessionId);
+          return squad ? { assignment, squad } : null;
+        })
+        .filter(
+          (
+            row,
+          ): row is { assignment: SquadRouteAssignment; squad: LiveSquad } =>
+            row !== null,
+        )
+        .sort((a, b) =>
+          a.squad.squadCode.localeCompare(b.squad.squadCode, "it"),
+        ),
+    [routeAssignmentsBySession, squads, onlineSessionIds],
   );
 
   const handleMapSquadSelect = useCallback((squad: LiveSquad) => {
@@ -562,6 +580,60 @@ export default function TocDashboard() {
     await forceLogoutSquad(picked);
   }
 
+  async function endTocMission(
+    assignment: SquadRouteAssignment,
+    squad: LiveSquad,
+  ) {
+    if (!supabase || !session || !activeEventId) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Chiudere la missione TOC per ${squad.squadCode}?\n` +
+          `Via ${assignment.routeCode}` +
+          (assignment.targetLabel ? ` → ${assignment.targetLabel}` : "") +
+          " verrà rimossa dalla mappa.",
+      )
+    ) {
+      return;
+    }
+
+    const routeClear = await clearRouteAssignmentForSession(
+      supabase,
+      assignment.sessionId,
+    );
+    const { error: logErr } = await supabase.from("toc_mission_close_logs").insert({
+      event_id: activeEventId,
+      session_id: assignment.sessionId,
+      squad_id: squad.squadId,
+      squad_code: squad.squadCode,
+      squad_name: squad.squadName,
+      route_code: assignment.routeCode,
+      target_waypoint_label: assignment.targetLabel,
+      admin_code: session.code,
+    });
+
+    await loadSelectedRouteAssignment();
+    if (selectedSessionId === assignment.sessionId) {
+      setSelectedRouteAssignment(null);
+    }
+
+    const routeHint = ` Via ${assignment.routeCode} rimossa dalla mappa.`;
+    if (logErr) {
+      setStatusMessage(
+        routeClear.error
+          ? `Fine evento missione (errore via: ${routeClear.error}; log: ${logErr.message}).`
+          : `Via rimossa; errore log missione: ${logErr.message}`,
+      );
+      return;
+    }
+    setStatusMessage(
+      routeClear.error
+        ? `Fine evento missione registrata (errore via: ${routeClear.error}).`
+        : `Fine evento missione registrata — ${squad.squadCode}.${routeHint}`,
+    );
+  }
+
   async function acknowledgeAlarm(alarm: AlarmRow) {
     if (!supabase || !session) {
       return;
@@ -643,14 +715,21 @@ export default function TocDashboard() {
       }
     }
 
+    const selectedRoute =
+      pushRouteId && pushSingleTarget ? mapRoutes.find((r) => r.id === pushRouteId) : null;
+
+    if (pushSingleTarget && pushRouteId && !pushTargetWaypointId) {
+      setPushAlert(
+        "Per inviare una missione con via TRK seleziona anche il target (waypoint).",
+      );
+      return;
+    }
+
     setPushAlert(null);
     setPushSending(true);
     let ok = 0;
     let fail = 0;
     const errors: string[] = [];
-
-    const selectedRoute =
-      pushRouteId && pushSingleTarget ? mapRoutes.find((r) => r.id === pushRouteId) : null;
 
     for (const squad of targets) {
       const routeForSquad =
@@ -976,6 +1055,53 @@ export default function TocDashboard() {
               ))
             )}
           </div>
+          <h3>Missioni TOC attive ({activeTocMissions.length})</h3>
+          <p className={styles.pushHint}>
+            Invia squadra verso un target con via TRK: push → una sola squadra, scegli via e
+            target. La TRK resta sulla mappa fino a «Fine evento».
+          </p>
+          <div className={styles.alarmList}>
+            {activeTocMissions.length === 0 ? (
+              <p>Nessuna missione attiva (nessuna via assegnata).</p>
+            ) : (
+              activeTocMissions.map(({ assignment, squad }) => (
+                <div key={assignment.id} className={styles.missionItem}>
+                  <div className={styles.missionDot} aria-hidden>
+                    →
+                  </div>
+                  <div className={styles.alarmBody}>
+                    <p className={styles.alarmTitle}>
+                      {squad.squadCode} — {squad.squadName}
+                    </p>
+                    <p className={styles.alarmMessage}>
+                      Via <strong>{assignment.routeCode}</strong>
+                      {assignment.targetLabel ? (
+                        <>
+                          {" "}
+                          → target <strong>{assignment.targetLabel}</strong>
+                        </>
+                      ) : null}
+                    </p>
+                    <p className={styles.alarmMeta}>
+                      Assegnata{" "}
+                      {new Date(assignment.assignedAt).toLocaleString("it-IT")}
+                    </p>
+                    <button
+                      className={styles.btnSmall}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSessionId(squad.sessionId);
+                        setSelectedRouteAssignment(assignment);
+                        void endTocMission(assignment, squad);
+                      }}
+                    >
+                      Fine evento
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
           <h3>Squadre online</h3>
           <div className={styles.squadListWrap}>
             <ul className={styles.squadList}>
@@ -1177,8 +1303,9 @@ export default function TocDashboard() {
             {pushSingleTarget ? (
               <>
                 <p className={styles.pushHint}>
-                  Squadra: <strong>{pushSingleTarget.squadCode}</strong> — scegli via e target
-                  (non scrivere la via nel messaggio).
+                  Missione TOC → <strong>{pushSingleTarget.squadCode}</strong>: scegli{" "}
+                  <strong>via TRK</strong> e <strong>target</strong> (obbligatori se assegni una
+                  via). Non scrivere la via nel messaggio.
                 </p>
                 {mapRoutes.length > 0 ? (
                   <>

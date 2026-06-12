@@ -378,6 +378,9 @@ function MapBoundsController({
   return null;
 }
 
+const ROUTE_HALO_WEIGHT = 5;
+const ROUTE_LINE_WEIGHT = 3;
+
 const ActiveRoutePolylines = memo(function ActiveRoutePolylines({
   route,
   highlighted = false,
@@ -395,8 +398,8 @@ const ActiveRoutePolylines = memo(function ActiveRoutePolylines({
   const haloOptions = useMemo(
     () => ({
       color: "#ffffff",
-      weight: highlighted ? 7 : 5,
-      opacity: 0.95,
+      weight: ROUTE_HALO_WEIGHT,
+      opacity: highlighted ? 0.98 : 0.9,
       lineCap: "round" as const,
       lineJoin: "round" as const,
     }),
@@ -405,8 +408,8 @@ const ActiveRoutePolylines = memo(function ActiveRoutePolylines({
   const lineOptions = useMemo(
     () => ({
       color: route.colorHex,
-      weight: highlighted ? 4 : 3,
-      opacity: 0.98,
+      weight: ROUTE_LINE_WEIGHT,
+      opacity: highlighted ? 0.98 : 0.82,
       lineCap: "round" as const,
       lineJoin: "round" as const,
     }),

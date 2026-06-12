@@ -59,5 +59,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: alarmErr.message }, { status: 500 });
   }
 
+  const { error: missionCloseErr } = await admin
+    .from("toc_mission_close_logs")
+    .delete()
+    .eq("event_id", eventId);
+
+  if (missionCloseErr && !missionCloseErr.message.includes("toc_mission_close_logs")) {
+    return NextResponse.json({ error: missionCloseErr.message }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }

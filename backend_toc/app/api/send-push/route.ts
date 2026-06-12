@@ -126,6 +126,16 @@ export async function POST(request: Request) {
   const squadInfo = Array.isArray(squadJoin) ? squadJoin[0] : squadJoin;
   const eventId = session.event_id as string;
 
+  let targetWaypointLabel: string | null = null;
+  if (targetWaypointId) {
+    const { data: waypointRow } = await admin
+      .from("squad_map_points")
+      .select("label")
+      .eq("id", targetWaypointId)
+      .maybeSingle();
+    targetWaypointLabel = (waypointRow?.label as string | null)?.trim() || null;
+  }
+
   async function writePushLog(status: "sent" | "failed", extra: {
     fcmMessageId?: string;
     errorMessage?: string;
@@ -140,6 +150,8 @@ export async function POST(request: Request) {
       title,
       body: bodyText,
       is_alarm: useAlarm,
+      route_code: routeCode || null,
+      target_waypoint_label: targetWaypointLabel,
       fcm_message_id: extra.fcmMessageId ?? null,
       status,
       error_message: extra.errorMessage ?? null,

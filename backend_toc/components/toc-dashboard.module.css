@@ -279,6 +279,32 @@
   color: #fff;
 }
 
+.missionItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: rgba(7, 155, 66, 0.2);
+  border: 2px solid #079b42;
+}
+
+.missionDot {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ffff00;
+  border: 2px solid #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 18px;
+  color: #111;
+}
+
 .alarmBody {
   flex: 1;
   min-width: 0;

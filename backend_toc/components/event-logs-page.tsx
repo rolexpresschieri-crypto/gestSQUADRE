@@ -17,6 +17,7 @@ import {
   mergeEventLogs,
   printEventLogsAsPdf,
   type SquadAlarmLogRow,
+  type TocMissionCloseLogRow,
   type TocPushLogRow,
 } from "@/lib/event-logs";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -30,6 +31,7 @@ export default function EventLogsPage() {
   const [eventTitle, setEventTitle] = useState("");
   const [alarms, setAlarms] = useState<SquadAlarmLogRow[]>([]);
   const [pushes, setPushes] = useState<TocPushLogRow[]>([]);
+  const [missionCloses, setMissionCloses] = useState<TocMissionCloseLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
@@ -54,6 +56,7 @@ export default function EventLogsPage() {
     if (!supabase || !eventId) {
       setAlarms([]);
       setPushes([]);
+      setMissionCloses([]);
       return;
     }
 
@@ -64,6 +67,7 @@ export default function EventLogsPage() {
       if (squadIds.length === 0) {
         setAlarms([]);
         setPushes([]);
+        setMissionCloses([]);
         return;
       }
     }
@@ -80,13 +84,24 @@ export default function EventLogsPage() {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500);
+    let missionCloseQuery = supabase
+      .from("toc_mission_close_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (squadIds) {
       alarmQuery = alarmQuery.in("squad_id", squadIds);
       pushQuery = pushQuery.in("squad_id", squadIds);
+      missionCloseQuery = missionCloseQuery.in("squad_id", squadIds);
     }
 
-    const [alarmRes, pushRes] = await Promise.all([alarmQuery, pushQuery]);
+    const [alarmRes, pushRes, missionCloseRes] = await Promise.all([
+      alarmQuery,
+      pushQuery,
+      missionCloseQuery,
+    ]);
 
     if (alarmRes.error) {
       setStatus(`Errore allarmi: ${alarmRes.error.message}`);
@@ -103,6 +118,17 @@ export default function EventLogsPage() {
       setPushes([]);
     } else {
       setPushes((pushRes.data ?? []) as TocPushLogRow[]);
+    }
+
+    if (missionCloseRes.error) {
+      if (missionCloseRes.error.message.includes("toc_mission_close_logs")) {
+        setStatus(
+          "Esegui sql/toc_mission_logs.sql su Supabase per i log «Fine evento missione».",
+        );
+      }
+      setMissionCloses([]);
+    } else {
+      setMissionCloses((missionCloseRes.data ?? []) as TocMissionCloseLogRow[]);
     }
   }, [supabase, eventId, session?.golfCourseId]);
 
@@ -141,8 +167,8 @@ export default function EventLogsPage() {
   }, [eventId, refreshLogs]);
 
   const unified = useMemo(
-    () => mergeEventLogs(alarms, pushes),
-    [alarms, pushes],
+    () => mergeEventLogs(alarms, pushes, missionCloses),
+    [alarms, pushes, missionCloses],
   );
 
   function exportCsv() {
@@ -231,8 +257,8 @@ export default function EventLogsPage() {
 
       <div className={styles.panel}>
         <p className={styles.hint}>
-          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Fine evento ·
-          Messaggi e allarmi TOC → volontari (titolo e testo completi)
+          Evento: <strong>{eventTitle || "—"}</strong> · Allarmi volontario → TOC · Missioni TOC
+          (via TRK + target) · Fine evento · Push TOC → volontari
           {session && isCampoGolfSession(session) ? (
             <>
               {" "}
