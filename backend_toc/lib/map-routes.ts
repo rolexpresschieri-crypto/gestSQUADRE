@@ -234,6 +234,20 @@ export async function fetchActiveRouteAssignmentsForSessions(
   return { assignments: result, error: null };
 }
 
+export function routeAssignmentsSig(
+  assignments: Map<string, SquadRouteAssignment>,
+): string {
+  return [...assignments.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(
+      ([sessionId, assignment]) =>
+        `${sessionId}:${assignment.routeCode}:${assignment.points
+          .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
+          .join(";")}`,
+    )
+    .join("|");
+}
+
 export async function clearRouteAssignmentForSession(
   supabase: SupabaseClient,
   sessionId: string,

@@ -18,6 +18,7 @@ import {
   clearRouteAssignmentForSession,
   fetchActiveRouteAssignmentsForSessions,
   fetchMapRoutes,
+  routeAssignmentsSig,
   type MapRoute,
   type SquadRouteAssignment,
 } from "@/lib/map-routes";
@@ -182,7 +183,8 @@ export default function TocDashboard() {
     }
     const rows = await fetchLiveSquads(supabase, golfCourseId);
     setSquads(rows);
-    setStatusMessage(`${rows.length} squadre online`);
+    const squadCountLabel = `${rows.length} squadre online`;
+    setStatusMessage((prev) => (prev === squadCountLabel ? prev : squadCountLabel));
   }, [supabase, golfCourseId]);
 
   const loadOnlineSessionsForLogout = useCallback(async () => {
@@ -288,7 +290,12 @@ export default function TocDashboard() {
     const visibleAssignments = new Map(
       [...assignments].filter(([sessionId]) => onlineIds.has(sessionId)),
     );
-    setRouteAssignmentsBySession(visibleAssignments);
+    setRouteAssignmentsBySession((prev) => {
+      if (routeAssignmentsSig(prev) === routeAssignmentsSig(visibleAssignments)) {
+        return prev;
+      }
+      return visibleAssignments;
+    });
     if (error) {
       setStatusMessage(`Via mappa: ${error}`);
     }
@@ -302,9 +309,23 @@ export default function TocDashboard() {
     if (!selectedSessionId && routeSessionId && visibleAssignments.has(routeSessionId)) {
       setSelectedSessionId(routeSessionId);
     }
-    setSelectedRouteAssignment(
-      routeSessionId ? (visibleAssignments.get(routeSessionId) ?? null) : null,
-    );
+    const nextSelectedRoute = routeSessionId
+      ? (visibleAssignments.get(routeSessionId) ?? null)
+      : null;
+    setSelectedRouteAssignment((prev) => {
+      if (!prev && !nextSelectedRoute) {
+        return prev;
+      }
+      if (
+        prev &&
+        nextSelectedRoute &&
+        prev.id === nextSelectedRoute.id &&
+        prev.sessionId === nextSelectedRoute.sessionId
+      ) {
+        return prev;
+      }
+      return nextSelectedRoute;
+    });
   }, [supabase, selectedSessionId, squads, pendingAlarmSessionIds]);
 
   useEffect(() => {

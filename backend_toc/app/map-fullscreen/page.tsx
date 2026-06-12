@@ -16,6 +16,7 @@ import { readStoredLayerMode, writeStoredLayerMode } from "@/lib/map-layer-stora
 import type { LiveSquad } from "@/lib/live-squads";
 import {
   fetchActiveRouteAssignmentsForSessions,
+  routeAssignmentsSig,
   type SquadRouteAssignment,
 } from "@/lib/map-routes";
 import {
@@ -210,7 +211,12 @@ function MapFullscreenContent() {
       const visibleAssignments = new Map(
         [...assignments].filter(([sessionId]) => onlineIds.has(sessionId)),
       );
-      setRouteAssignmentsBySession(visibleAssignments);
+      setRouteAssignmentsBySession((prev) => {
+        if (routeAssignmentsSig(prev) === routeAssignmentsSig(visibleAssignments)) {
+          return prev;
+        }
+        return visibleAssignments;
+      });
       if (!selectedSessionId) {
         const firstWithRoute = squadsSnapshot.find((s) =>
           visibleAssignments.has(s.sessionId),

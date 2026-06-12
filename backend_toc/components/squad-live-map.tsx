@@ -5,6 +5,8 @@ import L from "leaflet";
 import {
   createContext,
   Fragment,
+  memo,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -106,6 +108,7 @@ function useMapUserNav() {
 
 function MapUserNavProvider({ children }: { children: ReactNode }) {
   const userNavRef = useRef(false);
+  const api = useMemo(() => ({ userNavRef }), []);
 
   useEffect(() => {
     return () => {
@@ -114,7 +117,7 @@ function MapUserNavProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <MapUserNavContext.Provider value={{ userNavRef }}>
+    <MapUserNavContext.Provider value={api}>
       {children}
     </MapUserNavContext.Provider>
   );
@@ -149,60 +152,6 @@ function MapUserInteractionTracker() {
   return null;
 }
 
-/** Ripristina centro/zoom dopo aggiornamenti GPS se l'operatore ha mosso la mappa. */
-function MapViewPreserver({ squads }: { squads: LiveSquad[] }) {
-  const map = useMap();
-  const api = useMapUserNav();
-  const lockedViewRef = useRef<{ lat: number; lng: number; zoom: number } | null>(
-    null,
-  );
-
-  const squadsSig = useMemo(
-    () =>
-      squads
-        .map((s) =>
-          hasCoordinates(s)
-            ? `${s.sessionId}:${s.lastLatitude!.toFixed(5)},${s.lastLongitude!.toFixed(5)}`
-            : s.sessionId,
-        )
-        .join("|"),
-    [squads],
-  );
-
-  useEffect(() => {
-    if (!api) {
-      return;
-    }
-    const persistLock = () => {
-      if (!api.userNavRef.current) {
-        return;
-      }
-      const center = map.getCenter();
-      lockedViewRef.current = {
-        lat: center.lat,
-        lng: center.lng,
-        zoom: map.getZoom(),
-      };
-    };
-    map.on("moveend", persistLock);
-    map.on("zoomend", persistLock);
-    return () => {
-      map.off("moveend", persistLock);
-      map.off("zoomend", persistLock);
-    };
-  }, [map, api]);
-
-  useEffect(() => {
-    if (!api?.userNavRef.current || !lockedViewRef.current) {
-      return;
-    }
-    const view = lockedViewRef.current;
-    map.setView([view.lat, view.lng], view.zoom, { animate: false });
-  }, [squadsSig, map, api]);
-
-  return null;
-}
-
 /** Evita che vie TRK spariscano per un refresh vuoto del polling. */
 function useStableRoutes(routes: DrawnRoute[]): DrawnRoute[] {
   const cacheRef = useRef<DrawnRoute[]>([]);
@@ -226,96 +175,58 @@ function useStableRoutes(routes: DrawnRoute[]): DrawnRoute[] {
 }
 
 function MapBoundsController({
-  squads,
   waypoints,
   activeRoutes,
-  preferOperationalArea,
   recenterNonce = 0,
 }: {
-  squads: LiveSquad[];
   waypoints: SquadWaypoint[];
   activeRoutes: DrawnRoute[];
-  /** Con vie attive: inquadra percorso/waypoint, non inseguire il GPS squadra. */
-  preferOperationalArea: boolean;
   recenterNonce?: number;
 }) {
   const map = useMap();
   const api = useMapUserNav();
-  const autoFitDoneRef = useRef(false);
-  const lastBoundsSignatureRef = useRef<string | null>(null);
+  const initialFitDoneRef = useRef(false);
   const lastRecenterNonceRef = useRef(0);
 
-  const boundsSignature = useMemo(() => {
-    const squadPart = squads
-      .filter(hasCoordinates)
-      .map((s) => s.sessionId)
-      .sort()
-      .join("|");
-    const wpPart = waypoints
-      .map((w) => w.id)
-      .sort()
-      .join("|");
-    const routePart = activeRoutes
-      .map(
-        (route) =>
-          `${route.routeCode}:${route.points
-            .map((p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`)
-            .join(";")}`,
-      )
-      .join("|");
-    return `${squadPart}#${wpPart}#${routePart}`;
-  }, [squads, waypoints, activeRoutes]);
-
-  const points = useMemo(() => {
-    const squadPts = preferOperationalArea
-      ? []
-      : squads
-          .filter(hasCoordinates)
-          .map((s) => [s.lastLatitude!, s.lastLongitude!] as [number, number]);
+  const fitPoints = useMemo(() => {
     const wpPts = waypoints.map(
       (w) => [w.latitude, w.longitude] as [number, number],
     );
     const routePts = activeRoutes.flatMap((route) =>
       route.points.map((p) => [p.lat, p.lng] as [number, number]),
     );
-    return [...squadPts, ...wpPts, ...routePts];
-  }, [squads, waypoints, activeRoutes, preferOperationalArea]);
+    return [...wpPts, ...routePts];
+  }, [waypoints, activeRoutes]);
+
+  const fitToOperationalArea = useCallback(() => {
+    if (fitPoints.length === 0) {
+      return;
+    }
+    if (fitPoints.length === 1) {
+      map.setView(fitPoints[0], 15, { animate: false });
+      return;
+    }
+    map.fitBounds(L.latLngBounds(fitPoints), { padding: [40, 40], animate: false });
+  }, [fitPoints, map]);
 
   useEffect(() => {
-    if (recenterNonce > 0 && recenterNonce !== lastRecenterNonceRef.current) {
-      lastRecenterNonceRef.current = recenterNonce;
-      if (api) {
-        api.userNavRef.current = false;
-      }
-      autoFitDoneRef.current = false;
-      lastBoundsSignatureRef.current = null;
+    if (initialFitDoneRef.current || fitPoints.length === 0) {
+      return;
     }
-  }, [recenterNonce, api]);
+    fitToOperationalArea();
+    initialFitDoneRef.current = true;
+  }, [fitPoints.length, fitToOperationalArea]);
 
   useEffect(() => {
-    if (!boundsSignature) {
+    if (recenterNonce <= 0 || recenterNonce === lastRecenterNonceRef.current) {
       return;
     }
-    if (boundsSignature === lastBoundsSignatureRef.current) {
-      return;
+    lastRecenterNonceRef.current = recenterNonce;
+    if (api) {
+      api.userNavRef.current = false;
     }
-    lastBoundsSignatureRef.current = boundsSignature;
-
-    if (autoFitDoneRef.current || api?.userNavRef.current) {
-      return;
-    }
-
-    if (points.length === 0) {
-      return;
-    }
-    if (points.length === 1) {
-      map.setView(points[0], 15);
-      autoFitDoneRef.current = true;
-      return;
-    }
-    map.fitBounds(L.latLngBounds(points), { padding: [40, 40] });
-    autoFitDoneRef.current = true;
-  }, [map, boundsSignature, points, api]);
+    fitToOperationalArea();
+  }, [recenterNonce, api, fitToOperationalArea]);
 
   return null;
 }
@@ -366,16 +277,140 @@ function ActiveRoutePolylines({
 
 function LeafletInvalidateOnLayout() {
   const map = useMap();
+  const doneRef = useRef(false);
 
   useEffect(() => {
-    const run = () => map.invalidateSize({ animate: false });
-    run();
-    const mountTimer = window.setTimeout(run, 150);
+    if (doneRef.current) {
+      return;
+    }
+    doneRef.current = true;
+    const mountTimer = window.setTimeout(() => {
+      map.invalidateSize({ animate: false });
+    }, 250);
     return () => window.clearTimeout(mountTimer);
   }, [map]);
 
   return null;
 }
+
+const SquadMapMarker = memo(function SquadMapMarker({
+  squad,
+  selected,
+  isAlarming,
+  onSelect,
+}: {
+  squad: LiveSquad;
+  selected: boolean;
+  isAlarming: boolean;
+  onSelect: (squad: LiveSquad) => void;
+}) {
+  const icon = useMemo(
+    () => squadDivIcon(squad, selected, isAlarming),
+    [
+      squad.sessionId,
+      squad.squadCode,
+      squad.squadName,
+      squad.mapColor,
+      selected,
+      isAlarming,
+    ],
+  );
+  const acc = squad.lastAccuracy;
+  const accLabel = formatGpsAccuracyMeters(acc);
+  const showAccuracyCircle =
+    acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
+
+  return (
+    <Fragment>
+      {showAccuracyCircle ? (
+        <Circle
+          center={[squad.lastLatitude!, squad.lastLongitude!]}
+          radius={acc}
+          pathOptions={{
+            color: isAlarming ? ALARM_RED : squad.mapColor,
+            fillColor: isAlarming ? ALARM_RED : squad.mapColor,
+            fillOpacity: 0.12,
+            weight: 1,
+          }}
+        />
+      ) : null}
+      <Marker
+        position={[squad.lastLatitude!, squad.lastLongitude!]}
+        icon={icon}
+        eventHandlers={{ click: () => onSelect(squad) }}
+      >
+        <Popup>
+          <strong style={{ color: isAlarming ? ALARM_RED : undefined }}>
+            {isAlarming ? "ALLARME — " : ""}
+            {squad.squadCode}
+          </strong>
+          <br />
+          {squad.squadName}
+          {accLabel ? (
+            <>
+              <br />
+              Precisione GPS {accLabel}
+            </>
+          ) : null}
+        </Popup>
+      </Marker>
+    </Fragment>
+  );
+});
+
+const WaypointMapMarker = memo(function WaypointMapMarker({
+  waypoint,
+  canManageWaypoints,
+  onEditWaypoint,
+  onDeleteWaypoint,
+}: {
+  waypoint: SquadWaypoint;
+  canManageWaypoints: boolean;
+  onEditWaypoint?: (waypoint: SquadWaypoint) => void;
+  onDeleteWaypoint?: (waypoint: SquadWaypoint) => void;
+}) {
+  const icon = useMemo(
+    () => waypointDivIcon(waypoint),
+    [waypoint.id, waypoint.iconKey, waypoint.label],
+  );
+
+  return (
+    <Marker
+      position={[waypoint.latitude, waypoint.longitude]}
+      icon={icon}
+      zIndexOffset={800}
+    >
+      <Popup minWidth={220}>
+        <div style={{ color: "#111827" }}>
+          <strong>{waypointDisplayName(waypoint)}</strong>
+          <br />
+          {waypoint.latitude.toFixed(5)}, {waypoint.longitude.toFixed(5)}
+          <br />
+          {waypointSourceLabel(waypoint.source)} ·{" "}
+          {formatWaypointTimestamp(waypoint.createdAt)}
+          {canManageWaypoints && (onEditWaypoint || onDeleteWaypoint) ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+              {onEditWaypoint ? (
+                <button type="button" onClick={() => onEditWaypoint(waypoint)}>
+                  Modifica
+                </button>
+              ) : null}
+              {onDeleteWaypoint ? (
+                <button
+                  type="button"
+                  onClick={() => onDeleteWaypoint(waypoint)}
+                  style={{ color: "#c62828" }}
+                >
+                  Elimina
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </Popup>
+    </Marker>
+  );
+});
 
 type SquadLiveMapProps = {
   layerMode: LayerMode;
@@ -446,99 +481,30 @@ export default function SquadLiveMap({
         <MapUserNavProvider>
           <LeafletInvalidateOnLayout />
           <MapUserInteractionTracker />
-          <MapViewPreserver squads={withCoords} />
           <MapBoundsController
-            squads={withCoords}
             waypoints={waypoints}
             activeRoutes={routesToDraw}
-            preferOperationalArea={routesToDraw.length > 0}
             recenterNonce={recenterNonce}
           />
         </MapUserNavProvider>
         {waypoints.map((wp) => (
-          <Marker
+          <WaypointMapMarker
             key={`wp-${wp.id}`}
-            position={[wp.latitude, wp.longitude]}
-            icon={waypointDivIcon(wp)}
-            zIndexOffset={800}
-          >
-            <Popup minWidth={220}>
-              <div style={{ color: "#111827" }}>
-                <strong>{waypointDisplayName(wp)}</strong>
-                <br />
-                {wp.latitude.toFixed(5)}, {wp.longitude.toFixed(5)}
-                <br />
-                {waypointSourceLabel(wp.source)} ·{" "}
-                {formatWaypointTimestamp(wp.createdAt)}
-                {canManageWaypoints && (onEditWaypoint || onDeleteWaypoint) ? (
-                  <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-                    {onEditWaypoint ? (
-                      <button type="button" onClick={() => onEditWaypoint(wp)}>
-                        Modifica
-                      </button>
-                    ) : null}
-                    {onDeleteWaypoint ? (
-                      <button
-                        type="button"
-                        onClick={() => onDeleteWaypoint(wp)}
-                        style={{ color: "#c62828" }}
-                      >
-                        Elimina
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            </Popup>
-          </Marker>
+            waypoint={wp}
+            canManageWaypoints={canManageWaypoints}
+            onEditWaypoint={onEditWaypoint}
+            onDeleteWaypoint={onDeleteWaypoint}
+          />
         ))}
-        {withCoords.map((squad) => {
-          const isAlarming = alarmingSessionIds.has(squad.sessionId);
-          const acc = squad.lastAccuracy;
-          const accLabel = formatGpsAccuracyMeters(acc);
-          const showAccuracyCircle =
-            acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
-          return (
-            <Fragment key={squad.sessionId}>
-              {showAccuracyCircle ? (
-                <Circle
-                  center={[squad.lastLatitude!, squad.lastLongitude!]}
-                  radius={acc}
-                  pathOptions={{
-                    color: isAlarming ? ALARM_RED : squad.mapColor,
-                    fillColor: isAlarming ? ALARM_RED : squad.mapColor,
-                    fillOpacity: 0.12,
-                    weight: 1,
-                  }}
-                />
-              ) : null}
-              <Marker
-                position={[squad.lastLatitude!, squad.lastLongitude!]}
-                icon={squadDivIcon(
-                  squad,
-                  selectedSessionId === squad.sessionId,
-                  isAlarming,
-                )}
-                eventHandlers={{ click: () => onSelect(squad) }}
-              >
-                <Popup>
-                  <strong style={{ color: isAlarming ? ALARM_RED : undefined }}>
-                    {isAlarming ? "ALLARME — " : ""}
-                    {squad.squadCode}
-                  </strong>
-                  <br />
-                  {squad.squadName}
-                  {accLabel ? (
-                    <>
-                      <br />
-                      Precisione GPS {accLabel}
-                    </>
-                  ) : null}
-                </Popup>
-              </Marker>
-            </Fragment>
-          );
-        })}
+        {withCoords.map((squad) => (
+          <SquadMapMarker
+            key={squad.sessionId}
+            squad={squad}
+            selected={selectedSessionId === squad.sessionId}
+            isAlarming={alarmingSessionIds.has(squad.sessionId)}
+            onSelect={onSelect}
+          />
+        ))}
         {routesToDraw.map((route) => (
           <ActiveRoutePolylines
             key={route.routeCode}
