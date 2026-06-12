@@ -7,6 +7,8 @@ enum class SquadAlarmRequestType(
     AMBULANZA("ambulanza", "Ambulanza"),
     MEDICO("medico", "Medico"),
     DAE("dae", "DAE"),
+    FORZE_ORDINE("forze_ordine", "FORZE DELL'ORDINE"),
+    VVF("vvf", "V.V.F."),
     ALTRO("altro", "Altro"),
     ;
 

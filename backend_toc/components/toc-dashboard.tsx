@@ -42,6 +42,7 @@ import {
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
+import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
 import { waypointDisplayName, type SquadWaypoint } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
 import "./squad-live-map.css";
@@ -872,7 +873,7 @@ export default function TocDashboard() {
                       {a.squad_code} — {a.squad_name}
                     </p>
                     <p className={styles.alarmMessage}>
-                      {formatAlarmRequestDetail(a)}
+                      <SquadAlarmRequestDetail row={a} />
                     </p>
                     <p className={styles.alarmMeta}>
                       {new Date(a.created_at).toLocaleString("it-IT")}

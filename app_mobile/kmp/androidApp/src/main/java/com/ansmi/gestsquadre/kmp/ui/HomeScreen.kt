@@ -412,6 +412,8 @@ private fun SquadAlarmRequestDialog(
     var ambulanza by remember { mutableStateOf(false) }
     var medico by remember { mutableStateOf(false) }
     var dae by remember { mutableStateOf(false) }
+    var forzeOrdine by remember { mutableStateOf(false) }
+    var vvf by remember { mutableStateOf(false) }
     var altro by remember { mutableStateOf(false) }
     var otherDetail by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
@@ -421,6 +423,8 @@ private fun SquadAlarmRequestDialog(
             if (ambulanza) add(SquadAlarmRequestType.AMBULANZA)
             if (medico) add(SquadAlarmRequestType.MEDICO)
             if (dae) add(SquadAlarmRequestType.DAE)
+            if (forzeOrdine) add(SquadAlarmRequestType.FORZE_ORDINE)
+            if (vvf) add(SquadAlarmRequestType.VVF)
             if (altro) add(SquadAlarmRequestType.ALTRO)
         }
         return SquadAlarmRequest(
@@ -479,6 +483,27 @@ private fun SquadAlarmRequestDialog(
                         dae = it
                         validationError = null
                     },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "FORZE DELL'ORDINE",
+                    checked = forzeOrdine,
+                    onCheckedChange = {
+                        forzeOrdine = it
+                        validationError = null
+                    },
+                    labelColor = Color.White,
+                    labelBackground = TacticalNavy,
+                    labelUppercase = true,
+                )
+                AlarmRequestCheckboxRow(
+                    label = "V.V.F.",
+                    checked = vvf,
+                    onCheckedChange = {
+                        vvf = it
+                        validationError = null
+                    },
+                    labelColor = TacticalRed,
+                    labelUppercase = true,
                 )
                 AlarmRequestCheckboxRow(
                     label = "4. Altro",
@@ -555,6 +580,9 @@ private fun AlarmRequestCheckboxRow(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
+    labelColor: Color = Color.White,
+    labelBackground: Color? = null,
+    labelUppercase: Boolean = false,
 ) {
     Row(
         modifier =
@@ -575,11 +603,22 @@ private fun AlarmRequestCheckboxRow(
                 ),
         )
         Spacer(modifier = Modifier.width(4.dp))
+        val displayLabel = if (labelUppercase) label.uppercase() else label
         Text(
-            text = label,
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold,
+            text = displayLabel,
+            color = labelColor,
+            fontWeight = if (labelBackground != null || labelColor == TacticalRed) {
+                FontWeight.Black
+            } else {
+                FontWeight.SemiBold
+            },
             fontSize = 15.sp,
+            modifier =
+                labelBackground?.let { bg ->
+                    Modifier
+                        .background(bg, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                } ?: Modifier,
         )
     }
 }

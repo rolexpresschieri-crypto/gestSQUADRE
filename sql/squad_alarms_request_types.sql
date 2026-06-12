@@ -8,7 +8,7 @@ alter table squad_alarms
   add column if not exists other_detail text;
 
 comment on column squad_alarms.request_types is
-  'Codici richiesta: ambulanza, medico, dae, altro (array JSON).';
+  'Codici richiesta: ambulanza, medico, dae, forze_ordine, vvf, altro (array JSON).';
 
 comment on column squad_alarms.other_detail is
   'Descrizione breve se è selezionato «altro».';
