@@ -278,8 +278,6 @@ export default function TocDashboard() {
       ]),
     ];
     if (sessionIds.length === 0) {
-      setRouteAssignmentsBySession(new Map());
-      setSelectedRouteAssignment(null);
       return;
     }
     const { assignments, error } = await fetchActiveRouteAssignmentsForSessions(

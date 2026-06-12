@@ -2,7 +2,16 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { Fragment, useEffect, useMemo, useRef } from "react";
+import {
+  createContext,
+  Fragment,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import {
   Circle,
   MapContainer,
@@ -83,6 +92,35 @@ type DrawnRoute = {
   points: MapRoutePoint[];
 };
 
+/** Dopo pan/zoom manuale non ri-inquadrare automaticamente la mappa. */
+const MapUserNavContext = createContext<RefObject<boolean> | null>(null);
+
+function MapUserNavProvider({ children }: { children: ReactNode }) {
+  const map = useMap();
+  const userNavRef = useRef(false);
+
+  useEffect(() => {
+    const onDrag = () => {
+      userNavRef.current = true;
+    };
+    const onZoom = (event: L.LeafletEvent) => {
+      if (event.originalEvent) {
+        userNavRef.current = true;
+      }
+    };
+    map.on("dragstart", onDrag);
+    map.on("zoomstart", onZoom);
+    return () => {
+      map.off("dragstart", onDrag);
+      map.off("zoomstart", onZoom);
+    };
+  }, [map]);
+
+  return (
+    <MapUserNavContext.Provider value={userNavRef}>{children}</MapUserNavContext.Provider>
+  );
+}
+
 function MapBoundsController({
   squads,
   waypoints,
@@ -96,6 +134,7 @@ function MapBoundsController({
   preferOperationalArea: boolean;
 }) {
   const map = useMap();
+  const userNavRef = useContext(MapUserNavContext);
   const lastBoundsSignatureRef = useRef<string | null>(null);
 
   const boundsSignature = useMemo(() => {
@@ -141,6 +180,10 @@ function MapBoundsController({
     if (boundsSignature === lastBoundsSignatureRef.current) {
       return;
     }
+    if (userNavRef?.current) {
+      lastBoundsSignatureRef.current = boundsSignature;
+      return;
+    }
     lastBoundsSignatureRef.current = boundsSignature;
 
     if (points.length === 0) {
@@ -166,18 +209,25 @@ function MapFocusSelected({
   enabled: boolean;
 }) {
   const map = useMap();
+  const userNavRef = useContext(MapUserNavContext);
   const lastFocusedSessionRef = useRef<string | null>(null);
+  const prevSelectedSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) {
-      lastFocusedSessionRef.current = null;
       return;
     }
     if (!selectedSessionId) {
-      lastFocusedSessionRef.current = null;
+      prevSelectedSessionRef.current = null;
       return;
     }
-    if (lastFocusedSessionRef.current === selectedSessionId) {
+    const selectionChanged = prevSelectedSessionRef.current !== selectedSessionId;
+    prevSelectedSessionRef.current = selectedSessionId;
+
+    if (!selectionChanged && lastFocusedSessionRef.current === selectedSessionId) {
+      return;
+    }
+    if (!selectionChanged && userNavRef?.current) {
       return;
     }
     const squad = squads.find((s) => s.sessionId === selectedSessionId);
@@ -188,7 +238,7 @@ function MapFocusSelected({
     map.flyTo([squad.lastLatitude!, squad.lastLongitude!], Math.max(map.getZoom(), 15), {
       duration: 0.5,
     });
-  }, [map, enabled, selectedSessionId, squads]);
+  }, [map, enabled, selectedSessionId, squads, userNavRef]);
 
   return null;
 }
@@ -327,17 +377,19 @@ export default function SquadLiveMap({
           url={tile.url}
         />
         <LeafletInvalidateOnLayout />
-        <MapBoundsController
-          squads={withCoords}
-          waypoints={waypoints}
-          activeRoutes={routesToDraw}
-          preferOperationalArea={routesToDraw.length > 0}
-        />
-        <MapFocusSelected
-          squads={withCoords}
-          selectedSessionId={selectedSessionId}
-          enabled={routesToDraw.length === 0}
-        />
+        <MapUserNavProvider>
+          <MapBoundsController
+            squads={withCoords}
+            waypoints={waypoints}
+            activeRoutes={routesToDraw}
+            preferOperationalArea={routesToDraw.length > 0}
+          />
+          <MapFocusSelected
+            squads={withCoords}
+            selectedSessionId={selectedSessionId}
+            enabled={routesToDraw.length === 0}
+          />
+        </MapUserNavProvider>
         {waypoints.map((wp) => (
           <Marker
             key={`wp-${wp.id}`}

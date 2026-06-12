@@ -200,7 +200,6 @@ function MapFullscreenContent() {
         ]),
       ];
       if (sessionIds.length === 0) {
-        setRouteAssignmentsBySession(new Map());
         return;
       }
       const { assignments } = await fetchActiveRouteAssignmentsForSessions(
