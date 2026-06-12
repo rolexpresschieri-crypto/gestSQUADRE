@@ -90,6 +90,7 @@ type DrawnRoute = {
   routeCode: string;
   colorHex: string;
   points: MapRoutePoint[];
+  highlighted?: boolean;
 };
 
 /** Dopo pan/zoom manuale non ri-inquadrare automaticamente la mappa. */
@@ -108,7 +109,9 @@ function MapUserNavProvider({ children }: { children: ReactNode }) {
       userNavRef.current = true;
     };
     const onZoom = (event: L.LeafletEvent) => {
-      if (event.originalEvent) {
+      const originalEvent = (event as L.LeafletEvent & { originalEvent?: Event })
+        .originalEvent;
+      if (originalEvent) {
         markUserNav();
       }
     };
