@@ -58,13 +58,8 @@ else
 fi
 echo
 
-echo "--- 5) Build framework Kotlin (stesso comando di Xcode) ---"
-export OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=NO
-./gradlew :shared:embedAndSignAppleFrameworkForXcode \
-  -PXCODE_CONFIGURATION=Debug \
-  -PXCODE_SDK_NAME=iphonesimulator \
-  -PXCODE_ARCHS=arm64 \
-  --stacktrace
+echo "--- 5) Build framework Kotlin (stesso script di Xcode) ---"
+bash "$ROOT/iosApp/compile-kotlin-framework.sh"
 
 FW="$ROOT/shared/build/xcode-frameworks/Debug/iphonesimulator/shared.framework"
 if [[ -d "$FW" ]]; then
