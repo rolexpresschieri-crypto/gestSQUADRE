@@ -21,6 +21,14 @@ rm -rf "$ROOT/iosApp/iosApp.xcodeproj/xcuserdata"
 echo "3) Config Supabase..."
 bash "$ROOT/iosApp/sync-config.sh"
 
+echo "3b) Gradle eseguibile + local.properties..."
+chmod +x "$ROOT/gradlew" 2>/dev/null || true
+LP="$ROOT/local.properties"
+if [[ ! -f "$LP" && -d "$HOME/Library/Android/sdk" ]]; then
+  printf 'sdk.dir=%s\n' "$HOME/Library/Android/sdk" >"$LP"
+  echo "Creato local.properties"
+fi
+
 echo "4) Verifico project.pbxproj..."
 if ! plutil -lint "$PBX" >/dev/null 2>&1; then
   echo "ATTENZIONE: plutil segnala un problema su project.pbxproj"
