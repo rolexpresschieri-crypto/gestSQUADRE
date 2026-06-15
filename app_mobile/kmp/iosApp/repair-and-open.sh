@@ -10,7 +10,7 @@ cd "$ROOT/.."
 REPO_ROOT="$(pwd)"
 echo "Repo: $REPO_ROOT"
 
-echo "1) Aggiorno da GitHub..."
+echo "1) Aggiorno da GitHub (scarta modifiche locali ai file tracciati)..."
 git fetch origin
 git reset --hard origin/main
 
