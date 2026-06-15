@@ -64,8 +64,8 @@ bash "$ROOT/iosApp/compile-kotlin-framework.sh"
 FW="$ROOT/shared/build/xcode-frameworks/Debug/iphonesimulator/shared.framework"
 if [[ -d "$FW" ]]; then
   echo
-  echo "OK: framework generato → $FW"
+  echo "OK: framework pronto per Xcode → $FW"
   echo "Ora in Xcode: Product → Clean Build Folder (⇧⌘K) poi Run (⌘R)"
 else
-  fail "Framework non trovato dopo Gradle."
+  fail "Framework non trovato in $FW"
 fi
