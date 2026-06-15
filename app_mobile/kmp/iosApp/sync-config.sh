@@ -26,9 +26,13 @@ key = data.get("SUPABASE_ANON_KEY", "").strip()
 if not url or not key:
     raise SystemExit("SUPABASE_URL e SUPABASE_ANON_KEY obbligatori in dart-defines.json")
 
+def xc_quote(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
 content = f"""// Generato da sync-config.sh — non modificare a mano
-SUPABASE_URL = {url}
-SUPABASE_ANON_KEY = {key}
+SUPABASE_URL = {xc_quote(url)}
+SUPABASE_ANON_KEY = {xc_quote(key)}
 PRODUCT_BUNDLE_IDENTIFIER = com.ansmi.gest_squadre
 MARKETING_VERSION = 1.0.15
 CURRENT_PROJECT_VERSION = 15
