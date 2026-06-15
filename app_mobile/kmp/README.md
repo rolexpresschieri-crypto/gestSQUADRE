@@ -41,15 +41,26 @@ kmp-dev.bat install
 APK dev (nome fisso): `gestSQUADRE_KMP_dev_1.0.x.apk` nella cartella `kmp/`  
 Versione `x` da `androidApp/build.gradle.kts` → `versionName` (es. `1.0.0`).
 
-## iOS (fase 2, serve Mac)
+## iOS (fase 2 — Mac + Xcode)
 
-Target `iosArm64` / `iosSimulatorArm64` già definiti in `shared`.  
-Su Mac: framework Kotlin + app SwiftUI che importa `GestSquadreFacade`.
+Cartella **`iosApp/`** con progetto Xcode + SwiftUI (login Supabase).
+
+```bash
+cd app_mobile/kmp
+chmod +x kmp-dev.sh iosApp/sync-config.sh
+./kmp-dev.sh ios-open
+```
+
+In Xcode: simulatore iPhone → **Run** (⌘R). Stesso `dart-defines.json` dell’Android.
+
+Il TOC resta su **Windows**; l’app parla solo con **Supabase** in cloud.
 
 ## Prossimi passi
 
 - [x] UI Compose home + login (tema tactical, logo Open Golf, login/logout/allarme)
 - [x] GPS periodico (expect/actual + invio Supabase come Flutter)
 - [x] Mappa TOC (osmdroid: squadre, waypoint, stradale/ortofoto)
+- [x] App iOS SwiftUI — login base (fase 2)
+- [ ] GPS iOS (CoreLocation)
 - [ ] Push FCM / APNs
-- [ ] App iOS SwiftUI
+- [ ] UI iOS completa (mappa, allarmi, pannello TOC)
