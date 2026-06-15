@@ -12,7 +12,12 @@ case "$MODE" in
     ;;
   ios-open)
     bash iosApp/sync-config.sh
+    rm -rf iosApp/iosApp.xcodeproj/project.xcworkspace
+    rm -rf iosApp/iosApp.xcodeproj/xcuserdata
     open iosApp/iosApp.xcodeproj
+    ;;
+  ios-repair)
+    bash iosApp/repair-and-open.sh
     ;;
   ios-framework)
     bash iosApp/sync-config.sh
