@@ -18,7 +18,7 @@ import json
 import sys
 
 defines_path, out_path = sys.argv[1], sys.argv[2]
-with open(defines_path, encoding="utf-8") as f:
+with open(defines_path, encoding="utf-8-sig") as f:
     data = json.load(f)
 
 url = data.get("SUPABASE_URL", "").strip()

@@ -230,7 +230,7 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
-					shared,
+					"shared",
 				);
 				PRODUCT_NAME = gestSQUADRE;
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -258,7 +258,7 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
-					shared,
+					"shared",
 				);
 				PRODUCT_NAME = gestSQUADRE;
 				SWIFT_EMIT_LOC_STRINGS = YES;
