@@ -3,93 +3,82 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 50;
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A100000000000021 /* iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000D /* iosApp.swift */; };
-		A100000000000022 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000E /* ContentView.swift */; };
-		A100000000000023 /* SquadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000F /* SquadViewModel.swift */; };
-		A100000000000024 /* shared.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A100000000000017 /* shared.framework */; };
+		A1B2C3D41E5F678900000017 /* iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41E5F678900000007 /* iosApp.swift */; };
+		A1B2C3D41E5F678900000018 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41E5F678900000008 /* ContentView.swift */; };
+		A1B2C3D41E5F678900000019 /* SquadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41E5F678900000009 /* SquadViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A10000000000000D /* iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp.swift; sourceTree = "<group>"; };
-		A10000000000000E /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A10000000000000F /* SquadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadViewModel.swift; sourceTree = "<group>"; };
-		A100000000000010 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		A100000000000014 /* gestSQUADRE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gestSQUADRE.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A100000000000016 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		A100000000000017 /* shared.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = shared.framework; path = ../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)/shared.framework; sourceTree = "<group>"; };
+		A1B2C3D41E5F678900000006 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		A1B2C3D41E5F678900000007 /* iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp.swift; sourceTree = "<group>"; };
+		A1B2C3D41E5F678900000008 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1B2C3D41E5F678900000009 /* SquadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadViewModel.swift; sourceTree = "<group>"; };
+		A1B2C3D41E5F67890000000A /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1B2C3D41E5F67890000000B /* gestSQUADRE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gestSQUADRE.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		A10000000000000A /* Frameworks */ = {
+		A1B2C3D41E5F678900000014 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A100000000000024 /* shared.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A100000000000011 = {
+		A1B2C3D41E5F678900000002 = {
 			isa = PBXGroup;
 			children = (
-				A100000000000015 /* Configuration */,
-				A100000000000012 /* iosApp */,
-				A100000000000018 /* Frameworks */,
-				A100000000000013 /* Products */,
+				A1B2C3D41E5F678900000005 /* Configuration */,
+				A1B2C3D41E5F678900000004 /* iosApp */,
+				A1B2C3D41E5F678900000003 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		A100000000000012 /* iosApp */ = {
+		A1B2C3D41E5F678900000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000D /* iosApp.swift */,
-				A10000000000000E /* ContentView.swift */,
-				A10000000000000F /* SquadViewModel.swift */,
-				A100000000000010 /* Info.plist */,
-			);
-			path = iosApp;
-			sourceTree = "<group>";
-		};
-		A100000000000013 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A100000000000014 /* gestSQUADRE.app */,
+				A1B2C3D41E5F67890000000B /* gestSQUADRE.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		A100000000000015 /* Configuration */ = {
+		A1B2C3D41E5F678900000004 /* iosApp */ = {
 			isa = PBXGroup;
 			children = (
-				A100000000000016 /* Config.xcconfig */,
+				A1B2C3D41E5F67890000000A /* Info.plist */,
+				A1B2C3D41E5F678900000007 /* iosApp.swift */,
+				A1B2C3D41E5F678900000008 /* ContentView.swift */,
+				A1B2C3D41E5F678900000009 /* SquadViewModel.swift */,
 			);
-			path = Configuration;
+			path = iosApp;
 			sourceTree = "<group>";
 		};
-		A100000000000018 /* Frameworks */ = {
+		A1B2C3D41E5F678900000005 /* Configuration */ = {
 			isa = PBXGroup;
 			children = (
-				A100000000000017 /* shared.framework */,
+				A1B2C3D41E5F678900000006 /* Config.xcconfig */,
 			);
-			name = Frameworks;
+			path = Configuration;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A100000000000002 /* iosApp */ = {
+		A1B2C3D41E5F67890000000C /* iosApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A100000000000006 /* Build configuration list for PBXNativeTarget "iosApp" */;
+			buildConfigurationList = A1B2C3D41E5F67890000000E /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
-				A10000000000000C /* Compile Kotlin Framework */,
-				A100000000000009 /* Sources */,
-				A10000000000000A /* Frameworks */,
+				A1B2C3D41E5F678900000016 /* Compile Kotlin Framework */,
+				A1B2C3D41E5F678900000013 /* Sources */,
+				A1B2C3D41E5F678900000015 /* Resources */,
+				A1B2C3D41E5F678900000014 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -97,44 +86,54 @@
 			);
 			name = iosApp;
 			productName = iosApp;
-			productReference = A100000000000014 /* gestSQUADRE.app */;
+			productReference = A1B2C3D41E5F67890000000B /* gestSQUADRE.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		A100000000000001 /* Project object */ = {
+		A1B2C3D41E5F678900000001 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1600;
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
-					A100000000000002 = {
+					A1B2C3D41E5F67890000000C = {
 						CreatedOnToolsVersion = 16.0;
 					};
 				};
 			};
-			buildConfigurationList = A100000000000003 /* Build configuration list for PBXProject "iosApp" */;
-			compatibilityVersion = "Xcode 14.0";
+			buildConfigurationList = A1B2C3D41E5F67890000000D /* Build configuration list for PBXProject "iosApp" */;
+			compatibilityVersion = "Xcode 9.3";
 			developmentRegion = it;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				it,
 				Base,
 			);
-			mainGroup = A100000000000011;
-			productRefGroup = A100000000000013 /* Products */;
+			mainGroup = A1B2C3D41E5F678900000002;
+			productRefGroup = A1B2C3D41E5F678900000003 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A100000000000002 /* iosApp */,
+				A1B2C3D41E5F67890000000C /* iosApp */,
 			);
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		A1B2C3D41E5F678900000015 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXShellScriptBuildPhase section */
-		A10000000000000C /* Compile Kotlin Framework */ = {
+		A1B2C3D41E5F678900000016 /* Compile Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -151,26 +150,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "cd \"$SRCROOT/..\"\n./gradlew :shared:embedAndSignAppleFrameworkForXcode -PXCODE_CONFIGURATION=${CONFIGURATION} -PXCODE_SDK_NAME=${SDK_NAME} -PXCODE_ARCHS=\"${ARCHS}\"\n";
+			shellScript = "if [ \"YES\" = \"$OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED\" ]; then\n  echo \"Skipping Gradle build task invocation due to OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED environment variable set to \\\"YES\\\"\"\n  exit 0\nfi\ncd \"$SRCROOT/..\"\n./gradlew :shared:embedAndSignAppleFrameworkForXcode\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		A100000000000009 /* Sources */ = {
+		A1B2C3D41E5F678900000013 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A100000000000021 /* iosApp.swift in Sources */,
-				A100000000000022 /* ContentView.swift in Sources */,
-				A100000000000023 /* SquadViewModel.swift in Sources */,
+				A1B2C3D41E5F678900000017 /* iosApp.swift in Sources */,
+				A1B2C3D41E5F678900000018 /* ContentView.swift in Sources */,
+				A1B2C3D41E5F678900000019 /* SquadViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-		A100000000000004 /* Debug */ = {
+		A1B2C3D41E5F67890000000F /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D41E5F678900000006 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
@@ -193,8 +193,9 @@
 			};
 			name = Debug;
 		};
-		A100000000000005 /* Release */ = {
+		A1B2C3D41E5F678900000010 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = A1B2C3D41E5F678900000006 /* Config.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ENABLE_MODULES = YES;
@@ -211,12 +212,11 @@
 			};
 			name = Release;
 		};
-		A100000000000007 /* Debug */ = {
+		A1B2C3D41E5F678900000011 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A100000000000016 /* Config.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
@@ -239,12 +239,11 @@
 			};
 			name = Debug;
 		};
-		A100000000000008 /* Release */ = {
+		A1B2C3D41E5F678900000012 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = A100000000000016 /* Config.xcconfig */;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = "";
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)",
@@ -270,25 +269,25 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A100000000000003 /* Build configuration list for PBXProject "iosApp" */ = {
+		A1B2C3D41E5F67890000000D /* Build configuration list for PBXProject "iosApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A100000000000004 /* Debug */,
-				A100000000000005 /* Release */,
+				A1B2C3D41E5F67890000000F /* Debug */,
+				A1B2C3D41E5F678900000010 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A100000000000006 /* Build configuration list for PBXNativeTarget "iosApp" */ = {
+		A1B2C3D41E5F67890000000E /* Build configuration list for PBXNativeTarget "iosApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				A100000000000007 /* Debug */,
-				A100000000000008 /* Release */,
+				A1B2C3D41E5F678900000011 /* Debug */,
+				A1B2C3D41E5F678900000012 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
-	rootObject = A100000000000001 /* Project object */;
+	rootObject = A1B2C3D41E5F678900000001 /* Project object */;
 }
