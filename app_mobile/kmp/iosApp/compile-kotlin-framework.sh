@@ -6,6 +6,26 @@ KMP_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$KMP_ROOT"
 chmod +x ./gradlew
 
+# Xcode non carica .zshrc: imposta Java esplicitamente (Android Studio / macOS).
+if [[ -z "${JAVA_HOME:-}" || ! -x "${JAVA_HOME}/bin/java" ]]; then
+  for jhome in \
+    "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+    "$(/usr/libexec/java_home -v 17 2>/dev/null || true)" \
+    "$(/usr/libexec/java_home 2>/dev/null || true)"; do
+    if [[ -n "$jhome" && -x "$jhome/bin/java" ]]; then
+      export JAVA_HOME="$jhome"
+      break
+    fi
+  done
+fi
+if [[ -n "${JAVA_HOME:-}" ]]; then
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+if ! command -v java >/dev/null 2>&1; then
+  echo "ERRORE: Java non trovato per Gradle. Apri Android Studio una volta oppure installa JDK 17." >&2
+  exit 1
+fi
+
 if [[ "YES" == "${OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED:-}" ]]; then
   echo "Skipping Gradle build (OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES)"
   exit 0

@@ -145,10 +145,11 @@
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(SRCROOT)/../shared/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)/shared.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "bash \"$SRCROOT/compile-kotlin-framework.sh\"\n";
+			shellScript = "set -e\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\nbash \"$SRCROOT/compile-kotlin-framework.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
