@@ -21,10 +21,7 @@ case "$MODE" in
     ;;
   ios-framework)
     bash iosApp/sync-config.sh
-    ./gradlew :shared:embedAndSignAppleFrameworkForXcode \
-      -PXCODE_CONFIGURATION=Debug \
-      -PXCODE_SDK_NAME=iphonesimulator \
-      -PXCODE_ARCHS=arm64
+    bash iosApp/compile-kotlin-framework.sh
     echo "Framework OK. Apri Xcode: ./kmp-dev.sh ios-open"
     ;;
   install|build)
