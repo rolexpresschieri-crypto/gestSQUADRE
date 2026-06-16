@@ -68,17 +68,23 @@ class GestSquadreRepository(
             throw GestSquadreException("Password squadra non valida.")
         }
 
-        val now = nowIso()
+        val alreadyOnline =
+            rest.getMaybeSingle(
+                table = "squad_sessions",
+                select = "id,is_online",
+                filters = listOf(
+                    "event_id" to eventId,
+                    "squad_id" to squad.id,
+                    "is_online" to "true",
+                ),
+            ) { body ->
+                json.decodeFromString<SessionOnlineRow>(body)
+            }
+        if (alreadyOnline != null) {
+            throw GestSquadreException(GestSquadreMessages.SQUAD_ALREADY_ACTIVE)
+        }
 
-        rest.patch(
-            table = "squad_sessions",
-            filters = listOf(
-                "event_id" to eventId,
-                "squad_id" to squad.id,
-                "is_online" to "true",
-            ),
-            body = LogoutPatchBody(isOnline = false, logoutAt = now),
-        )
+        val now = nowIso()
 
         val inserted =
             rest.insertReturning(

@@ -6,6 +6,7 @@ final class SquadViewModel: ObservableObject {
     @Published var squadCode = ""
     @Published var password = ""
     @Published var statusMessage = "Inserisci codice squadra e password."
+    @Published var loginBlockingMessage: String?
     @Published var isLoggedIn = false
     @Published var sessionLabel = ""
     @Published var sessionId = ""
@@ -103,6 +104,7 @@ final class SquadViewModel: ObservableObject {
         }
 
         statusMessage = "Accesso in corso..."
+        loginBlockingMessage = nil
         facade.loginSquadSafe(
             squadCode: squadCode.trimmingCharacters(in: .whitespacesAndNewlines),
             password: password
@@ -112,6 +114,9 @@ final class SquadViewModel: ObservableObject {
                 if let errorMessage {
                     self.statusMessage = errorMessage
                     self.isLoggedIn = false
+                    if errorMessage == GestSquadreMessages.shared.SQUAD_ALREADY_ACTIVE {
+                        self.loginBlockingMessage = errorMessage
+                    }
                     return
                 }
                 guard let session else {

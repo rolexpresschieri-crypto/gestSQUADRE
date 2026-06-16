@@ -28,10 +28,12 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ansmi.gestsquadre.kmp.ui.components.MainButton
+import com.ansmi.gestsquadre.kmp.ui.components.SquadBlockingAlert
 import com.ansmi.gestsquadre.kmp.ui.components.TacticalShell
 import com.ansmi.gestsquadre.kmp.ui.components.TacticalTitleText
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalGreen
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
+import com.ansmi.gestsquadre.shared.GestSquadreMessages
 
 @Composable
 fun LoginScreen(
@@ -44,6 +46,7 @@ fun LoginScreen(
     var squadCode by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var blockingAlert by rememberSaveable { mutableStateOf<String?>(null) }
 
     val fieldColors = OutlinedTextFieldDefaults.colors(
         focusedTextColor = Color.White,
@@ -60,9 +63,17 @@ fun LoginScreen(
             TacticalTitleText(text = "Login squadra", fontSize = 24)
             Spacer(modifier = Modifier.height(20.dp))
 
+            blockingAlert?.let { message ->
+                SquadBlockingAlert(message = message)
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             OutlinedTextField(
                 value = squadCode,
-                onValueChange = { squadCode = it.uppercase() },
+                onValueChange = {
+                    squadCode = it.uppercase()
+                    blockingAlert = null
+                },
                 label = { Text("Codice squadra") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -77,7 +88,10 @@ fun LoginScreen(
 
             OutlinedTextField(
                 value = password,
-                onValueChange = { password = it.uppercase() },
+                onValueChange = {
+                    password = it.uppercase()
+                    blockingAlert = null
+                },
                 label = { Text("Password") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
@@ -126,9 +140,15 @@ fun LoginScreen(
                         if (code.isEmpty()) {
                             onShowMessage("Inserisci il codice squadra.")
                         } else {
+                            blockingAlert = null
                             viewModel.login(code, password) { err ->
-                                onShowMessage(err ?: "Login squadra completato.")
-                                if (err == null) onLoginSuccess()
+                                if (err == null) {
+                                    onLoginSuccess()
+                                } else if (err == GestSquadreMessages.SQUAD_ALREADY_ACTIVE) {
+                                    blockingAlert = err
+                                } else {
+                                    onShowMessage(err)
+                                }
                             }
                         }
                     }

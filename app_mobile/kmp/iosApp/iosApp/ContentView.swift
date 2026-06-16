@@ -39,12 +39,29 @@ struct ContentView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else {
+                    if let blocking = viewModel.loginBlockingMessage {
+                        Text(blocking)
+                            .font(.headline.bold())
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .multilineTextAlignment(.center)
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 14)
+                            .background(Color.red)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
                     TextField("Codice squadra (es. SQD001)", text: $viewModel.squadCode)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .textFieldStyle(.roundedBorder)
+                        .onChange(of: viewModel.squadCode) { _ in
+                            viewModel.loginBlockingMessage = nil
+                        }
                     SecureField("Password", text: $viewModel.password)
                         .textFieldStyle(.roundedBorder)
+                        .onChange(of: viewModel.password) { _ in
+                            viewModel.loginBlockingMessage = nil
+                        }
                     Text(viewModel.statusMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)

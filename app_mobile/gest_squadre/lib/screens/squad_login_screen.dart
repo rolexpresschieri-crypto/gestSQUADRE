@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../controllers/squad_controller.dart';
+import '../services/gest_api.dart';
 import '../theme/tactical_theme.dart';
 import '../utils/uppercase_text_input.dart';
 import '../widgets/tactical_shell.dart';
@@ -17,6 +18,7 @@ class SquadLoginScreen extends StatefulWidget {
 class _SquadLoginScreenState extends State<SquadLoginScreen> {
   final _code = TextEditingController();
   final _password = TextEditingController();
+  String? _blockingMessage;
 
   static final _upperFormatters = [UpperCaseTextFormatter()];
 
@@ -40,6 +42,10 @@ class _SquadLoginScreenState extends State<SquadLoginScreen> {
       password: _password.text,
     );
     if (!mounted) {
+      return;
+    }
+    if (err == GestApi.squadAlreadyActiveMessage) {
+      setState(() => _blockingMessage = err);
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(
@@ -72,9 +78,34 @@ class _SquadLoginScreenState extends State<SquadLoginScreen> {
               style: kTacticalTitleWhite.copyWith(fontSize: 24),
             ),
             const SizedBox(height: 20),
+            if (_blockingMessage != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: tacticalRed,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  _blockingMessage!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             TextField(
               controller: _code,
               inputFormatters: _upperFormatters,
+              onChanged: (_) {
+                if (_blockingMessage != null) {
+                  setState(() => _blockingMessage = null);
+                }
+              },
               keyboardType: TextInputType.visiblePassword,
               autocorrect: false,
               style: fieldStyle,
@@ -95,6 +126,11 @@ class _SquadLoginScreenState extends State<SquadLoginScreen> {
               controller: _password,
               obscureText: true,
               inputFormatters: _upperFormatters,
+              onChanged: (_) {
+                if (_blockingMessage != null) {
+                  setState(() => _blockingMessage = null);
+                }
+              },
               autocorrect: false,
               style: fieldStyle,
               decoration: InputDecoration(

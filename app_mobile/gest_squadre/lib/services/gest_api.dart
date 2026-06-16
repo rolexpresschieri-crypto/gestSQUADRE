@@ -7,6 +7,9 @@ import '../models/squad_session.dart';
 class GestApi {
   GestApi(this._client);
 
+  static const squadAlreadyActiveMessage =
+      'Squadra già attiva su un altro telefono';
+
   final SupabaseClient _client;
 
   Future<EventInfo?> loadActiveEvent() async {
@@ -47,18 +50,20 @@ class GestApi {
       throw StateError('Password squadra non valida.');
     }
 
-    final now = DateTime.now().toUtc();
-
-    // Chiude eventuale sessione ancora "online" (crash app, rinomina, altro telefono).
-    await _client
+    final existingOnline = await _client
         .from('squad_sessions')
-        .update({
-          'is_online': false,
-          'logout_at': now.toIso8601String(),
-        })
+        .select('id')
         .eq('event_id', eventId)
         .eq('squad_id', squad['id'])
-        .eq('is_online', true);
+        .eq('is_online', true)
+        .maybeSingle();
+
+    if (existingOnline != null) {
+      throw StateError(GestApi.squadAlreadyActiveMessage);
+    }
+
+    final now = DateTime.now().toUtc();
+
     final inserted = await _client
         .from('squad_sessions')
         .insert({
