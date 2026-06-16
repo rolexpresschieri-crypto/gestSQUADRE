@@ -4,20 +4,21 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEFINES="$ROOT/../gest_squadre/dart-defines.json"
 OUT="$ROOT/iosApp/Configuration/Config.xcconfig"
+JSON_OUT="$ROOT/iosApp/iosApp/supabase-config.json"
 
 if [[ ! -f "$DEFINES" ]]; then
   echo "ERRORE: manca $DEFINES"
-  echo "Copia dart-defines.example.json in gest_squadre/dart-defines.json"
+  echo "Copia dart-defines.json dal PC Windows in app_mobile/gest_squadre/"
   exit 1
 fi
 
-mkdir -p "$(dirname "$OUT")"
+mkdir -p "$(dirname "$OUT")" "$(dirname "$JSON_OUT")"
 
-python3 - "$DEFINES" "$OUT" <<'PY'
+python3 - "$DEFINES" "$OUT" "$JSON_OUT" <<'PY'
 import json
 import sys
 
-defines_path, out_path = sys.argv[1], sys.argv[2]
+defines_path, out_path, json_out_path = sys.argv[1], sys.argv[2], sys.argv[3]
 with open(defines_path, encoding="utf-8-sig") as f:
     data = json.load(f)
 
@@ -40,7 +41,15 @@ CURRENT_PROJECT_VERSION = 15
 with open(out_path, "w", encoding="utf-8") as f:
     f.write(content)
 
-# Verifica che xcconfig non tronchi l'URL (https:// → https: se mancano le virgolette).
+with open(json_out_path, "w", encoding="utf-8") as f:
+    json.dump(
+        {"SUPABASE_URL": url, "SUPABASE_ANON_KEY": key},
+        f,
+        indent=2,
+        ensure_ascii=False,
+    )
+    f.write("\n")
+
 with open(out_path, encoding="utf-8") as f:
     written = f.read()
 if url not in written:
@@ -52,5 +61,6 @@ if ".supabase.co" not in url:
     raise SystemExit("SUPABASE_URL non sembra un endpoint Supabase valido.")
 
 print(f"OK: {out_path}")
+print(f"OK: {json_out_path}")
 print(f"    SUPABASE_URL = {url}")
 PY

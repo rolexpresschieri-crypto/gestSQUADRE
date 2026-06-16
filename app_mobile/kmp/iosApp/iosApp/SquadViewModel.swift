@@ -24,7 +24,31 @@ final class SquadViewModel: ObservableObject {
         supabaseUrl != nil && supabaseAnonKey != nil
     }
 
+    private struct SupabaseBundleConfig: Decodable {
+        let supabaseUrl: String
+        let supabaseAnonKey: String
+
+        enum CodingKeys: String, CodingKey {
+            case supabaseUrl = "SUPABASE_URL"
+            case supabaseAnonKey = "SUPABASE_ANON_KEY"
+        }
+    }
+
+    private var bundledSupabaseConfig: SupabaseBundleConfig? {
+        guard let url = Bundle.main.url(forResource: "supabase-config", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let config = try? JSONDecoder().decode(SupabaseBundleConfig.self, from: data) else {
+            return nil
+        }
+        return config
+    }
+
     private var supabaseUrl: String? {
+        if let bundled = bundledSupabaseConfig {
+            let value = bundled.supabaseUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard Self.isValidSupabaseUrl(value) else { return nil }
+            return value
+        }
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String else { return nil }
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
         guard Self.isValidSupabaseUrl(value) else { return nil }
@@ -32,14 +56,19 @@ final class SquadViewModel: ObservableObject {
     }
 
     private var supabaseAnonKey: String? {
+        if let bundled = bundledSupabaseConfig {
+            let value = bundled.supabaseAnonKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard Self.isValidSupabaseAnonKey(value) else { return nil }
+            return value
+        }
         guard let raw = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String else { return nil }
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-        guard !value.isEmpty, !value.hasPrefix("$("), value != "YOUR_ANON_KEY" else { return nil }
+        guard Self.isValidSupabaseAnonKey(value) else { return nil }
         return value
     }
 
     private static func missingConfigMessage() -> String {
-        "Configura Supabase sul Mac: bash iosApp/sync-config.sh (l'URL in Config.xcconfig va tra virgolette)."
+        "Manca dart-defines.json sul Mac. Copialo in gest_squadre/ poi: bash iosApp/sync-config.sh e rebuild."
     }
 
     private static func isValidSupabaseUrl(_ value: String) -> Bool {
@@ -49,6 +78,11 @@ final class SquadViewModel: ObservableObject {
               value.hasPrefix("https://"),
               value.contains(".supabase.co"),
               URL(string: value) != nil else { return false }
+        return true
+    }
+
+    private static func isValidSupabaseAnonKey(_ value: String) -> Bool {
+        guard !value.isEmpty, !value.hasPrefix("$("), value != "YOUR_ANON_KEY" else { return false }
         return true
     }
 

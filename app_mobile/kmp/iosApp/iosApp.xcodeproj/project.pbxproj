@@ -10,6 +10,7 @@
 		B2C3D4E51F60718293A4B5D1 /* iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E51F60718293A4B5C6 /* iosApp.swift */; };
 		B2C3D4E51F60718293A4B5D2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E51F60718293A4B5C7 /* ContentView.swift */; };
 		B2C3D4E51F60718293A4B5D3 /* SquadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */; };
+		C2D3E4F51F60718293A4B5DB /* supabase-config.json in Resources */ = {isa = PBXBuildFile; fileRef = C2D3E4F51F60718293A4B5DA /* supabase-config.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +20,7 @@
 		B2C3D4E51F60718293A4B5C7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadViewModel.swift; sourceTree = "<group>"; };
 		B2C3D4E51F60718293A4B5C9 /* gestSQUADRE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gestSQUADRE.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C2D3E4F51F60718293A4B5DA /* supabase-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "supabase-config.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,6 +58,7 @@
 				B2C3D4E51F60718293A4B5C6 /* iosApp.swift */,
 				B2C3D4E51F60718293A4B5C7 /* ContentView.swift */,
 				B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */,
+				C2D3E4F51F60718293A4B5DA /* supabase-config.json */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -127,6 +130,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C2D3E4F51F60718293A4B5DB /* supabase-config.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -148,6 +152,7 @@
 			);
 			outputPaths = (
 				"$(SRCROOT)/Configuration/Config.xcconfig",
+				"$(SRCROOT)/iosApp/supabase-config.json",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;

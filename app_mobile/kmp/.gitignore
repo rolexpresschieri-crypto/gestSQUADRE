@@ -8,3 +8,4 @@ captures/
 .cxx/
 *.apk
 iosApp/Configuration/Config.xcconfig
+iosApp/iosApp/supabase-config.json
