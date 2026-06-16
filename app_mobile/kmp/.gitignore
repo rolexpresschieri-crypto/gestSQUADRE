@@ -7,7 +7,8 @@ local.properties
 captures/
 .cxx/
 *.apk
-iosApp/Configuration/Config.xcconfig
+iosApp/iosApp.xcodeproj/project.xcworkspace/xcuserdata/
+iosApp/iosApp.xcodeproj/xcuserdata/
 iosApp/Configuration/Signing.xcconfig
 iosApp/iosApp/supabase-config.json
 gestSQUADRE_iOS_*.ipa
