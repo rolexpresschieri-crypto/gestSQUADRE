@@ -96,9 +96,9 @@ if /i not "%MODE%"=="install" (
   echo            oppure kmp-dev.bat rebuild  poi  kmp-dev.bat install
   echo.
   if exist "%APK_EASY%" (
-    explorer /select,"%APK_EASY%"
-  ) else (
-    explorer /select,"%cd%\%APK%"
+    start "" explorer /select,"%APK_EASY%"
+  ) else if exist "%cd%\%APK%" (
+    start "" explorer /select,"%cd%\%APK%"
   )
   pause
   exit /b 0
@@ -106,24 +106,30 @@ if /i not "%MODE%"=="install" (
 
 where adb >nul 2>nul
 if errorlevel 1 (
-  echo ERRORE: adb non nel PATH. Installa Android platform-tools.
+  echo ERRORE: adb non nel PATH.
+  echo Installa Android SDK Platform-Tools oppure apri Android Studio una volta.
+  echo Aggiungi al PATH, es. %%LOCALAPPDATA%%\Android\Sdk\platform-tools
   pause
   exit /b 1
 )
 
 set "DEVICE_ID="
-for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0..\gest_squadre\get-android-device.ps1"`) do set "DEVICE_ID=%%i"
+for /f "usebackq delims=" %%i in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0get-android-device.ps1"`) do set "DEVICE_ID=%%i"
 
 if not defined DEVICE_ID (
   echo *** NESSUN TELEFONE ANDROID RILEVATO ***
-  echo Collega USB con debug USB oppure avvia un emulatore.
+  echo Collega USB, attiva Debug USB, autorizza il PC sul telefono.
+  echo.
   adb devices
+  echo.
+  echo Puoi installare a mano l APK:
+  if exist "%APK_EASY%" (echo   %APK_EASY%) else (echo   %cd%\%APK%)
   pause
   exit /b 1
 )
 
 echo Installazione su %DEVICE_ID% ...
-adb -s "%DEVICE_ID%" install -r "%APK%"
+adb -s "%DEVICE_ID%" install -r "%cd%\%APK%"
 if errorlevel 1 (
   echo Installazione fallita.
   pause

@@ -66,6 +66,7 @@ import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequestType
+import com.ansmi.gestsquadre.shared.model.loginTimeLabel
 import kotlinx.coroutines.launch
 
 private const val SquadAlarmHint =
