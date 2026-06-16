@@ -214,6 +214,20 @@ class SquadViewModel(
     }
 
     private suspend fun restoreSessionOnStart() {
+        if (!sessionStorage.isAuthLogMigrationDone()) {
+            val cached = sessionStorage.loadCached()
+            if (cached != null) {
+                try {
+                    facade.logoutSquad(cached)
+                } catch (_: Exception) {
+                    // Rete assente o sessione già chiusa: pulizia locale comunque.
+                }
+                sessionStorage.clear()
+            }
+            sessionStorage.setAuthLogMigrationDone()
+            return
+        }
+
         val sessionId = sessionStorage.loadSessionId() ?: return
         try {
             val session = facade.restoreOnlineSession(sessionId) ?: run {

@@ -61,8 +61,17 @@ class SessionStorage(
         prefs.edit().remove(KEY).apply()
     }
 
+    /** Una tantum: dopo aggiornamento con log auth, forza nuovo login. */
+    fun isAuthLogMigrationDone(): Boolean =
+        prefs.getBoolean(KEY_AUTH_LOG_MIGRATION, false)
+
+    fun setAuthLogMigrationDone() {
+        prefs.edit().putBoolean(KEY_AUTH_LOG_MIGRATION, true).apply()
+    }
+
     companion object {
         const val PREFS_NAME = "gest_squadre_prefs"
         const val KEY = "gest_squadre_session_json"
+        private const val KEY_AUTH_LOG_MIGRATION = "kmp_auth_log_migration_v1"
     }
 }
