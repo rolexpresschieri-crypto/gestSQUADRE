@@ -11,6 +11,12 @@ struct ContentView: View {
                 Text("Volontario — iOS")
                     .foregroundStyle(.secondary)
 
+                if !viewModel.isConfigured {
+                    Label("Supabase non configurato", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .font(.subheadline)
+                }
+
                 if viewModel.isLoggedIn {
                     Label(viewModel.sessionLabel, systemImage: "person.crop.circle.badge.checkmark")
                         .font(.headline)

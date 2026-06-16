@@ -1,7 +1,6 @@
 import Foundation
 import shared
 
-@MainActor
 final class SquadViewModel: ObservableObject {
     @Published var squadCode = ""
     @Published var password = ""
@@ -10,36 +9,52 @@ final class SquadViewModel: ObservableObject {
     @Published var sessionLabel = ""
     @Published var sessionId = ""
 
-    private let facade: GestSquadreFacade
+    private var facade: GestSquadreFacade?
 
     init() {
-        let url = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String ?? ""
-        let key = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? ""
+        guard let url = supabaseUrl, let key = supabaseAnonKey else {
+            statusMessage = "Configura Supabase: esegui iosApp/sync-config.sh sul Mac."
+            return
+        }
         let config = GestSquadreConfig(supabaseUrl: url, supabaseAnonKey: key)
         facade = GestSquadreFacade(config: config)
     }
 
     var isConfigured: Bool {
-        guard
-            let url = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-            let key = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String
-        else { return false }
-        return !url.isEmpty && !key.isEmpty && url != "https://YOUR-PROJECT-REF.supabase.co"
+        supabaseUrl != nil && supabaseAnonKey != nil
+    }
+
+    private var supabaseUrl: String? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty,
+              !value.hasPrefix("$("),
+              value != "https://YOUR-PROJECT-REF.supabase.co" else { return nil }
+        return value
+    }
+
+    private var supabaseAnonKey: String? {
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.hasPrefix("$("), value != "YOUR_ANON_KEY" else { return nil }
+        return value
     }
 
     func login() {
-        guard isConfigured else {
+        guard let facade else {
             statusMessage = "Configura Supabase: esegui iosApp/sync-config.sh sul Mac."
             return
         }
 
         statusMessage = "Accesso in corso..."
-        facade.loginSquad(squadCode: squadCode.trimmingCharacters(in: .whitespacesAndNewlines),
-                          password: password) { [weak self] session, error in
-            Task { @MainActor in
+        facade.loginSquadSafe(
+            squadCode: squadCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            password: password
+        ) { [weak self] session, errorMessage in
+            DispatchQueue.main.async {
                 guard let self else { return }
-                if let error {
-                    self.statusMessage = error.localizedDescription
+                if let errorMessage {
+                    self.statusMessage = errorMessage
                     self.isLoggedIn = false
                     return
                 }
@@ -57,14 +72,15 @@ final class SquadViewModel: ObservableObject {
     }
 
     func logout() {
-        guard isLoggedIn, !sessionId.isEmpty else { return }
+        guard isLoggedIn, !sessionId.isEmpty, let facade else { return }
         let id = sessionId
-        facade.logoutSquad(sessionId: id) { [weak self] error in
-            Task { @MainActor in
-                self?.isLoggedIn = false
-                self?.sessionId = ""
-                self?.sessionLabel = ""
-                self?.statusMessage = error == nil ? "Disconnesso." : error!.localizedDescription
+        facade.logoutSquadSafe(sessionId: id) { [weak self] errorMessage in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isLoggedIn = false
+                self.sessionId = ""
+                self.sessionLabel = ""
+                self.statusMessage = errorMessage ?? "Disconnesso."
             }
         }
     }
