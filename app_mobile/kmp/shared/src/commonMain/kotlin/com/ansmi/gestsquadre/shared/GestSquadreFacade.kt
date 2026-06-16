@@ -34,7 +34,7 @@ class GestSquadreFacade(
         )
     }
 
-    suspend fun logoutSquad(sessionId: String) = repository.logoutSquad(sessionId)
+    suspend fun logoutSquad(session: SquadSession) = repository.logoutSquad(session)
 
     suspend fun restoreOnlineSession(sessionId: String): SquadSession? =
         repository.restoreOnlineSession(sessionId)

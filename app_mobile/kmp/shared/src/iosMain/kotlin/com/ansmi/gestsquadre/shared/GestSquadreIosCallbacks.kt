@@ -29,12 +29,12 @@ fun GestSquadreFacade.loginSquadSafe(
 }
 
 fun GestSquadreFacade.logoutSquadSafe(
-    sessionId: String,
+    session: SquadSession,
     onComplete: (String?) -> Unit,
 ) {
     iosScope.launch {
         try {
-            logoutSquad(sessionId)
+            logoutSquad(session)
             onComplete(null)
         } catch (e: Throwable) {
             onComplete(e.message ?: e.toString())

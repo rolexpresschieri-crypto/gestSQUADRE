@@ -128,7 +128,7 @@ class SquadViewModel(
             stopGpsTracking()
             _uiState.update { it.copy(isBusy = true) }
             try {
-                facade.logoutSquad(session.sessionId)
+                facade.logoutSquad(session)
                 clearLocalSession()
                 onResult(null)
             } catch (e: GestSquadreException) {

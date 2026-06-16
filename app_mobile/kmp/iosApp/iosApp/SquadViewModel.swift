@@ -131,10 +131,9 @@ final class SquadViewModel: ObservableObject {
     }
 
     func logout() {
-        guard isLoggedIn, !sessionId.isEmpty, let facade else { return }
+        guard isLoggedIn, let facade, let session else { return }
         stopGpsTracking()
-        let id = sessionId
-        facade.logoutSquadSafe(sessionId: id) { [weak self] errorMessage in
+        facade.logoutSquadSafe(session: session) { [weak self] errorMessage in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isLoggedIn = false

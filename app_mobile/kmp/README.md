@@ -19,7 +19,7 @@ val facade = GestSquadreFacade(
 )
 facade.loginSquad("SQD001", "1234")
 facade.sendAlarm(session)
-facade.logoutSquad(sessionId)
+facade.logoutSquad(session)
 ```
 
 ## Build Android (dev)

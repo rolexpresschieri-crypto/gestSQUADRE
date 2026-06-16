@@ -16,7 +16,6 @@ import com.ansmi.gestsquadre.shared.network.TocPushIdRow
 import com.ansmi.gestsquadre.shared.network.SessionAuthLogInsertBody
 import com.ansmi.gestsquadre.shared.network.SessionInsertBody
 import com.ansmi.gestsquadre.shared.network.SessionInsertRow
-import com.ansmi.gestsquadre.shared.network.SessionLogoutRow
 import com.ansmi.gestsquadre.shared.network.SessionOnlineRow
 import com.ansmi.gestsquadre.shared.network.SessionRestoreRow
 import com.ansmi.gestsquadre.shared.network.SquadRow
@@ -144,33 +143,14 @@ class GestSquadreRepository(
         return row.isOnline
     }
 
-    suspend fun logoutSquad(sessionId: String) {
-        val row =
-            rest.getMaybeSingle(
-                table = "squad_sessions",
-                select = "id,event_id,squad_id,squads(squad_code,squad_name)",
-                filters = listOf("id" to sessionId),
-            ) { body ->
-                json.decodeFromString<SessionLogoutRow>(body)
-            }
-
+    suspend fun logoutSquad(session: SquadSession) {
         val now = nowIso()
         rest.patch(
             table = "squad_sessions",
-            filters = listOf("id" to sessionId),
+            filters = listOf("id" to session.sessionId),
             body = LogoutPatchBody(isOnline = false, logoutAt = now),
         )
-
-        if (row != null) {
-            insertSessionAuthLog(
-                eventId = row.eventId,
-                sessionId = row.id,
-                squadId = row.squadId,
-                squadCode = row.squads.squadCode.uppercase(),
-                squadName = row.squads.squadName,
-                action = ACTION_LOGOUT,
-            )
-        }
+        insertSessionAuthLog(session, ACTION_LOGOUT)
     }
 
     suspend fun updatePosition(
@@ -299,20 +279,18 @@ class GestSquadreRepository(
         squadName: String,
         action: String,
     ) {
-        runCatching {
-            rest.insert(
-                table = "squad_session_auth_logs",
-                body =
-                    SessionAuthLogInsertBody(
-                        eventId = eventId,
-                        sessionId = sessionId,
-                        squadId = squadId,
-                        squadCode = squadCode,
-                        squadName = squadName,
-                        action = action,
-                    ),
-            )
-        }
+        rest.insert(
+            table = "squad_session_auth_logs",
+            body =
+                SessionAuthLogInsertBody(
+                    eventId = eventId,
+                    sessionId = sessionId,
+                    squadId = squadId,
+                    squadCode = squadCode,
+                    squadName = squadName,
+                    action = action,
+                ),
+        )
     }
 
     private fun nowIso(): String = Clock.System.now().toString()
