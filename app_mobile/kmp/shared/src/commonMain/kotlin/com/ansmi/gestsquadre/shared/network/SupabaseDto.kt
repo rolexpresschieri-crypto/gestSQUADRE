@@ -114,3 +114,21 @@ internal data class AlarmInsertBody(
     @SerialName("request_types") val requestTypes: List<String> = emptyList(),
     @SerialName("other_detail") val otherDetail: String? = null,
 )
+
+@Serializable
+internal data class SessionLogoutRow(
+    val id: String,
+    @SerialName("event_id") val eventId: String,
+    @SerialName("squad_id") val squadId: String,
+    val squads: SquadCodeNameRow,
+)
+
+@Serializable
+internal data class SessionAuthLogInsertBody(
+    @SerialName("event_id") val eventId: String,
+    @SerialName("session_id") val sessionId: String,
+    @SerialName("squad_id") val squadId: String,
+    @SerialName("squad_code") val squadCode: String,
+    @SerialName("squad_name") val squadName: String,
+    val action: String,
+)

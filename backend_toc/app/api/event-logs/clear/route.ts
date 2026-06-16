@@ -77,5 +77,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: mobileDismissErr.message }, { status: 500 });
   }
 
+  const { error: sessionAuthErr } = await admin
+    .from("squad_session_auth_logs")
+    .delete()
+    .eq("event_id", eventId);
+
+  if (sessionAuthErr && !sessionAuthErr.message.includes("squad_session_auth_logs")) {
+    return NextResponse.json({ error: sessionAuthErr.message }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }

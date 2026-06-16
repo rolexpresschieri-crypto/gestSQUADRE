@@ -18,6 +18,7 @@ import {
   printEventLogsAsPdf,
   type SquadAlarmLogRow,
   type SquadMobileDismissLogRow,
+  type SquadSessionAuthLogRow,
   type TocMissionCloseLogRow,
   type TocPushLogRow,
 } from "@/lib/event-logs";
@@ -34,6 +35,7 @@ export default function EventLogsPage() {
   const [pushes, setPushes] = useState<TocPushLogRow[]>([]);
   const [missionCloses, setMissionCloses] = useState<TocMissionCloseLogRow[]>([]);
   const [mobileDismisses, setMobileDismisses] = useState<SquadMobileDismissLogRow[]>([]);
+  const [sessionAuthLogs, setSessionAuthLogs] = useState<SquadSessionAuthLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
@@ -60,6 +62,7 @@ export default function EventLogsPage() {
       setPushes([]);
       setMissionCloses([]);
       setMobileDismisses([]);
+      setSessionAuthLogs([]);
       return;
     }
 
@@ -72,6 +75,7 @@ export default function EventLogsPage() {
         setPushes([]);
         setMissionCloses([]);
         setMobileDismisses([]);
+        setSessionAuthLogs([]);
         return;
       }
     }
@@ -100,19 +104,28 @@ export default function EventLogsPage() {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500);
+    let sessionAuthQuery = supabase
+      .from("squad_session_auth_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (squadIds) {
       alarmQuery = alarmQuery.in("squad_id", squadIds);
       pushQuery = pushQuery.in("squad_id", squadIds);
       missionCloseQuery = missionCloseQuery.in("squad_id", squadIds);
       mobileDismissQuery = mobileDismissQuery.in("squad_id", squadIds);
+      sessionAuthQuery = sessionAuthQuery.in("squad_id", squadIds);
     }
 
-    const [alarmRes, pushRes, missionCloseRes, mobileDismissRes] = await Promise.all([
+    const [alarmRes, pushRes, missionCloseRes, mobileDismissRes, sessionAuthRes] =
+      await Promise.all([
       alarmQuery,
       pushQuery,
       missionCloseQuery,
       mobileDismissQuery,
+      sessionAuthQuery,
     ]);
 
     if (alarmRes.error) {
@@ -151,6 +164,17 @@ export default function EventLogsPage() {
     } else {
       setMobileDismisses((mobileDismissRes.data ?? []) as SquadMobileDismissLogRow[]);
     }
+
+    if (sessionAuthRes.error) {
+      if (sessionAuthRes.error.message.includes("squad_session_auth_logs")) {
+        setStatus(
+          "Esegui sql/squad_session_auth_logs.sql su Supabase per i log login/logout.",
+        );
+      }
+      setSessionAuthLogs([]);
+    } else {
+      setSessionAuthLogs((sessionAuthRes.data ?? []) as SquadSessionAuthLogRow[]);
+    }
   }, [supabase, eventId, session?.golfCourseId]);
 
   useEffect(() => {
@@ -188,8 +212,8 @@ export default function EventLogsPage() {
   }, [eventId, refreshLogs]);
 
   const unified = useMemo(
-    () => mergeEventLogs(alarms, pushes, missionCloses, mobileDismisses),
-    [alarms, pushes, missionCloses, mobileDismisses],
+    () => mergeEventLogs(alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs),
+    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs],
   );
 
   function exportCsv() {
@@ -278,8 +302,7 @@ export default function EventLogsPage() {
 
       <div className={styles.panel}>
         <p className={styles.hint}>
-          Evento: <strong>{eventTitle || "—"}</strong> · Stati: inviato → registrato (reset mobile) →
-          chiuso (solo TOC) · Allarmi volontario ↔ TOC · Missioni · Push
+          Evento: <strong>{eventTitle || "—"}</strong> · Login/logout squadra · Allarmi · Missioni · Push
           {session && isCampoGolfSession(session) ? (
             <>
               {" "}
@@ -289,9 +312,8 @@ export default function EventLogsPage() {
           ) : null}
         </p>
         <p className={styles.hintMuted}>
-          Login, logout e GPS dall&apos;app mobile non compaiono qui (solo allarme squadra→TOC e
-          push TOC→volontario). Se un allarme dall&apos;app non compare con login GOLF_TORINO,
-          verifica che la squadra abbia <code>golf_course_id</code> (sql/golf_courses_campo.sql).
+          Il GPS periodico non è nel log (solo posizione live sulla mappa). Se mancano login/logout,
+          esegui <code>sql/squad_session_auth_logs.sql</code> su Supabase.
         </p>
         {status ? <p className={styles.status}>{status}</p> : null}
 

@@ -13,10 +13,12 @@ import com.ansmi.gestsquadre.shared.network.MobileDismissedAtPatch
 import com.ansmi.gestsquadre.shared.network.PositionPatchBody
 import com.ansmi.gestsquadre.shared.network.TocPushClosedRow
 import com.ansmi.gestsquadre.shared.network.TocPushIdRow
+import com.ansmi.gestsquadre.shared.network.SessionAuthLogInsertBody
 import com.ansmi.gestsquadre.shared.network.SessionInsertBody
+import com.ansmi.gestsquadre.shared.network.SessionInsertRow
+import com.ansmi.gestsquadre.shared.network.SessionLogoutRow
 import com.ansmi.gestsquadre.shared.network.SessionOnlineRow
 import com.ansmi.gestsquadre.shared.network.SessionRestoreRow
-import com.ansmi.gestsquadre.shared.network.SessionInsertRow
 import com.ansmi.gestsquadre.shared.network.SquadRow
 import com.ansmi.gestsquadre.shared.network.SupabaseRestClient
 import kotlinx.datetime.Clock
@@ -93,14 +95,17 @@ class GestSquadreRepository(
                 json.decodeFromString<SessionInsertRow>(body)
             }
 
-        return SquadSession(
-            sessionId = inserted.id,
-            eventId = inserted.eventId,
-            squadId = inserted.squadId,
-            squadCode = squad.squadCode.uppercase(),
-            squadName = squad.squadName,
-            loginAt = Instant.parse(inserted.loginAt),
-        )
+        val session =
+            SquadSession(
+                sessionId = inserted.id,
+                eventId = inserted.eventId,
+                squadId = inserted.squadId,
+                squadCode = squad.squadCode.uppercase(),
+                squadName = squad.squadName,
+                loginAt = Instant.parse(inserted.loginAt),
+            )
+        insertSessionAuthLog(session, ACTION_LOGIN)
+        return session
     }
 
     suspend fun restoreOnlineSession(sessionId: String): SquadSession? {
@@ -140,12 +145,32 @@ class GestSquadreRepository(
     }
 
     suspend fun logoutSquad(sessionId: String) {
+        val row =
+            rest.getMaybeSingle(
+                table = "squad_sessions",
+                select = "id,event_id,squad_id,squads(squad_code,squad_name)",
+                filters = listOf("id" to sessionId),
+            ) { body ->
+                json.decodeFromString<SessionLogoutRow>(body)
+            }
+
         val now = nowIso()
         rest.patch(
             table = "squad_sessions",
             filters = listOf("id" to sessionId),
             body = LogoutPatchBody(isOnline = false, logoutAt = now),
         )
+
+        if (row != null) {
+            insertSessionAuthLog(
+                eventId = row.eventId,
+                sessionId = row.id,
+                squadId = row.squadId,
+                squadCode = row.squads.squadCode.uppercase(),
+                squadName = row.squads.squadName,
+                action = ACTION_LOGOUT,
+            )
+        }
     }
 
     suspend fun updatePosition(
@@ -252,9 +277,49 @@ class GestSquadreRepository(
         )
     }
 
+    private suspend fun insertSessionAuthLog(
+        session: SquadSession,
+        action: String,
+    ) {
+        insertSessionAuthLog(
+            eventId = session.eventId,
+            sessionId = session.sessionId,
+            squadId = session.squadId,
+            squadCode = session.squadCode,
+            squadName = session.squadName,
+            action = action,
+        )
+    }
+
+    private suspend fun insertSessionAuthLog(
+        eventId: String,
+        sessionId: String,
+        squadId: String,
+        squadCode: String,
+        squadName: String,
+        action: String,
+    ) {
+        runCatching {
+            rest.insert(
+                table = "squad_session_auth_logs",
+                body =
+                    SessionAuthLogInsertBody(
+                        eventId = eventId,
+                        sessionId = sessionId,
+                        squadId = squadId,
+                        squadCode = squadCode,
+                        squadName = squadName,
+                        action = action,
+                    ),
+            )
+        }
+    }
+
     private fun nowIso(): String = Clock.System.now().toString()
 
     companion object {
         const val SQUAD_ALARM_BACKEND_LABEL = "ALLARME"
+        private const val ACTION_LOGIN = "login"
+        private const val ACTION_LOGOUT = "logout"
     }
 }

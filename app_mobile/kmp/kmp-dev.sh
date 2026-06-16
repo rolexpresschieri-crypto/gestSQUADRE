@@ -35,6 +35,12 @@ case "$MODE" in
     fi
     ./gradlew :androidApp:assembleDebug --rerun-tasks --no-daemon
     ;;
+  ios-ipa)
+    bash "$ROOT/build-ios-ipa.sh" development
+    ;;
+  ios-ipa-adhoc)
+    bash "$ROOT/build-ios-ipa.sh" ad-hoc
+    ;;
   *)
     cat <<'EOF'
 gestSQUADRE KMP — Mac
@@ -42,6 +48,7 @@ gestSQUADRE KMP — Mac
   ./kmp-dev.sh ios-sync      → Supabase da dart-defines.json → Config.xcconfig
   ./kmp-dev.sh ios-framework → compila modulo Kotlin shared per iOS
   ./kmp-dev.sh ios-open      → sync config + apre Xcode
+  ./kmp-dev.sh ios-ipa       → IPA per iPhone fisico → gestSQUADRE_iOS_1.0.x.ipa
   ./kmp-dev.sh android       → APK debug Android
 
 Prima build iOS in Xcode:

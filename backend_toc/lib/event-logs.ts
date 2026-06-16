@@ -48,6 +48,17 @@ export type SquadMobileDismissLogRow = {
   created_at: string;
 };
 
+export type SquadSessionAuthLogRow = {
+  id: string;
+  event_id: string;
+  session_id: string;
+  squad_id: string;
+  squad_code: string;
+  squad_name: string;
+  action: "login" | "logout" | string;
+  created_at: string;
+};
+
 export type TocMissionCloseLogRow = {
   id: string;
   event_id: string;
@@ -93,6 +104,8 @@ export type UnifiedEventLog = {
   id: string;
   kind:
     | "squad_alarm"
+    | "squad_login"
+    | "squad_logout"
     | "fine_evento"
     | "toc_push"
     | "toc_push_close"
@@ -112,6 +125,7 @@ export function mergeEventLogs(
   pushes: TocPushLogRow[],
   missionCloses: TocMissionCloseLogRow[] = [],
   mobileDismisses: SquadMobileDismissLogRow[] = [],
+  sessionAuthLogs: SquadSessionAuthLogRow[] = [],
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
@@ -223,6 +237,20 @@ export function mergeEventLogs(
       status: "chiuso",
       actor: m.admin_code,
     })),
+    ...sessionAuthLogs.map((entry) => {
+      const isLogin = entry.action === "login";
+      return {
+        id: entry.id,
+        kind: isLogin ? ("squad_login" as const) : ("squad_logout" as const),
+        createdAt: entry.created_at,
+        squadCode: entry.squad_code,
+        squadName: entry.squad_name,
+        summary: isLogin ? "Login squadra (app mobile)" : "Logout squadra (app mobile)",
+        detail: `Sessione ${entry.session_id.slice(0, 8)}…`,
+        status: "registrato" as const,
+        actor: entry.squad_code,
+      };
+    }),
   ];
 
   return rows.sort(
@@ -315,7 +343,7 @@ export function eventLogsPrintHtml(rows: UnifiedEventLog[], eventTitle: string):
 </head>
 <body>
   <h1>Log evento: ${escapeHtml(eventTitle)}</h1>
-  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Allarmi volontario↔TOC · missioni TOC · messaggi push</p>
+  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Login/logout · allarmi · missioni · push</p>
   <table>
     <thead>
       <tr>

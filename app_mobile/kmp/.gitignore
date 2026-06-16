@@ -8,4 +8,8 @@ captures/
 .cxx/
 *.apk
 iosApp/Configuration/Config.xcconfig
+iosApp/Configuration/Signing.xcconfig
 iosApp/iosApp/supabase-config.json
+gestSQUADRE_iOS_*.ipa
+build/ios-archive/
+build/ios-ipa-export/

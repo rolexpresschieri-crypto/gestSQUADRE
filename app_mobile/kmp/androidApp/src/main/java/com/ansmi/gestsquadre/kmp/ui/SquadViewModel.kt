@@ -16,6 +16,7 @@ import com.ansmi.gestsquadre.shared.location.LocationTracker
 import com.ansmi.gestsquadre.shared.model.GpsPosition
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
+import com.ansmi.gestsquadre.shared.model.loginTimeLabel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +25,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 
 data class SquadUiState(
     val session: SquadSession? = null,
@@ -466,11 +465,4 @@ class SquadViewModel(
         sessionWatchJob?.cancel()
         super.onCleared()
     }
-}
-
-fun SquadSession.loginTimeLabel(): String {
-    val local = loginAt.toLocalDateTime(TimeZone.currentSystemDefault())
-    val h = local.hour.toString().padStart(2, '0')
-    val m = local.minute.toString().padStart(2, '0')
-    return "$h:$m"
 }

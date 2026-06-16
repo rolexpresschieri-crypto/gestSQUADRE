@@ -70,7 +70,7 @@ class GestApi {
         .select('id, event_id, squad_id, login_at')
         .single();
 
-    return SquadSession(
+    final session = SquadSession(
       sessionId: inserted['id'] as String,
       eventId: inserted['event_id'] as String,
       squadId: inserted['squad_id'] as String,
@@ -78,14 +78,63 @@ class GestApi {
       squadName: squad['squad_name'] as String,
       loginAt: DateTime.parse(inserted['login_at'] as String).toLocal(),
     );
+    await _insertSessionAuthLog(
+      eventId: session.eventId,
+      sessionId: session.sessionId,
+      squadId: session.squadId,
+      squadCode: session.squadCode,
+      squadName: session.squadName,
+      action: 'login',
+    );
+    return session;
+  }
+
+  Future<void> _insertSessionAuthLog({
+    required String eventId,
+    required String sessionId,
+    required String squadId,
+    required String squadCode,
+    required String squadName,
+    required String action,
+  }) async {
+    try {
+      await _client.from('squad_session_auth_logs').insert({
+        'event_id': eventId,
+        'session_id': sessionId,
+        'squad_id': squadId,
+        'squad_code': squadCode,
+        'squad_name': squadName,
+        'action': action,
+      });
+    } catch (_) {
+      // Il log non deve bloccare login/logout.
+    }
   }
 
   Future<void> logoutSquad(String sessionId) async {
+    final row = await _client
+        .from('squad_sessions')
+        .select('id, event_id, squad_id, squads(squad_code, squad_name)')
+        .eq('id', sessionId)
+        .maybeSingle();
+
     final now = DateTime.now().toUtc();
     await _client.from('squad_sessions').update({
       'is_online': false,
       'logout_at': now.toIso8601String(),
     }).eq('id', sessionId);
+
+    if (row != null) {
+      final squad = row['squads'] as Map<String, dynamic>?;
+      await _insertSessionAuthLog(
+        eventId: row['event_id'] as String,
+        sessionId: row['id'] as String,
+        squadId: row['squad_id'] as String,
+        squadCode: (squad?['squad_code'] as String? ?? '').toUpperCase(),
+        squadName: squad?['squad_name'] as String? ?? '',
+        action: 'logout',
+      );
+    }
   }
 
   Future<void> updatePosition({

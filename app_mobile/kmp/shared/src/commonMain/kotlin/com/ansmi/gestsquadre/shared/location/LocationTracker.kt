@@ -3,7 +3,7 @@ package com.ansmi.gestsquadre.shared.location
 import com.ansmi.gestsquadre.shared.model.GpsPosition
 
 /**
- * Provider posizione multipiattaforma (Android: FusedLocation; iOS: fase 3).
+ * Provider posizione multipiattaforma (Android: FusedLocation; iOS: CoreLocation).
  *
  * @param platformContext Android [android.content.Context] o altro handle nativo.
  */

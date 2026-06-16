@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import shared
 
@@ -8,8 +9,17 @@ final class SquadViewModel: ObservableObject {
     @Published var isLoggedIn = false
     @Published var sessionLabel = ""
     @Published var sessionId = ""
+    @Published var gpsStatusLabel: String?
+    @Published var needsLocationPermission = false
+    @Published var showAlarmSheet = false
+    @Published var isAlarmBusy = false
 
     private var facade: GestSquadreFacade?
+    private var session: SquadSession?
+    private let locationTracker = LocationTracker(platformContext: NSObject())
+    private var stopLocationUpdates: (() -> Void)?
+    private var lastPublished: GpsPosition?
+    private var lastPublishedAtMs: Int64?
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
@@ -110,24 +120,163 @@ final class SquadViewModel: ObservableObject {
                     return
                 }
                 self.isLoggedIn = true
+                self.session = session
                 self.sessionId = session.sessionId
-                self.sessionLabel = "\(session.squadCode) — \(session.squadName)"
+                self.sessionLabel = "\(session.squadName) + \(session.loginTimeLabel())"
                 self.statusMessage = "Connesso. I dati vanno su Supabase (TOC Windows li vede subito)."
+                self.gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+                self.startGpsTracking()
             }
         }
     }
 
     func logout() {
         guard isLoggedIn, !sessionId.isEmpty, let facade else { return }
+        stopGpsTracking()
         let id = sessionId
         facade.logoutSquadSafe(sessionId: id) { [weak self] errorMessage in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isLoggedIn = false
+                self.session = nil
                 self.sessionId = ""
                 self.sessionLabel = ""
-                self.statusMessage = errorMessage ?? "Disconnesso."
+                self.gpsStatusLabel = nil
+                self.needsLocationPermission = false
+                self.statusMessage = errorMessage ?? "Log-out completato."
             }
         }
     }
+
+    func onLocationPermissionGranted() {
+        guard locationTracker.hasLocationPermission() else { return }
+        needsLocationPermission = false
+        startGpsTracking()
+    }
+
+    func sendAlarm(
+        ambulanza: Bool,
+        medico: Bool,
+        dae: Bool,
+        forzeOrdine: Bool,
+        vvf: Bool,
+        altro: Bool,
+        otherDetail: String,
+        onComplete: @escaping (String?) -> Void
+    ) {
+        guard let facade, let session else {
+            onComplete("Sessione non attiva.")
+            return
+        }
+
+        let request = facade.makeSquadAlarmRequest(
+            ambulanza: ambulanza,
+            medico: medico,
+            dae: dae,
+            forzeOrdine: forzeOrdine,
+            vvf: vvf,
+            altro: altro,
+            otherDetail: otherDetail
+        )
+
+        if let validationError = request.validate() {
+            onComplete(validationError)
+            return
+        }
+
+        isAlarmBusy = true
+        facade.sendAlarmSafe(session: session, request: request) { [weak self] (errorMessage: String?) in
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                isAlarmBusy = false
+                if let errorMessage {
+                    onComplete(errorMessage)
+                    return
+                }
+                showAlarmSheet = false
+                let detail = request.toLogMessage()
+                statusMessage = "\(SquadAlarmCopy.sentOk) \(detail)"
+                onComplete(nil)
+            }
+        }
+    }
+
+    private func startGpsTracking() {
+        guard isLoggedIn, !sessionId.isEmpty, facade != nil else { return }
+
+        if !locationTracker.isLocationServiceEnabled() {
+            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+            statusMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC."
+            return
+        }
+
+        if !locationTracker.hasLocationPermission() {
+            needsLocationPermission = true
+            locationTracker.requestLocationAuthorization()
+            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+            return
+        }
+
+        needsLocationPermission = false
+        stopLocationUpdates?()
+        stopLocationUpdates = nil
+
+        locationTracker.getCurrentFixSafe { [weak self] initial in
+            DispatchQueue.main.async {
+                guard let self, let initial else { return }
+                self.maybePublish(position: initial)
+            }
+        }
+
+        let kotlinStop = locationTracker.startUpdates { [weak self] fix in
+            DispatchQueue.main.async {
+                self?.maybePublish(position: fix)
+            }
+        }
+        stopLocationUpdates = { _ = kotlinStop() }
+    }
+
+    private func stopGpsTracking() {
+        stopLocationUpdates?()
+        stopLocationUpdates = nil
+        lastPublished = nil
+        lastPublishedAtMs = nil
+    }
+
+    private func maybePublish(position: GpsPosition) {
+        guard isLoggedIn, !sessionId.isEmpty, let facade else { return }
+
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let shouldPublish = GpsPublishPolicy.shared.shouldPublish(
+            position: position,
+            lastPublished: lastPublished,
+            lastPublishedAtMs: lastPublishedAtMs.map(KotlinLong.init),
+            nowMs: now
+        )
+        guard shouldPublish else { return }
+
+        facade.updatePositionSafe(sessionId: sessionId, position: position) { [weak self] errorMessage in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let errorMessage {
+                    self.gpsStatusLabel = "GPS: errore invio (\(errorMessage))"
+                    return
+                }
+                self.lastPublished = position
+                self.lastPublishedAtMs = now
+                self.gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(
+                    accuracyM: position.accuracyMeters
+                )
+            }
+        }
+    }
+}
+
+enum SquadAlarmCopy {
+    static let hint =
+        "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
+    static let dialogTitle = "Segnala allarme su mappa TOC"
+    static let dialogBody =
+        "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Preso in carico»."
+    static let sentOk = "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
 }

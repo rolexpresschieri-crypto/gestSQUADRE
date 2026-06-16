@@ -5,6 +5,8 @@
 | Componente | Stato |
 |------------|--------|
 | App Flutter (home, login, GPS, allarme mappa) | Pronta |
+| App KMP iOS (login, log-out, GPS, allarme mappa) | Pronta (UI base) |
+| App KMP Android | Pronta (UI tactical completa) |
 | Backend TOC (mappa, rosso allarme, push) | Pronta |
 | SQL Supabase `schema_v1.sql` | Da eseguire sul **nuovo** progetto |
 | `dart-defines.json` | Da creare (non in git) |
@@ -120,3 +122,18 @@ Con squadra loggata dal telefono: vedi marker sulla mappa; **Segnala ALLARME** �
 3. Test login + allarme
 4. `backend_toc` + verifica cerchio rosso
 5. Firebase quando serve la push
+
+---
+
+## Fase 6 — App iOS (Mac)
+
+```bash
+cd app_mobile/kmp
+./kmp-dev.sh ios-open
+```
+
+1. Xcode → **Signing** → Personal Team + iPhone collegato.
+2. **⌘R** su simulatore o iPhone fisico.
+3. Checklist: **Log-in** SQD001/1234 → GPS su mappa TOC → **INVIA ALLARME** → cerchio rosso → **Log-out**.
+
+Log eventi TOC (menu **Log evento**): compare l’allarme inviato dall’iPhone (tabella `squad_alarms`).

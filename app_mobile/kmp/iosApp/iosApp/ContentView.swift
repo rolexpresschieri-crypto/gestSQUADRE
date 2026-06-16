@@ -1,7 +1,9 @@
+import CoreLocation
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var viewModel: SquadViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -21,12 +23,21 @@ struct ContentView: View {
                     Label(viewModel.sessionLabel, systemImage: "person.crop.circle.badge.checkmark")
                         .font(.headline)
                     Text(viewModel.statusMessage)
+                        .font(.subheadline)
                         .foregroundStyle(.green)
-                    Button("Esci") {
-                        viewModel.logout()
+                    if let gpsLabel = viewModel.gpsStatusLabel {
+                        Label(gpsLabel, systemImage: "location.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                    if viewModel.needsLocationPermission {
+                        Text("Consenti l'accesso alla posizione per inviare il GPS al TOC.")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
+                    Text(SquadAlarmCopy.hint)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 } else {
                     TextField("Codice squadra (es. SQD001)", text: $viewModel.squadCode)
                         .textInputAutocapitalization(.characters)
@@ -34,15 +45,30 @@ struct ContentView: View {
                         .textFieldStyle(.roundedBorder)
                     SecureField("Password", text: $viewModel.password)
                         .textFieldStyle(.roundedBorder)
-                    Button("Accedi") {
-                        viewModel.login()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(viewModel.squadCode.isEmpty || viewModel.password.isEmpty)
                     Text(viewModel.statusMessage)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+
+                Button("Log-in") {
+                    viewModel.login()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isLoggedIn || viewModel.squadCode.isEmpty || viewModel.password.isEmpty)
+
+                Button("Log-out") {
+                    viewModel.logout()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.orange)
+                .disabled(!viewModel.isLoggedIn)
+
+                Button("INVIA ALLARME A TOC") {
+                    viewModel.showAlarmSheet = true
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .disabled(!viewModel.isLoggedIn || viewModel.isAlarmBusy)
 
                 Spacer()
                 Text("TOC su Windows: nessuna connessione diretta. Tutto passa da Supabase in cloud.")
@@ -52,6 +78,89 @@ struct ContentView: View {
             .padding()
             .navigationTitle("Open Golf")
             .navigationBarTitleDisplayMode(.inline)
+            .onChange(of: scenePhase) { phase in
+                if phase == .active, viewModel.isLoggedIn, viewModel.needsLocationPermission {
+                    viewModel.onLocationPermissionGranted()
+                }
+            }
+            .sheet(isPresented: $viewModel.showAlarmSheet) {
+                AlarmRequestSheet(viewModel: viewModel)
+            }
+        }
+    }
+}
+
+private struct AlarmRequestSheet: View {
+    @ObservedObject var viewModel: SquadViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var ambulanza = false
+    @State private var medico = false
+    @State private var dae = false
+    @State private var forzeOrdine = false
+    @State private var vvf = false
+    @State private var altro = false
+    @State private var otherDetail = ""
+    @State private var validationError: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Text(SquadAlarmCopy.dialogBody)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+                Section("Cosa richiedi? (scelta multipla)") {
+                    Toggle("Ambulanza", isOn: $ambulanza)
+                    Toggle("Medico", isOn: $medico)
+                    Toggle("DAE", isOn: $dae)
+                    Toggle("Forze dell'ordine", isOn: $forzeOrdine)
+                    Toggle("V.V.F.", isOn: $vvf)
+                    Toggle("Altro", isOn: $altro)
+                    if altro {
+                        TextField("Descrivi la richiesta", text: $otherDetail)
+                    }
+                }
+                if let validationError {
+                    Section {
+                        Text(validationError)
+                            .foregroundStyle(.red)
+                            .font(.footnote)
+                    }
+                }
+            }
+            .navigationTitle(SquadAlarmCopy.dialogTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Annulla") { dismiss() }
+                        .disabled(viewModel.isAlarmBusy)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Invia") { submit() }
+                        .disabled(viewModel.isAlarmBusy)
+                }
+            }
+        }
+    }
+
+    private func submit() {
+        validationError = nil
+        viewModel.sendAlarm(
+            ambulanza: ambulanza,
+            medico: medico,
+            dae: dae,
+            forzeOrdine: forzeOrdine,
+            vvf: vvf,
+            altro: altro,
+            otherDetail: otherDetail
+        ) { errorMessage in
+            if let errorMessage {
+                validationError = errorMessage
+            } else {
+                dismiss()
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ App **nuova e separata** da TocAppBuild: tracking squadre, allarme verso TOC, ba
 | Cartella | Contenuto |
 |----------|-----------|
 | `app_mobile/gest_squadre/` | App Flutter Android (squadre + ingresso TOC) |
+| `app_mobile/kmp/` | App KMP Android + **iOS** (in sviluppo) |
 | `backend_toc/` | Backoffice Next.js (mappa, allarmi realtime, messaggi FCM) |
 | `sql/schema_v1.sql` | Schema Supabase **dedicato** |
 
@@ -84,3 +85,16 @@ build-apk.bat
 ```
 
 Crea anche `gestSQUADRE_1.0.xx.apk` (xx da `version` in `pubspec.yaml`, es. `1.0.0` → `gestSQUADRE_1.0.0.apk`).
+
+## App iOS (KMP — Mac + Xcode)
+
+```bash
+cd app_mobile/kmp
+./kmp-dev.sh ios-open
+```
+
+In Xcode: iPhone o simulatore → **Run** (⌘R). Stesso `dart-defines.json` di Android.
+
+**Stato iOS (volontario):** login, log-out, GPS → TOC, allarme mappa (cerchio rosso). Push e UI tactical in seguito.
+
+Vedi `app_mobile/kmp/README.md`.

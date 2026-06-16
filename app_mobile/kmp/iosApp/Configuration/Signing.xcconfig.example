@@ -1,0 +1,3 @@
+// Copia in Signing.xcconfig (non committare) e inserisci il Team ID Apple.
+// Lo trovi in Xcode ? iosApp target ? Signing & Capabilities ? Team (10 caratteri).
+DEVELOPMENT_TEAM = XXXXXXXXXX
