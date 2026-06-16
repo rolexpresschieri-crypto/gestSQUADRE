@@ -114,7 +114,7 @@ final class SquadViewModel: ObservableObject {
                 if let errorMessage {
                     self.statusMessage = errorMessage
                     self.isLoggedIn = false
-                    if errorMessage == GestSquadreMessages.shared.SQUAD_ALREADY_ACTIVE {
+                    if GestSquadreMessages.shared.isSquadAlreadyActiveMessage(message: errorMessage) {
                         self.loginBlockingMessage = errorMessage
                     }
                     return

@@ -44,7 +44,9 @@ class _SquadLoginScreenState extends State<SquadLoginScreen> {
     if (!mounted) {
       return;
     }
-    if (err == GestApi.squadAlreadyActiveMessage) {
+    if (err != null &&
+        (err == GestApi.squadAlreadyActiveMessage ||
+            err.toLowerCase().contains('attiva su un altro telefono'))) {
       setState(() => _blockingMessage = err);
       return;
     }

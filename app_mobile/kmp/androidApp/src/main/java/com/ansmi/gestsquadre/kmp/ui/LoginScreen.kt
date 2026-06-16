@@ -144,7 +144,7 @@ fun LoginScreen(
                             viewModel.login(code, password) { err ->
                                 if (err == null) {
                                     onLoginSuccess()
-                                } else if (err == GestSquadreMessages.SQUAD_ALREADY_ACTIVE) {
+                                } else if (GestSquadreMessages.isSquadAlreadyActiveMessage(err)) {
                                     blockingAlert = err
                                 } else {
                                     onShowMessage(err)

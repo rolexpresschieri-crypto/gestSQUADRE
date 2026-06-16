@@ -12,6 +12,7 @@ case "$MODE" in
     ;;
   ios-open)
     bash iosApp/sync-config.sh
+    bash iosApp/compile-kotlin-framework.sh
     rm -rf iosApp/iosApp.xcodeproj/project.xcworkspace
     rm -rf iosApp/iosApp.xcodeproj/xcuserdata
     open iosApp/iosApp.xcodeproj

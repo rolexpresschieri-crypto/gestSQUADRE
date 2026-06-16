@@ -8,7 +8,7 @@ class GestApi {
   GestApi(this._client);
 
   static const squadAlreadyActiveMessage =
-      'Squadra già attiva su un altro telefono';
+      'Squadra gia attiva su un altro telefono';
 
   final SupabaseClient _client;
 

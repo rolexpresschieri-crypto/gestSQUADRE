@@ -68,19 +68,7 @@ class GestSquadreRepository(
             throw GestSquadreException("Password squadra non valida.")
         }
 
-        val alreadyOnline =
-            rest.getMaybeSingle(
-                table = "squad_sessions",
-                select = "id,is_online",
-                filters = listOf(
-                    "event_id" to eventId,
-                    "squad_id" to squad.id,
-                    "is_online" to "true",
-                ),
-            ) { body ->
-                json.decodeFromString<SessionOnlineRow>(body)
-            }
-        if (alreadyOnline != null) {
+        if (hasActiveSession(eventId = eventId, squadId = squad.id)) {
             throw GestSquadreException(GestSquadreMessages.SQUAD_ALREADY_ACTIVE)
         }
 
@@ -297,6 +285,25 @@ class GestSquadreRepository(
                     action = action,
                 ),
         )
+    }
+
+    private suspend fun hasActiveSession(
+        eventId: String,
+        squadId: String,
+    ): Boolean {
+        val rows =
+            rest.getList<SessionOnlineRow>(
+                table = "squad_sessions",
+                select = "id,is_online",
+                eqFilters =
+                    listOf(
+                        "event_id" to eventId,
+                        "squad_id" to squadId,
+                        "is_online" to "true",
+                    ),
+                limit = 1,
+            )
+        return rows.isNotEmpty()
     }
 
     private fun nowIso(): String = Clock.System.now().toString()
