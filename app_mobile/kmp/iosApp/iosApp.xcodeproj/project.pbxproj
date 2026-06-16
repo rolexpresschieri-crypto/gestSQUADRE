@@ -75,6 +75,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7555FFA5242A565B00829871 /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
+				C1A2B3D4E5F60718293A4B5D0 /* Sync Supabase Config */,
 				05EA384A2A8A60F800FD98BE /* Compile Kotlin Framework */,
 				7555FF77242A565900829871 /* Sources */,
 				7555FF79242A565900829871 /* Resources */,
@@ -132,6 +133,26 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		C1A2B3D4E5F60718293A4B5D0 /* Sync Supabase Config */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/../gest_squadre/dart-defines.json",
+			);
+			name = "Sync Supabase Config";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Configuration/Config.xcconfig",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\"\nbash \"$SRCROOT/sync-config.sh\"\n";
+		};
 		05EA384A2A8A60F800FD98BE /* Compile Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;

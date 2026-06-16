@@ -40,5 +40,17 @@ CURRENT_PROJECT_VERSION = 15
 with open(out_path, "w", encoding="utf-8") as f:
     f.write(content)
 
+# Verifica che xcconfig non tronchi l'URL (https:// → https: se mancano le virgolette).
+with open(out_path, encoding="utf-8") as f:
+    written = f.read()
+if url not in written:
+    raise SystemExit(
+        "Config.xcconfig generato ma SUPABASE_URL troncato. "
+        "Controlla dart-defines.json e le virgolette in xcconfig."
+    )
+if ".supabase.co" not in url:
+    raise SystemExit("SUPABASE_URL non sembra un endpoint Supabase valido.")
+
 print(f"OK: {out_path}")
+print(f"    SUPABASE_URL = {url}")
 PY
