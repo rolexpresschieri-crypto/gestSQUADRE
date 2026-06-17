@@ -8,19 +8,39 @@
 
 /* Begin PBXBuildFile section */
 		B2C3D4E51F60718293A4B5D1 /* iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E51F60718293A4B5C6 /* iosApp.swift */; };
-		B2C3D4E51F60718293A4B5D2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E51F60718293A4B5C7 /* ContentView.swift */; };
 		B2C3D4E51F60718293A4B5D3 /* SquadViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */; };
 		C2D3E4F51F60718293A4B5DB /* supabase-config.json in Resources */ = {isa = PBXBuildFile; fileRef = C2D3E4F51F60718293A4B5DA /* supabase-config.json */; };
+		D1E2F3A41F60718293A4B5E1 /* TacticalTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */; };
+		D1E2F3A41F60718293A4B5E2 /* TacticalComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */; };
+		D1E2F3A41F60718293A4B5E3 /* LaunchSplashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F3 /* LaunchSplashView.swift */; };
+		D1E2F3A41F60718293A4B5E4 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F4 /* HomeView.swift */; };
+		D1E2F3A41F60718293A4B5E5 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F5 /* LoginView.swift */; };
+		D1E2F3A41F60718293A4B5E6 /* AlarmRequestSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F6 /* AlarmRequestSheet.swift */; };
+		D1E2F3A41F60718293A4B5E7 /* GestSquadreRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F7 /* GestSquadreRootView.swift */; };
+		D1E2F3A41F60718293A4B5E8 /* TocMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F8 /* TocMapView.swift */; };
+		D1E2F3A41F60718293A4B5E9 /* TocMapViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */; };
+		D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */; };
+		D1E2F3A41F60718293A4B5EB /* logo_open_golf_2026.png in Resources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F0 /* logo_open_golf_2026.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		7555FF8C242A565B00829871 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AB3632DC29227652001CCB65 /* Config.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		B2C3D4E51F60718293A4B5C6 /* iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp.swift; sourceTree = "<group>"; };
-		B2C3D4E51F60718293A4B5C7 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadViewModel.swift; sourceTree = "<group>"; };
 		B2C3D4E51F60718293A4B5C9 /* gestSQUADRE.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = gestSQUADRE.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C2D3E4F51F60718293A4B5DA /* supabase-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "supabase-config.json"; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F0 /* logo_open_golf_2026.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = logo_open_golf_2026.png; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TacticalTheme.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TacticalComponents.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F3 /* LaunchSplashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchSplashView.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F4 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F5 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F6 /* AlarmRequestSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmRequestSheet.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F7 /* GestSquadreRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GestSquadreRootView.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F8 /* TocMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocMapView.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocMapViewModel.swift; sourceTree = "<group>"; };
+		D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStorage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -56,9 +76,19 @@
 			children = (
 				7555FF8C242A565B00829871 /* Info.plist */,
 				B2C3D4E51F60718293A4B5C6 /* iosApp.swift */,
-				B2C3D4E51F60718293A4B5C7 /* ContentView.swift */,
+				D1E2F3A41F60718293A4B5F7 /* GestSquadreRootView.swift */,
+				D1E2F3A41F60718293A4B5F4 /* HomeView.swift */,
+				D1E2F3A41F60718293A4B5F5 /* LoginView.swift */,
+				D1E2F3A41F60718293A4B5F3 /* LaunchSplashView.swift */,
+				D1E2F3A41F60718293A4B5F6 /* AlarmRequestSheet.swift */,
+				D1E2F3A41F60718293A4B5F8 /* TocMapView.swift */,
+				D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */,
+				D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */,
+				D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */,
+				D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */,
 				B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */,
 				C2D3E4F51F60718293A4B5DA /* supabase-config.json */,
+				D1E2F3A41F60718293A4B5F0 /* logo_open_golf_2026.png */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -131,6 +161,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2D3E4F51F60718293A4B5DB /* supabase-config.json in Resources */,
+				D1E2F3A41F60718293A4B5EB /* logo_open_golf_2026.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,7 +216,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				B2C3D4E51F60718293A4B5D1 /* iosApp.swift in Sources */,
-				B2C3D4E51F60718293A4B5D2 /* ContentView.swift in Sources */,
+				D1E2F3A41F60718293A4B5E7 /* GestSquadreRootView.swift in Sources */,
+				D1E2F3A41F60718293A4B5E4 /* HomeView.swift in Sources */,
+				D1E2F3A41F60718293A4B5E5 /* LoginView.swift in Sources */,
+				D1E2F3A41F60718293A4B5E3 /* LaunchSplashView.swift in Sources */,
+				D1E2F3A41F60718293A4B5E6 /* AlarmRequestSheet.swift in Sources */,
+				D1E2F3A41F60718293A4B5E8 /* TocMapView.swift in Sources */,
+				D1E2F3A41F60718293A4B5E9 /* TocMapViewModel.swift in Sources */,
+				D1E2F3A41F60718293A4B5E1 /* TacticalTheme.swift in Sources */,
+				D1E2F3A41F60718293A4B5E2 /* TacticalComponents.swift in Sources */,
+				D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */,
 				B2C3D4E51F60718293A4B5D3 /* SquadViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

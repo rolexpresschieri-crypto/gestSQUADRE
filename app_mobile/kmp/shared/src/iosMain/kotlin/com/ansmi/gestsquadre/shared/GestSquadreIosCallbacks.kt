@@ -1,6 +1,8 @@
 package com.ansmi.gestsquadre.shared
 
 import com.ansmi.gestsquadre.shared.model.GpsPosition
+import com.ansmi.gestsquadre.shared.model.LiveSquadPin
+import com.ansmi.gestsquadre.shared.model.MapWaypointPin
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequestType
 import com.ansmi.gestsquadre.shared.model.SquadSession
@@ -93,6 +95,52 @@ fun GestSquadreFacade.sendAlarmSafe(
             onComplete(null)
         } catch (e: Throwable) {
             onComplete(e.message ?: e.toString())
+        }
+    }
+}
+
+fun GestSquadreFacade.restoreOnlineSessionSafe(
+    sessionId: String,
+    onComplete: (SquadSession?, String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            onComplete(restoreOnlineSession(sessionId), null)
+        } catch (e: Throwable) {
+            onComplete(null, e.message ?: e.toString())
+        }
+    }
+}
+
+fun GestSquadreFacade.isSessionOnlineSafe(
+    sessionId: String,
+    onComplete: (Boolean, String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            onComplete(isSessionOnline(sessionId), null)
+        } catch (e: Throwable) {
+            onComplete(false, e.message ?: e.toString())
+        }
+    }
+}
+
+fun GestSquadreFacade.refreshTocMapSafe(
+    onComplete: (
+        squads: List<LiveSquadPin>,
+        waypoints: List<MapWaypointPin>,
+        alarmingSessionIds: List<String>,
+        errorMessage: String?,
+    ) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            val squads = loadMapSquads()
+            val waypoints = loadMapWaypoints()
+            val alarming = loadAlarmingSessionIds().toList()
+            onComplete(squads, waypoints, alarming, null)
+        } catch (e: Throwable) {
+            onComplete(emptyList(), emptyList(), emptyList(), e.message ?: e.toString())
         }
     }
 }

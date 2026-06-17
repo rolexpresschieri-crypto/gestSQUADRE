@@ -1,38 +1,322 @@
-import CoreLocation
-import Foundation
+import SwiftUI
 import shared
 
 final class SquadViewModel: ObservableObject {
     @Published var squadCode = ""
     @Published var password = ""
-    @Published var statusMessage = "Inserisci codice squadra e password."
+    @Published var statusMessage = ""
     @Published var loginBlockingMessage: String?
+    @Published var bannerMessage: String?
+    @Published var lastTocMessage: String?
     @Published var isLoggedIn = false
+    @Published var isBusy = false
+    @Published var isInitializing = true
     @Published var sessionLabel = ""
     @Published var sessionId = ""
     @Published var gpsStatusLabel: String?
+    @Published var lastGpsAccuracyM: Double?
     @Published var needsLocationPermission = false
     @Published var showAlarmSheet = false
     @Published var isAlarmBusy = false
 
-    private var facade: GestSquadreFacade?
+    private(set) var facade: GestSquadreFacade?
     private var session: SquadSession?
     private let locationTracker = LocationTracker(platformContext: NSObject())
+    private let sessionStorage = SessionStorage()
     private var stopLocationUpdates: (() -> Void)?
     private var lastPublished: GpsPosition?
     private var lastPublishedAtMs: Int64?
+    private var sessionWatchTimer: Timer?
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
             statusMessage = Self.missingConfigMessage()
+            isInitializing = false
             return
         }
         let config = GestSquadreConfig(supabaseUrl: url, supabaseAnonKey: key)
         facade = GestSquadreFacade(config: config)
+        restoreSessionOnStart()
     }
 
     var isConfigured: Bool {
         supabaseUrl != nil && supabaseAnonKey != nil
+    }
+
+    func login(squadCode: String, password: String, onComplete: @escaping (String?) -> Void) {
+        guard let facade else {
+            onComplete(Self.missingConfigMessage())
+            return
+        }
+
+        isBusy = true
+        loginBlockingMessage = nil
+        facade.loginSquadSafe(squadCode: squadCode, password: password) { [weak self] session, errorMessage in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isBusy = false
+                if let errorMessage {
+                    if GestSquadreMessages.shared.isSquadAlreadyActiveMessage(message: errorMessage) {
+                        self.loginBlockingMessage = errorMessage
+                    }
+                    onComplete(errorMessage)
+                    return
+                }
+                guard let session else {
+                    onComplete("Login fallito.")
+                    return
+                }
+                self.onSessionReady(session)
+                onComplete(nil)
+            }
+        }
+    }
+
+    func logout(onComplete: @escaping (String?) -> Void) {
+        guard isLoggedIn, let facade, let session else { return }
+        isBusy = true
+        stopGpsTracking()
+        stopSessionWatchdog()
+        facade.logoutSquadSafe(session: session) { [weak self] errorMessage in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isBusy = false
+                self.clearLocalSession()
+                onComplete(errorMessage)
+            }
+        }
+    }
+
+    func clearLastTocMessage() {
+        lastTocMessage = nil
+    }
+
+    func onLocationPermissionGranted() {
+        guard locationTracker.hasLocationPermission() else { return }
+        needsLocationPermission = false
+        startGpsTracking()
+    }
+
+    func sendAlarm(
+        ambulanza: Bool,
+        medico: Bool,
+        dae: Bool,
+        forzeOrdine: Bool,
+        vvf: Bool,
+        altro: Bool,
+        otherDetail: String,
+        onComplete: @escaping (String?) -> Void
+    ) {
+        guard let facade, let session else {
+            onComplete("Sessione non attiva.")
+            return
+        }
+
+        let request = facade.makeSquadAlarmRequest(
+            ambulanza: ambulanza,
+            medico: medico,
+            dae: dae,
+            forzeOrdine: forzeOrdine,
+            vvf: vvf,
+            altro: altro,
+            otherDetail: otherDetail
+        )
+
+        if let validationError = request.validate() {
+            onComplete(validationError)
+            return
+        }
+
+        isAlarmBusy = true
+        facade.sendAlarmSafe(session: session, request: request) { [weak self] errorMessage in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isAlarmBusy = false
+                if let errorMessage {
+                    onComplete(errorMessage)
+                    return
+                }
+                self.showAlarmSheet = false
+                let detail = request.toLogMessage()
+                self.statusMessage = "\(SquadAlarmCopy.sentOk) \(detail)"
+                onComplete(nil)
+            }
+        }
+    }
+
+    private func restoreSessionOnStart() {
+        guard let facade else {
+            isInitializing = false
+            return
+        }
+
+        if !sessionStorage.isAuthLogMigrationDone() {
+            if let sessionId = sessionStorage.loadSessionId() {
+                facade.restoreOnlineSessionSafe(sessionId: sessionId) { [weak self] session, _ in
+                    DispatchQueue.main.async {
+                        guard let self else { return }
+                        if let session {
+                            facade.logoutSquadSafe(session: session) { _ in }
+                        }
+                        self.sessionStorage.clear()
+                        self.sessionStorage.setAuthLogMigrationDone()
+                        self.isInitializing = false
+                    }
+                }
+            } else {
+                sessionStorage.setAuthLogMigrationDone()
+                isInitializing = false
+            }
+            return
+        }
+
+        guard let sessionId = sessionStorage.loadSessionId() else {
+            isInitializing = false
+            return
+        }
+
+        facade.restoreOnlineSessionSafe(sessionId: sessionId) { [weak self] session, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let session {
+                    self.onSessionReady(session)
+                } else {
+                    self.sessionStorage.clear()
+                }
+                self.isInitializing = false
+            }
+        }
+    }
+
+    private func onSessionReady(_ session: SquadSession) {
+        self.session = session
+        sessionStorage.save(session)
+        isLoggedIn = true
+        sessionId = session.sessionId
+        sessionLabel = "\(session.squadName) + \(session.loginTimeLabel())"
+        statusMessage = "Connesso. I dati vanno su Supabase (TOC Windows li vede subito)."
+        bannerMessage = nil
+        gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+        lastGpsAccuracyM = nil
+        startGpsTracking()
+        startSessionWatchdog()
+    }
+
+    private func clearLocalSession() {
+        session = nil
+        sessionStorage.clear()
+        isLoggedIn = false
+        sessionId = ""
+        sessionLabel = ""
+        gpsStatusLabel = nil
+        lastGpsAccuracyM = nil
+        needsLocationPermission = false
+        statusMessage = "Log-out completato."
+    }
+
+    private func startSessionWatchdog() {
+        stopSessionWatchdog()
+        sessionWatchTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            guard let self, self.isLoggedIn, let facade, !self.sessionId.isEmpty else { return }
+            facade.isSessionOnlineSafe(sessionId: self.sessionId) { online, _ in
+                DispatchQueue.main.async {
+                    if !online {
+                        self.handleRemoteLogout()
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopSessionWatchdog() {
+        sessionWatchTimer?.invalidate()
+        sessionWatchTimer = nil
+    }
+
+    private func handleRemoteLogout() {
+        stopGpsTracking()
+        stopSessionWatchdog()
+        sessionStorage.clear()
+        session = nil
+        isLoggedIn = false
+        sessionId = ""
+        sessionLabel = ""
+        gpsStatusLabel = nil
+        lastGpsAccuracyM = nil
+        bannerMessage = "Sessione chiusa: login su un altro telefono o logout dal TOC."
+    }
+
+    private func startGpsTracking() {
+        guard isLoggedIn, !sessionId.isEmpty, facade != nil else { return }
+
+        if !locationTracker.isLocationServiceEnabled() {
+            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+            bannerMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC."
+            return
+        }
+
+        if !locationTracker.hasLocationPermission() {
+            needsLocationPermission = true
+            locationTracker.requestLocationAuthorization()
+            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+            return
+        }
+
+        needsLocationPermission = false
+        stopLocationUpdates?()
+        stopLocationUpdates = nil
+
+        locationTracker.getCurrentFixSafe { [weak self] initial in
+            DispatchQueue.main.async {
+                guard let self, let initial else { return }
+                self.maybePublish(position: initial)
+            }
+        }
+
+        let kotlinStop = locationTracker.startUpdates { [weak self] fix in
+            DispatchQueue.main.async {
+                self?.maybePublish(position: fix)
+            }
+        }
+        stopLocationUpdates = { _ = kotlinStop() }
+    }
+
+    private func stopGpsTracking() {
+        stopLocationUpdates?()
+        stopLocationUpdates = nil
+        lastPublished = nil
+        lastPublishedAtMs = nil
+    }
+
+    private func maybePublish(position: GpsPosition) {
+        guard isLoggedIn, !sessionId.isEmpty, let facade else { return }
+
+        let now = Int64(Date().timeIntervalSince1970 * 1000)
+        let shouldPublish = GpsPublishPolicy.shared.shouldPublish(
+            position: position,
+            lastPublished: lastPublished,
+            lastPublishedAtMs: lastPublishedAtMs.map(KotlinLong.init),
+            nowMs: now
+        )
+        guard shouldPublish else { return }
+
+        facade.updatePositionSafe(sessionId: sessionId, position: position) { [weak self] errorMessage in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let errorMessage {
+                    self.gpsStatusLabel = "GPS: errore invio (\(errorMessage))"
+                    return
+                }
+                self.lastPublished = position
+                self.lastPublishedAtMs = now
+                if let accuracy = position.accuracyMeters {
+                    self.lastGpsAccuracyM = accuracy.doubleValue
+                }
+                self.gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(
+                    accuracyM: position.accuracyMeters
+                )
+            }
+        }
     }
 
     private struct SupabaseBundleConfig: Decodable {
@@ -95,184 +379,6 @@ final class SquadViewModel: ObservableObject {
     private static func isValidSupabaseAnonKey(_ value: String) -> Bool {
         guard !value.isEmpty, !value.hasPrefix("$("), value != "YOUR_ANON_KEY" else { return false }
         return true
-    }
-
-    func login() {
-        guard let facade else {
-            statusMessage = Self.missingConfigMessage()
-            return
-        }
-
-        statusMessage = "Accesso in corso..."
-        loginBlockingMessage = nil
-        facade.loginSquadSafe(
-            squadCode: squadCode.trimmingCharacters(in: .whitespacesAndNewlines),
-            password: password
-        ) { [weak self] session, errorMessage in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if let errorMessage {
-                    self.statusMessage = errorMessage
-                    self.isLoggedIn = false
-                    if GestSquadreMessages.shared.isSquadAlreadyActiveMessage(message: errorMessage) {
-                        self.loginBlockingMessage = errorMessage
-                    }
-                    return
-                }
-                guard let session else {
-                    self.statusMessage = "Login fallito."
-                    self.isLoggedIn = false
-                    return
-                }
-                self.isLoggedIn = true
-                self.session = session
-                self.sessionId = session.sessionId
-                self.sessionLabel = "\(session.squadName) + \(session.loginTimeLabel())"
-                self.statusMessage = "Connesso. I dati vanno su Supabase (TOC Windows li vede subito)."
-                self.gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
-                self.startGpsTracking()
-            }
-        }
-    }
-
-    func logout() {
-        guard isLoggedIn, let facade, let session else { return }
-        stopGpsTracking()
-        facade.logoutSquadSafe(session: session) { [weak self] errorMessage in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isLoggedIn = false
-                self.session = nil
-                self.sessionId = ""
-                self.sessionLabel = ""
-                self.gpsStatusLabel = nil
-                self.needsLocationPermission = false
-                self.statusMessage = errorMessage ?? "Log-out completato."
-            }
-        }
-    }
-
-    func onLocationPermissionGranted() {
-        guard locationTracker.hasLocationPermission() else { return }
-        needsLocationPermission = false
-        startGpsTracking()
-    }
-
-    func sendAlarm(
-        ambulanza: Bool,
-        medico: Bool,
-        dae: Bool,
-        forzeOrdine: Bool,
-        vvf: Bool,
-        altro: Bool,
-        otherDetail: String,
-        onComplete: @escaping (String?) -> Void
-    ) {
-        guard let facade, let session else {
-            onComplete("Sessione non attiva.")
-            return
-        }
-
-        let request = facade.makeSquadAlarmRequest(
-            ambulanza: ambulanza,
-            medico: medico,
-            dae: dae,
-            forzeOrdine: forzeOrdine,
-            vvf: vvf,
-            altro: altro,
-            otherDetail: otherDetail
-        )
-
-        if let validationError = request.validate() {
-            onComplete(validationError)
-            return
-        }
-
-        isAlarmBusy = true
-        facade.sendAlarmSafe(session: session, request: request) { [weak self] (errorMessage: String?) in
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                isAlarmBusy = false
-                if let errorMessage {
-                    onComplete(errorMessage)
-                    return
-                }
-                showAlarmSheet = false
-                let detail = request.toLogMessage()
-                statusMessage = "\(SquadAlarmCopy.sentOk) \(detail)"
-                onComplete(nil)
-            }
-        }
-    }
-
-    private func startGpsTracking() {
-        guard isLoggedIn, !sessionId.isEmpty, facade != nil else { return }
-
-        if !locationTracker.isLocationServiceEnabled() {
-            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
-            statusMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC."
-            return
-        }
-
-        if !locationTracker.hasLocationPermission() {
-            needsLocationPermission = true
-            locationTracker.requestLocationAuthorization()
-            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
-            return
-        }
-
-        needsLocationPermission = false
-        stopLocationUpdates?()
-        stopLocationUpdates = nil
-
-        locationTracker.getCurrentFixSafe { [weak self] initial in
-            DispatchQueue.main.async {
-                guard let self, let initial else { return }
-                self.maybePublish(position: initial)
-            }
-        }
-
-        let kotlinStop = locationTracker.startUpdates { [weak self] fix in
-            DispatchQueue.main.async {
-                self?.maybePublish(position: fix)
-            }
-        }
-        stopLocationUpdates = { _ = kotlinStop() }
-    }
-
-    private func stopGpsTracking() {
-        stopLocationUpdates?()
-        stopLocationUpdates = nil
-        lastPublished = nil
-        lastPublishedAtMs = nil
-    }
-
-    private func maybePublish(position: GpsPosition) {
-        guard isLoggedIn, !sessionId.isEmpty, let facade else { return }
-
-        let now = Int64(Date().timeIntervalSince1970 * 1000)
-        let shouldPublish = GpsPublishPolicy.shared.shouldPublish(
-            position: position,
-            lastPublished: lastPublished,
-            lastPublishedAtMs: lastPublishedAtMs.map(KotlinLong.init),
-            nowMs: now
-        )
-        guard shouldPublish else { return }
-
-        facade.updatePositionSafe(sessionId: sessionId, position: position) { [weak self] errorMessage in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if let errorMessage {
-                    self.gpsStatusLabel = "GPS: errore invio (\(errorMessage))"
-                    return
-                }
-                self.lastPublished = position
-                self.lastPublishedAtMs = now
-                self.gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(
-                    accuracyM: position.accuracyMeters
-                )
-            }
-        }
     }
 }
 

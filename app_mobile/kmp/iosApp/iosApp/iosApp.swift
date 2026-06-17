@@ -6,7 +6,7 @@ struct GestSquadreIosApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            GestSquadreRootView()
                 .environmentObject(viewModel)
         }
     }

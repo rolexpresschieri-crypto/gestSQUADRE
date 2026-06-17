@@ -1,0 +1,151 @@
+import SwiftUI
+
+struct HomeView: View {
+    @ObservedObject var viewModel: SquadViewModel
+    let onNavigateLogin: () -> Void
+    let onNavigateMap: () -> Void
+    let onShowMessage: (String) -> Void
+
+    @State private var showAlarmSheet = false
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                TacticalShell {
+                    VStack(spacing: 0) {
+                        AppTitleBlock()
+                            .padding(.bottom, 24)
+
+                        if let banner = viewModel.bannerMessage, !banner.isEmpty {
+                            TacticalBodyText(text: banner)
+                                .padding(.bottom, 12)
+                        }
+
+                        TocNotificationPanel(message: viewModel.lastTocMessage)
+                            .padding(.bottom, 12)
+
+                        TacticalBodyText(
+                            text: "Reset notifica: solo sul telefono (registrato su log). La chiusura evento è solo dal TOC.",
+                            fontSize: 12
+                        )
+                        .padding(.bottom, 8)
+
+                        MainButton(
+                            label: "Reset notifica",
+                            backgroundColor: TacticalColors.navy,
+                            foregroundColor: .white,
+                            enabled: true,
+                            action: { viewModel.clearLastTocMessage() }
+                        )
+                        .padding(.bottom, 20)
+
+                        squadBox
+                        loggedInDetails
+                        busyIndicator
+
+                        MainButton(
+                            label: "Log-in",
+                            backgroundColor: viewModel.isLoggedIn ? TacticalColors.disabled : TacticalColors.green,
+                            foregroundColor: viewModel.isLoggedIn ? TacticalColors.muted : .white,
+                            enabled: !viewModel.isLoggedIn && !viewModel.isBusy && !viewModel.isInitializing,
+                            action: onNavigateLogin
+                        )
+                        .padding(.top, 18)
+
+                        MainButton(
+                            label: "Log-out",
+                            backgroundColor: viewModel.isLoggedIn ? TacticalColors.orange : TacticalColors.disabled,
+                            foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
+                            enabled: viewModel.isLoggedIn && !viewModel.isBusy,
+                            action: {
+                                viewModel.logout { err in
+                                    if let err { onShowMessage(err) }
+                                }
+                            }
+                        )
+                        .padding(.top, 18)
+
+                        MainButton(
+                            label: "INVIA ALLARME A TOC",
+                            backgroundColor: viewModel.isLoggedIn ? TacticalColors.red : TacticalColors.disabled,
+                            foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
+                            enabled: viewModel.isLoggedIn && !viewModel.isBusy,
+                            action: { showAlarmSheet = true }
+                        )
+                        .padding(.top, 18)
+
+                        MainButton(
+                            label: "Tactical Operations Center",
+                            backgroundColor: TacticalColors.yellow,
+                            foregroundColor: .black,
+                            enabled: !viewModel.isBusy && !viewModel.isInitializing && viewModel.isConfigured,
+                            action: {
+                                if viewModel.isConfigured {
+                                    onNavigateMap()
+                                } else {
+                                    onShowMessage("Mappa TOC: configura SUPABASE_* in dart-defines.json.")
+                                }
+                            }
+                        )
+                        .padding(.top, 18)
+                    }
+                }
+            }
+            .padding(.bottom, 12)
+        }
+        .sheet(isPresented: $showAlarmSheet) {
+            AlarmRequestSheet(viewModel: viewModel) { message in
+                onShowMessage(message)
+            }
+        }
+    }
+
+    private var squadBox: some View {
+        Text(viewModel.isLoggedIn ? viewModel.sessionLabel : "Nessuna squadra loggata")
+            .font(.system(size: 17, weight: .heavy))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity)
+            .padding(16)
+            .background(viewModel.isLoggedIn ? TacticalColors.green : Color.black.opacity(0.48))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.white.opacity(viewModel.isLoggedIn ? 0.35 : 0.55), lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var loggedInDetails: some View {
+        if viewModel.isLoggedIn {
+            if let gpsLabel = viewModel.gpsStatusLabel {
+                TacticalBodyText(
+                    text: gpsLabel,
+                    fontSize: 13,
+                    color: gpsLabelColor(accuracyM: viewModel.lastGpsAccuracyM)
+                )
+                .padding(.top, 14)
+                .padding(.bottom, 8)
+            }
+            if viewModel.needsLocationPermission {
+                TacticalBodyText(
+                    text: "Consenti l'accesso alla posizione per inviare il GPS al TOC.",
+                    fontSize: 13,
+                    color: TacticalColors.orange
+                )
+                .padding(.bottom, 8)
+            }
+            TacticalBodyText(text: SquadAlarmCopy.hint, fontSize: 13)
+                .padding(.bottom, 8)
+        }
+    }
+
+    @ViewBuilder
+    private var busyIndicator: some View {
+        if viewModel.isBusy {
+            ProgressView()
+                .tint(TacticalColors.yellow)
+                .padding(.top, 18)
+        }
+    }
+}
