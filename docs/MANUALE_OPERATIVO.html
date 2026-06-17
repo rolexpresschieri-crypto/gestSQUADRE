@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <title>gestSQUADRE — Manuale operativo Volontari e TOC</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 14mm 12mm 16mm 12mm;
+    }
+
+    @page :first {
+      margin: 0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      background: #fff;
+    }
+
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.45;
+      font-size: 10.5pt;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Header ripetuto su ogni pagina (trick thead — compatibile Chrome PDF) */
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+    }
+
+    .doc-table thead {
+      display: table-header-group;
+    }
+
+    .doc-table tbody {
+      display: table-row-group;
+    }
+
+    .print-header-cell {
+      padding: 0 0 3mm;
+      text-align: right;
+      vertical-align: bottom;
+      border-bottom: 0.5pt solid #d8d8d8;
+      background: #fff;
+    }
+
+    .page-logo {
+      display: inline-block;
+      background: #fff;
+      border-radius: 4px;
+      padding: 1px 3px;
+      line-height: 0;
+    }
+
+    .page-logo img {
+      display: block;
+      width: 16mm;
+      max-height: 9mm;
+      object-fit: contain;
+    }
+
+    .print-body-cell {
+      padding: 4mm 0 0;
+      vertical-align: top;
+    }
+
+    .cover {
+      position: relative;
+      page-break-after: always;
+      page-break-inside: avoid;
+      break-after: page;
+      width: 210mm;
+      height: 297mm;
+      max-height: 297mm;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(160deg, #6a0018 0%, #1a0a10 55%, #0a0607 100%);
+      color: #fff;
+      padding: 24mm;
+      margin: 0;
+    }
+
+    .cover-logo {
+      position: absolute;
+      top: 10mm;
+      right: 10mm;
+      background: transparent;
+      padding: 0;
+      line-height: 0;
+    }
+
+    .cover-logo img {
+      display: block;
+      width: 20mm;
+      height: auto;
+      max-height: 20mm;
+      object-fit: contain;
+    }
+
+    .cover h1 {
+      font-size: 20pt;
+      margin: 0 0 16px;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.92);
+    }
+
+    .cover .sub,
+    .cover .sub-toc {
+      font-size: 24pt;
+      color: #e0be3a;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+    }
+
+    .cover .sub {
+      margin: 0 0 10px;
+      white-space: nowrap;
+    }
+
+    .cover .sub-toc {
+      margin: 0 0 32px;
+    }
+
+    .cover .meta {
+      font-size: 11pt;
+      color: rgba(255,255,255,0.85);
+      max-width: 120mm;
+    }
+
+    .cover .ver {
+      margin-top: 40px;
+      padding: 8px 16px;
+      border: 2px solid #e0be3a;
+      border-radius: 8px;
+      font-weight: 700;
+      color: #e0be3a;
+    }
+
+    .cover .chief {
+      position: absolute;
+      bottom: 18mm;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 10.5pt;
+      color: rgba(255, 255, 255, 0.92);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      margin: 0;
+      padding: 0 12mm;
+    }
+
+    .cover .doc-ver {
+      position: absolute;
+      bottom: 18mm;
+      left: 18mm;
+      font-size: 8pt;
+      color: rgba(255, 255, 255, 0.7);
+      font-weight: 500;
+      margin: 0;
+    }
+
+    h2 {
+      font-size: 14pt;
+      color: #6a0018;
+      border-bottom: 2px solid #e0be3a;
+      padding-bottom: 4px;
+      margin: 16px 0 10px;
+      page-break-after: avoid;
+    }
+
+    .toc h2 {
+      margin-top: 0;
+    }
+
+    h3 {
+      font-size: 11.5pt;
+      color: #1a3066;
+      margin: 14px 0 6px;
+      page-break-after: avoid;
+    }
+
+    p { margin: 6px 0; }
+
+    ul, ol { margin: 6px 0 10px 18px; padding: 0; }
+    li { margin-bottom: 4px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+      margin: 10px 0 14px;
+      page-break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid #999;
+      padding: 6px 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f0e6e8;
+      font-weight: 700;
+    }
+
+    .note {
+      background: #fff8e1;
+      border-left: 4px solid #e0be3a;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+
+    .warn {
+      background: #ffebee;
+      border-left: 4px solid #c62828;
+      padding: 8px 12px;
+      margin: 10px 0;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+    }
+
+    .rule {
+      background: #e8f5e9;
+      border: 2px solid #079b42;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin: 12px 0;
+      font-weight: 600;
+      page-break-inside: avoid;
+    }
+
+    .diagram-wrap {
+      margin: 14px 0 18px;
+      page-break-inside: avoid;
+      text-align: center;
+    }
+
+    .diagram-wrap figcaption {
+      font-size: 9pt;
+      color: #555;
+      margin-top: 6px;
+      font-style: italic;
+    }
+
+    svg text { font-family: "Segoe UI", system-ui, sans-serif; }
+
+    .toc {
+      page-break-after: always;
+    }
+
+    .toc ol {
+      font-size: 11pt;
+      line-height: 1.8;
+    }
+
+    .toc a {
+      color: #1a3066;
+      text-decoration: none;
+    }
+
+    .page-section {
+      page-break-before: auto;
+    }
+
+    .status-inviato { color: #1565c0; font-weight: 700; }
+    .status-registrato { color: #e65100; font-weight: 700; }
+    .status-chiuso { color: #2e7d32; font-weight: 700; }
+
+    footer.print-foot {
+      margin-top: 24px;
+      padding-top: 8px;
+      border-top: 1px solid #ccc;
+      font-size: 8.5pt;
+      color: #666;
+      text-align: center;
+    }
+
+    @media print {
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      a { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+
+  <section class="cover">
+    <div class="cover-logo" aria-hidden="true">
+      <img src="assets/logo_rolexpress_cover.png" alt="Rolexpress Digital Service" />
+    </div>
+    <h1>gestSQUADRE</h1>
+    <p class="sub">Manuale operativo — Volontari e TOC</p>
+    <p class="sub-toc">Tactical Operations Center</p>
+    <p class="meta">
+      Procedure campo, Tactical Operations Center, stati evento
+      (<strong>inviato → registrato → chiuso</strong>) e popolamento log eventi.
+    </p>
+    <p class="ver">Mobile Android 1.0.15 · Mobile iOS 1.0.15 · Backend TOC 2026</p>
+    <p class="meta" style="margin-top:24px;font-size:10pt;">
+      Per salvare in PDF: apri questo file nel browser → Stampa → «Salva come PDF»
+    </p>
+    <p class="chief">Chief T.O.C. - Tactical Operations Center - Roberto Ronco</p>
+    <p class="doc-ver">ver001</p>
+  </section>
+
+  <table class="doc-table">
+    <thead>
+      <tr>
+        <td class="print-header-cell">
+          <div class="page-logo">
+            <img src="assets/logo_rolexpress.png" alt="Rolexpress Digital Service" />
+          </div>
+        </td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="print-body-cell">
+
+  <section class="toc">
+    <h2>Indice</h2>
+    <ol>
+      <li><a href="#s1">Panoramica sistema</a></li>
+      <li><a href="#s2">App mobile — Volontari</a></li>
+      <li><a href="#s3">TOC web — Operatori</a></li>
+      <li><a href="#s4">Regole Volontario vs TOC (definitive)</a></li>
+      <li><a href="#s5">Diagrammi di flusso</a></li>
+      <li><a href="#s6">Log eventi — cosa e quando</a></li>
+      <li><a href="#s7">Ruoli e checklist</a></li>
+    </ol>
+  </section>
+
+  <section id="s1" class="page-section">
+    <h2>1. Panoramica sistema</h2>
+    <table>
+      <thead>
+        <tr><th>Componente</th><th>Utenti</th><th>Funzione</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>App mobile</strong> (Android + iOS KMP)</td><td>Volontari</td><td>Login/logout, GPS, ricezione push TOC, segnalazione allarme mappa, mappa tattica</td></tr>
+        <tr><td><strong>TOC web</strong></td><td>Operatori centro</td><td>Squadre online, allarmi, missioni TRK, push, mappa, waypoint, log</td></tr>
+        <tr><td><strong>Supabase</strong></td><td>Backend</td><td>Sessioni, posizioni, allarmi, push, missioni, log persistenti</td></tr>
+        <tr><td><strong>Log evento</strong> (/logs)</td><td>TOC admin/viewer</td><td>Storico operazioni evento attivo, export CSV/PDF</td></tr>
+      </tbody>
+    </table>
+    <div class="rule">
+      Principio: il volontario <strong>segnala ed esegue</strong>; il TOC <strong>coordina e chiude</strong>.
+      La chiusura ufficiale è <strong>sempre dal TOC</strong> (pulsante «Fine evento»).
+    </div>
+  </section>
+
+  <section id="s2" class="page-section">
+    <h2>2. App mobile — Volontari</h2>
+
+    <div class="note">
+      Le stesse procedure valgono per <strong>Android</strong> (APK) e <strong>iOS</strong> (gestSQUADRE).
+      Le funzionalità operative sono equivalenti; cambia solo l’installazione (APK su Android, app da Xcode su iPhone).
+    </div>
+
+    <h3>2.1 Login squadra</h3>
+    <ol>
+      <li>Apri gestSQUADRE → attendi splash → home.</li>
+      <li><strong>Login squadra</strong> → codice + password.</li>
+      <li>Consenti <strong>posizione</strong> e <strong>notifiche</strong>.</li>
+      <li>Verifica <strong>Push TOC: attiva</strong> (verde). Se rosso: <strong>Ripara push TOC</strong>.</li>
+      <li>Il login viene <strong>registrato nel log evento</strong> (tipo «Login squadra»).</li>
+    </ol>
+
+    <h3>2.2 GPS</h3>
+    <p>Con login attivo la posizione è inviata al TOC automaticamente. Il GPS <strong>non</strong> compare nel log eventi.</p>
+
+    <h3>2.3 Ricezione messaggio TOC</h3>
+    <ul>
+      <li>Notifica sul telefono (sirena se allarme).</li>
+      <li>Testo nel <strong>pannello blu</strong> in home.</li>
+      <li>Se missione TRK: via visibile sulla mappa tattica.</li>
+    </ul>
+
+    <h3>2.4 Allarme volontario → TOC (mappa rossa)</h3>
+    <p><strong>Non</strong> invia SMS/push al TOC. Evidenzia la squadra in rosso sulla mappa centrale.</p>
+    <ol>
+      <li>Pulsante allarme / segnala su mappa TOC.</li>
+      <li>Seleziona: Ambulanza, Medico, DAE, FORZE DELL'ORDINE (giallo), V.V.F. (giallo), Altro (testo obbligatorio).</li>
+      <li>Conferma → TOC vede allarme in colonna «Allarmi volontario».</li>
+    </ol>
+
+    <h3>2.5 Reset notifica</h3>
+    <div class="note">
+      Azzera <strong>solo</strong> il pannello blu sul telefono. Registra log <span class="status-registrato">registrato</span>.
+      <strong>Non</strong> chiude allarme o missione sul TOC.
+    </div>
+
+    <h3>2.6 Logout</h3>
+    <p>Logout dalla home, oppure logout forzato dal TOC. Ogni logout volontario o forzato viene <strong>registrato nel log evento</strong> (tipo «Logout squadra»).</p>
+  </section>
+
+  <section id="s3" class="page-section">
+    <h2>3. TOC web — Operatori</h2>
+
+    <h3>3.1 Dashboard (3 colonne)</h3>
+    <table>
+      <thead><tr><th>Colonna</th><th>Contenuto</th><th>Azione chiusura</th></tr></thead>
+      <tbody>
+        <tr><td>1 — Squadre online</td><td>Connesse, badge rosso se allarme</td><td>Logout forzato (admin)</td></tr>
+        <tr><td>2 — Allarmi volontario</td><td>Segnalazioni dal campo</td><td><strong>Fine evento</strong></td></tr>
+        <tr><td>3 — Missioni TOC attive</td><td>Via TRK + target assegnati</td><td><strong>Fine evento</strong></td></tr>
+      </tbody>
+    </table>
+    <p>La mappa è su <strong>schermo grande</strong> o <strong>stessa finestra</strong> (non più embedded in home).</p>
+
+    <h3>3.2 Invio push / missione</h3>
+    <ol>
+      <li><strong>Invia allarme a squadre (push)</strong>.</li>
+      <li>Titolo e testo messaggio.</li>
+      <li>Per missione: <strong>una squadra</strong> + <strong>via TRK</strong> + <strong>target waypoint</strong> (obbligatorio con via).</li>
+      <li>Invia → push mobile + via su mappa + log <span class="status-inviato">inviato</span>.</li>
+    </ol>
+
+    <h3>3.3 Fine evento (solo TOC)</h3>
+    <ul>
+      <li><strong>Allarme volontario</strong>: colonna 2 → Fine evento → allarme chiuso, log <span class="status-chiuso">chiuso</span>, pannello mobile azzerato (FCM).</li>
+      <li><strong>Missione</strong>: colonna 3 → Fine evento → via rimossa, log missione <span class="status-chiuso">chiuso</span>, pannello mobile azzerato.</li>
+    </ul>
+
+    <h3>3.4 Log evento</h3>
+    <p>Menu <strong>Log evento</strong> → elenco cronologico, export CSV/PDF. Include anche <strong>login e logout squadre</strong>, reset notifica mobile, allarmi, missioni e chiusure TOC. Solo admin può cancellare tutti i log.</p>
+  </section>
+
+  <section id="s4" class="page-section">
+    <h2>4. Regole definitive Volontario vs TOC</h2>
+
+    <h3>4.1 Stati evento</h3>
+    <table>
+      <thead><tr><th>Stato</th><th>Significato</th><th>Chi</th></tr></thead>
+      <tbody>
+        <tr><td class="status-inviato">inviato</td><td>Evento aperto, visibile su TOC e/o mobile</td><td>Invio iniziale</td></tr>
+        <tr><td class="status-registrato">registrato</td><td>Reset notifica sul telefono</td><td>Solo volontario</td></tr>
+        <tr><td class="status-chiuso">chiuso</td><td>Evento concluso ufficialmente</td><td>Solo TOC</td></tr>
+      </tbody>
+    </table>
+
+    <h3>4.2 Flusso A — Volontario → TOC</h3>
+    <ol>
+      <li>Volontario segnala → <span class="status-inviato">inviato</span></li>
+      <li>TOC vede rosso + colonna allarmi</li>
+      <li>(Opz.) reset notifica mobile → <span class="status-registrato">registrato</span> — allarme TOC <strong>resta aperto</strong></li>
+      <li>TOC «Fine evento» → <span class="status-chiuso">chiuso</span></li>
+    </ol>
+
+    <h3>4.3 Flusso B — TOC → Volontario</h3>
+    <ol>
+      <li>TOC push (+ eventuale TRK) → <span class="status-inviato">inviato</span></li>
+      <li>Mobile: notifica + pannello + via su mappa</li>
+      <li>Volontario esegue; (consigliato) segnala <strong>Altro</strong> al TOC</li>
+      <li>Reset notifica → <span class="status-registrato">registrato</span> — missione TOC <strong>resta aperta</strong></li>
+      <li>TOC «Fine evento» missione → <span class="status-chiuso">chiuso</span></li>
+    </ol>
+
+    <div class="warn">
+      <strong>Errori da evitare:</strong> il reset notifica mobile NON chiude missioni/allarmi sul TOC.
+      Solo «Fine evento» dal TOC chiude e registra la chiusura nel log.
+    </div>
+  </section>
+
+  <section id="s5" class="page-section">
+    <h2>5. Diagrammi di flusso</h2>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 520 120" width="100%" style="max-width:520px" aria-label="Diagramma stati">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L6,3 L0,6 Z" fill="#333"/>
+          </marker>
+        </defs>
+        <rect x="10" y="40" width="130" height="44" rx="8" fill="#e3f2fd" stroke="#1565c0" stroke-width="2"/>
+        <text x="75" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#1565c0">INVIATO</text>
+        <text x="75" y="74" text-anchor="middle" font-size="9" fill="#333">Apertura evento</text>
+
+        <line x1="140" y1="62" x2="175" y2="62" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="157" y="54" text-anchor="middle" font-size="8" fill="#555">reset mobile</text>
+
+        <rect x="175" y="40" width="130" height="44" rx="8" fill="#fff3e0" stroke="#e65100" stroke-width="2"/>
+        <text x="240" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#e65100">REGISTRATO</text>
+        <text x="240" y="74" text-anchor="middle" font-size="9" fill="#333">Solo telefono</text>
+
+        <line x1="75" y1="84" x2="75" y2="100" stroke="#333" stroke-width="1.5"/>
+        <line x1="75" y1="100" x2="405" y2="100" stroke="#333" stroke-width="1.5"/>
+        <line x1="405" y1="100" x2="405" y2="84" stroke="#333" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="240" y="112" text-anchor="middle" font-size="8" fill="#555">Fine evento TOC (da inviato o registrato)</text>
+
+        <rect x="340" y="40" width="130" height="44" rx="8" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2"/>
+        <text x="405" y="58" text-anchor="middle" font-size="13" font-weight="700" fill="#2e7d32">CHIUSO</text>
+        <text x="405" y="74" text-anchor="middle" font-size="9" fill="#333">Solo operatore TOC</text>
+      </svg>
+      <figcaption>Fig. 1 — Macchina a stati: inviato → registrato (opz.) → chiuso</figcaption>
+    </div>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 520 280" width="100%" style="max-width:520px" aria-label="Flusso volontario TOC">
+        <rect x="180" y="8" width="160" height="36" rx="6" fill="#ffebee" stroke="#c62828" stroke-width="2"/>
+        <text x="260" y="30" text-anchor="middle" font-size="11" font-weight="700">VOLONTARIO: Segnala allarme</text>
+
+        <line x1="260" y1="44" x2="260" y2="58" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="160" y="58" width="200" height="32" rx="6" fill="#e3f2fd" stroke="#1565c0" stroke-width="2"/>
+        <text x="260" y="78" text-anchor="middle" font-size="10" font-weight="700">TOC: mappa rossa + colonna allarmi [INVIATO]</text>
+
+        <line x1="260" y1="90" x2="260" y2="108" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="120" y="108" width="280" height="32" rx="6" fill="#fff8e1" stroke="#e0be3a" stroke-width="1.5" stroke-dasharray="4"/>
+        <text x="260" y="128" text-anchor="middle" font-size="9">(Opz.) VOL: Reset notifica → log REGISTRATO — allarme RESTA su TOC</text>
+
+        <line x1="260" y1="140" x2="260" y2="158" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="150" y="158" width="220" height="36" rx="6" fill="#f3e5f5" stroke="#6a0018" stroke-width="2"/>
+        <text x="260" y="176" text-anchor="middle" font-size="10" font-weight="700">TOC: Fine evento (allarme volontario)</text>
+        <text x="260" y="188" text-anchor="middle" font-size="9">Log Fine evento (TOC) [CHIUSO] + clear pannello mobile</text>
+
+        <line x1="260" y1="194" x2="260" y2="212" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="180" y="212" width="160" height="32" rx="6" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2"/>
+        <text x="260" y="232" text-anchor="middle" font-size="10" font-weight="700">Evento chiuso su entrambi i lati</text>
+      </svg>
+      <figcaption>Fig. 2 — Flusso A: Allarme volontario → TOC</figcaption>
+    </div>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 520 320" width="100%" style="max-width:520px" aria-label="Flusso TOC volontario">
+        <rect x="170" y="8" width="180" height="36" rx="6" fill="#f3e5f5" stroke="#6a0018" stroke-width="2"/>
+        <text x="260" y="26" text-anchor="middle" font-size="11" font-weight="700">TOC: Push (+ via TRK + target)</text>
+        <text x="260" y="38" text-anchor="middle" font-size="9">[INVIATO]</text>
+
+        <line x1="260" y1="44" x2="260" y2="58" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="130" y="58" width="260" height="32" rx="6" fill="#e3f2fd" stroke="#1565c0" stroke-width="2"/>
+        <text x="260" y="78" text-anchor="middle" font-size="10">MOBILE: notifica + pannello blu + TRK su mappa</text>
+
+        <line x1="260" y1="90" x2="260" y2="108" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="110" y="108" width="300" height="32" rx="6" fill="#ffebee" stroke="#c62828" stroke-width="1.5" stroke-dasharray="4"/>
+        <text x="260" y="128" text-anchor="middle" font-size="9">(Consigliato) VOL: Segnala «Altro» al TOC con resoconto azione [INVIATO]</text>
+
+        <line x1="260" y1="140" x2="260" y2="158" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="120" y="158" width="280" height="32" rx="6" fill="#fff3e0" stroke="#e65100" stroke-width="2"/>
+        <text x="260" y="178" text-anchor="middle" font-size="10" font-weight="700">VOL: Reset notifica [REGISTRATO]</text>
+        <text x="260" y="188" text-anchor="middle" font-size="8">Missione RESTA in colonna 3 TOC</text>
+
+        <line x1="260" y1="190" x2="260" y2="208" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="140" y="208" width="240" height="36" rx="6" fill="#f3e5f5" stroke="#6a0018" stroke-width="2"/>
+        <text x="260" y="226" text-anchor="middle" font-size="10" font-weight="700">TOC: Fine evento missione</text>
+        <text x="260" y="238" text-anchor="middle" font-size="9">Via rimossa + log CHIUSO + clear pannello mobile</text>
+
+        <line x1="260" y1="244" x2="260" y2="262" stroke="#333" stroke-width="2" marker-end="url(#arr)"/>
+
+        <rect x="180" y="262" width="160" height="32" rx="6" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2"/>
+        <text x="260" y="282" text-anchor="middle" font-size="10" font-weight="700">Missione conclusa</text>
+      </svg>
+      <figcaption>Fig. 3 — Flusso B: Messaggio / missione TOC → volontario</figcaption>
+    </div>
+
+    <div class="diagram-wrap">
+      <svg viewBox="0 0 520 100" width="100%" style="max-width:520px" aria-label="Attori">
+        <rect x="20" y="20" width="200" height="60" rx="8" fill="#e8f5e9" stroke="#079b42" stroke-width="2"/>
+        <text x="120" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#1b5e20">VOLONTARIO</text>
+        <text x="120" y="62" text-anchor="middle" font-size="9">Segnala · Esegue · Reset notifica</text>
+
+        <rect x="300" y="20" width="200" height="60" rx="8" fill="#f3e5f5" stroke="#6a0018" stroke-width="2"/>
+        <text x="400" y="45" text-anchor="middle" font-size="12" font-weight="700" fill="#6a0018">TOC</text>
+        <text x="400" y="62" text-anchor="middle" font-size="9">Coordina · Push · Fine evento</text>
+
+        <line x1="220" y1="50" x2="300" y2="50" stroke="#333" stroke-width="2"/>
+        <polygon points="295,46 305,50 295,54" fill="#333"/>
+        <text x="260" y="42" text-anchor="middle" font-size="8" fill="#555">allarmi / Altro</text>
+        <polygon points="305,46 295,50 305,54" fill="#333"/>
+        <text x="260" y="68" text-anchor="middle" font-size="8" fill="#555">push / missioni</text>
+      </svg>
+      <figcaption>Fig. 4 — Separazione ruoli Volontario ↔ TOC</figcaption>
+    </div>
+  </section>
+
+  <section id="s6" class="page-section">
+    <h2>6. Log eventi — cosa e quando viene popolato</h2>
+    <p>Il log unifica tabelle Supabase. Ordine cronologico inverso in pagina /logs.</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Tipo in log</th>
+          <th>Quando</th>
+          <th>Stato</th>
+          <th>Attore</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Login squadra</strong></td>
+          <td>Volontario accede con codice + password</td>
+          <td class="status-registrato">registrato</td>
+          <td>codice squadra</td>
+        </tr>
+        <tr>
+          <td><strong>Logout squadra</strong></td>
+          <td>Volontario esce, oppure TOC logout forzato</td>
+          <td class="status-registrato">registrato</td>
+          <td>codice squadra / TOC</td>
+        </tr>
+        <tr>
+          <td><strong>Allarme volontario → TOC</strong></td>
+          <td>Volontario conferma segnalazione in app</td>
+          <td class="status-inviato">inviato</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>Reset notifica mobile</strong></td>
+          <td>Volontario «Reset notifica»</td>
+          <td class="status-registrato">registrato</td>
+          <td>codice squadra</td>
+        </tr>
+        <tr>
+          <td><strong>Allarme / Messaggio TOC → volontario</strong></td>
+          <td>TOC invia push (senza TRK)</td>
+          <td class="status-inviato">inviato</td>
+          <td>codice TOC</td>
+        </tr>
+        <tr>
+          <td><strong>Missione TOC → volontario</strong></td>
+          <td>TOC push con via TRK + target</td>
+          <td class="status-inviato">inviato</td>
+          <td>codice TOC</td>
+        </tr>
+        <tr>
+          <td><strong>Fine evento (TOC)</strong></td>
+          <td>TOC Fine evento su allarme volontario</td>
+          <td class="status-chiuso">chiuso</td>
+          <td>codice TOC</td>
+        </tr>
+        <tr>
+          <td><strong>Fine evento messaggio TOC</strong></td>
+          <td>TOC chiude missione / pannello push</td>
+          <td class="status-chiuso">chiuso</td>
+          <td>codice TOC</td>
+        </tr>
+        <tr>
+          <td><strong>Fine evento missione TOC</strong></td>
+          <td>TOC Fine evento colonna missioni</td>
+          <td class="status-chiuso">chiuso</td>
+          <td>codice TOC</td>
+        </tr>
+        <tr>
+          <td><strong>Push fallito</strong></td>
+          <td>FCM non consegnato</td>
+          <td>fallito</td>
+          <td>codice TOC</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Esempio sequenza missione</h3>
+    <table>
+      <thead><tr><th>Ora</th><th>Evento</th><th>Stato</th></tr></thead>
+      <tbody>
+        <tr><td>10:00</td><td>Missione TOC → volontario</td><td class="status-inviato">inviato</td></tr>
+        <tr><td>10:15</td><td>Reset notifica mobile</td><td class="status-registrato">registrato</td></tr>
+        <tr><td>10:15</td><td>Allarme volontario (Altro: «arrivati al target»)</td><td class="status-inviato">inviato</td></tr>
+        <tr><td>10:30</td><td>Fine evento missione TOC</td><td class="status-chiuso">chiuso</td></tr>
+      </tbody>
+    </table>
+
+    <h3>NON compare nel log</h3>
+    <p>GPS periodico, navigazione mappa, aggiornamenti dashboard in tempo reale.</p>
+    <p>Login e logout squadra <strong>sono invece registrati</strong> (tabella <code>squad_session_auth_logs</code>).</p>
+
+    <h3>SQL Supabase richiesti</h3>
+    <ol>
+      <li><code>sql/event_logs_and_campo.sql</code></li>
+      <li><code>sql/squad_session_auth_logs.sql</code> (login/logout squadre)</li>
+      <li><code>sql/squad_alarms_request_types.sql</code></li>
+      <li><code>sql/toc_mission_logs.sql</code></li>
+      <li><code>sql/squad_event_flow.sql</code> (reset notifica mobile)</li>
+      <li><code>sql/map_routes.sql</code> (vie TRK)</li>
+    </ol>
+  </section>
+
+  <section id="s7" class="page-section">
+    <h2>7. Ruoli e checklist</h2>
+
+    <h3>Ruoli TOC</h3>
+    <table>
+      <thead><tr><th>Funzione</th><th>Admin</th><th>Viewer</th><th>Campo</th></tr></thead>
+      <tbody>
+        <tr><td>Dashboard, push, Fine evento</td><td>✓</td><td>✓</td><td>✓</td></tr>
+        <tr><td>Log evento lettura</td><td>✓</td><td>✓</td><td>—</td></tr>
+        <tr><td>Cancella log</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Logout forzato squadra</td><td>✓</td><td>—</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Checklist TOC (giorno evento)</h3>
+    <ol>
+      <li>Login TOC, evento attivo.</li>
+      <li>Mappa su schermo grande (secondo monitor).</li>
+      <li>Verifica squadre online e log login/logout in «Log evento».</li>
+      <li>Push missioni: squadra + via + target.</li>
+      <li>Monitora allarmi (col. 2) e missioni (col. 3).</li>
+      <li>Fine evento su ogni riga gestita.</li>
+      <li>Export log CSV/PDF a fine giornata.</li>
+    </ol>
+
+    <h3>Checklist volontario</h3>
+    <ol>
+      <li>Login, GPS e push attiva (verde).</li>
+      <li>Allarme mappa solo se serve evidenziare al TOC.</li>
+      <li>Dopo ordine TOC: esegui, eventualmente «Altro», poi reset notifica.</li>
+      <li>Reset notifica ≠ «ho finito» — aspetta Fine evento TOC.</li>
+    </ol>
+
+    <footer class="print-foot">
+      gestSQUADRE — Manuale operativo · Android + iOS · Open Golf / TOC · Chief T.O.C. Roberto Ronco
+    </footer>
+  </section>
+
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+</body>
+</html>
