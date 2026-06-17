@@ -16,6 +16,9 @@ final class SquadViewModel: ObservableObject {
     @Published var gpsStatusLabel: String?
     @Published var lastGpsAccuracyM: Double?
     @Published var needsLocationPermission = false
+    @Published var needsNotificationPermission = false
+    @Published var pushStatusLabel: String?
+    @Published var pushStatusOk = false
     @Published var showAlarmSheet = false
     @Published var isAlarmBusy = false
 
@@ -27,6 +30,7 @@ final class SquadViewModel: ObservableObject {
     private var lastPublished: GpsPosition?
     private var lastPublishedAtMs: Int64?
     private var sessionWatchTimer: Timer?
+    private var pushWatchTimer: Timer?
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
@@ -36,6 +40,7 @@ final class SquadViewModel: ObservableObject {
         }
         let config = GestSquadreConfig(supabaseUrl: url, supabaseAnonKey: key)
         facade = GestSquadreFacade(config: config)
+        observePushBus()
         restoreSessionOnStart()
     }
 
@@ -77,6 +82,7 @@ final class SquadViewModel: ObservableObject {
         isBusy = true
         stopGpsTracking()
         stopSessionWatchdog()
+        stopPushWatchdog()
         facade.logoutSquadSafe(session: session) { [weak self] errorMessage in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -95,6 +101,17 @@ final class SquadViewModel: ObservableObject {
         guard locationTracker.hasLocationPermission() else { return }
         needsLocationPermission = false
         startGpsTracking()
+    }
+
+    func onNotificationPermissionGranted() {
+        needsNotificationPermission = false
+        guard let facade, let session else { return }
+        registerFcmForSession(session, facade: facade)
+    }
+
+    func retryPushRegistration() {
+        guard let facade, let session else { return }
+        registerFcmForSession(session, facade: facade)
     }
 
     func sendAlarm(
@@ -198,11 +215,104 @@ final class SquadViewModel: ObservableObject {
         bannerMessage = nil
         gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
         lastGpsAccuracyM = nil
+        lastTocMessage = TocMessageStorage.shared.load()
         startGpsTracking()
         startSessionWatchdog()
+        setupPushForSession(session)
+    }
+
+    private func setupPushForSession(_ session: SquadSession) {
+        guard let facade else { return }
+        FcmManager.shared.configureIfNeeded()
+        if FcmManager.shared.isConfigured {
+            bindFcmSession(session, facade: facade)
+            FcmManager.shared.hasNotificationPermission { [weak self] granted in
+                guard let self else { return }
+                if !granted {
+                    self.needsNotificationPermission = true
+                    FcmManager.shared.requestNotificationPermission { _ in }
+                }
+                self.registerFcmForSession(session, facade: facade)
+            }
+        } else {
+            pushStatusLabel = "Push TOC disabilitata (Firebase iOS non configurato)."
+            pushStatusOk = false
+            bannerMessage = "Push TOC disabilitata: aggiungi FIREBASE_IOS_* in dart-defines.json."
+        }
+    }
+
+    private func bindFcmSession(_ session: SquadSession, facade: GestSquadreFacade) {
+        FcmSessionRegistry.shared.bind(session: session) { active, token in
+            facade.registerFcmTokenSafe(
+                sessionId: active.sessionId,
+                squadId: active.squadId,
+                token: token
+            ) { _ in }
+        }
+    }
+
+    private func registerFcmForSession(_ session: SquadSession, facade: GestSquadreFacade) {
+        bindFcmSession(session, facade: facade)
+        FcmManager.shared.registerToken(facade: facade, session: session) { [weak self] err in
+            guard let self else { return }
+            if let err {
+                let registeredOnServer = err.localizedCaseInsensitiveContains("Push registrata")
+                self.pushStatusLabel = err
+                self.pushStatusOk = registeredOnServer
+                if !registeredOnServer {
+                    self.bannerMessage = err
+                }
+            } else {
+                self.pushStatusLabel = "Push TOC: attiva (il server può inviarti allarmi)."
+                self.pushStatusOk = true
+                if let banner = self.bannerMessage,
+                   banner.localizedCaseInsensitiveContains("push") ||
+                   banner.localizedCaseInsensitiveContains("notifiche") ||
+                   banner.localizedCaseInsensitiveContains("firebase") {
+                    self.bannerMessage = nil
+                }
+            }
+            self.startPushWatchdog(session: session, facade: facade)
+        }
+    }
+
+    private func startPushWatchdog(session: SquadSession, facade: GestSquadreFacade) {
+        stopPushWatchdog()
+        guard FcmManager.shared.isConfigured else { return }
+        pushWatchTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            guard let self, self.isLoggedIn else { return }
+            self.registerFcmForSession(session, facade: facade)
+        }
+    }
+
+    private func stopPushWatchdog() {
+        pushWatchTimer?.invalidate()
+        pushWatchTimer = nil
+    }
+
+    private func observePushBus() {
+        NotificationCenter.default.addObserver(
+            forName: FcmPushBus.messageReceived,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            let title = notification.userInfo?["title"] as? String ?? ""
+            let body = notification.userInfo?["body"] as? String ?? ""
+            self.lastTocMessage = TocMessageStorage.formatDisplayMessage(title: title, body: body)
+        }
+        NotificationCenter.default.addObserver(
+            forName: FcmPushBus.panelCleared,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.lastTocMessage = nil
+        }
     }
 
     private func clearLocalSession() {
+        stopPushWatchdog()
+        FcmSessionRegistry.shared.clear()
         session = nil
         sessionStorage.clear()
         isLoggedIn = false
@@ -211,6 +321,10 @@ final class SquadViewModel: ObservableObject {
         gpsStatusLabel = nil
         lastGpsAccuracyM = nil
         needsLocationPermission = false
+        needsNotificationPermission = false
+        pushStatusLabel = nil
+        pushStatusOk = false
+        lastTocMessage = nil
         statusMessage = "Log-out completato."
     }
 
@@ -220,8 +334,19 @@ final class SquadViewModel: ObservableObject {
             guard let self, self.isLoggedIn, let facade, !self.sessionId.isEmpty else { return }
             facade.isSessionOnlineSafe(sessionId: self.sessionId) { online, _ in
                 DispatchQueue.main.async {
-                    if !online {
+                    if !online.boolValue {
                         self.handleRemoteLogout()
+                        return
+                    }
+                    if self.lastTocMessage != nil {
+                        facade.isTocPanelClosedByTocSafe(sessionId: self.sessionId) { closed, _ in
+                            DispatchQueue.main.async {
+                                if closed.boolValue {
+                                    TocMessageStorage.shared.clear()
+                                    self.lastTocMessage = nil
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -236,6 +361,8 @@ final class SquadViewModel: ObservableObject {
     private func handleRemoteLogout() {
         stopGpsTracking()
         stopSessionWatchdog()
+        stopPushWatchdog()
+        FcmSessionRegistry.shared.clear()
         sessionStorage.clear()
         session = nil
         isLoggedIn = false
@@ -243,6 +370,9 @@ final class SquadViewModel: ObservableObject {
         sessionLabel = ""
         gpsStatusLabel = nil
         lastGpsAccuracyM = nil
+        pushStatusLabel = nil
+        pushStatusOk = false
+        lastTocMessage = nil
         bannerMessage = "Sessione chiusa: login su un altro telefono o logout dal TOC."
     }
 

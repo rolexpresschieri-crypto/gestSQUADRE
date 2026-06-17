@@ -144,3 +144,32 @@ fun GestSquadreFacade.refreshTocMapSafe(
         }
     }
 }
+
+fun GestSquadreFacade.registerFcmTokenSafe(
+    sessionId: String,
+    squadId: String,
+    token: String,
+    onComplete: (String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            registerFcmToken(sessionId, squadId, token)
+            onComplete(null)
+        } catch (e: Throwable) {
+            onComplete(e.message ?: e.toString())
+        }
+    }
+}
+
+fun GestSquadreFacade.isTocPanelClosedByTocSafe(
+    sessionId: String,
+    onComplete: (Boolean, String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            onComplete(isTocPanelClosedByToc(sessionId), null)
+        } catch (e: Throwable) {
+            onComplete(false, e.message ?: e.toString())
+        }
+    }
+}

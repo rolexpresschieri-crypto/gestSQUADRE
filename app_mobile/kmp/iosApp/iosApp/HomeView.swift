@@ -25,7 +25,7 @@ struct HomeView: View {
                             .padding(.bottom, 12)
 
                         TacticalBodyText(
-                            text: "Reset notifica: solo sul telefono (registrato su log). La chiusura evento √® solo dal TOC.",
+                            text: "Reset notifica: solo sul telefono (registrato su log). La chiusura evento ù solo dal TOC.",
                             fontSize: 12
                         )
                         .padding(.bottom, 8)
@@ -132,6 +132,24 @@ struct HomeView: View {
                     text: "Consenti l'accesso alla posizione per inviare il GPS al TOC.",
                     fontSize: 13,
                     color: TacticalColors.orange
+                )
+                .padding(.bottom, 8)
+            }
+            if let pushLabel = viewModel.pushStatusLabel {
+                TacticalBodyText(
+                    text: pushLabel,
+                    fontSize: 13,
+                    color: viewModel.pushStatusOk ? TacticalColors.gpsGood : TacticalColors.red
+                )
+                .padding(.bottom, 8)
+            }
+            if !viewModel.pushStatusOk, viewModel.isLoggedIn {
+                MainButton(
+                    label: "Ripara push TOC",
+                    backgroundColor: TacticalColors.navy,
+                    foregroundColor: .white,
+                    enabled: !viewModel.isBusy,
+                    action: { viewModel.retryPushRegistration() }
                 )
                 .padding(.bottom, 8)
             }

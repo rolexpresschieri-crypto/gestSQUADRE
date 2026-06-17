@@ -66,4 +66,4 @@ Il TOC resta su **Windows**; l’app parla solo con **Supabase** in cloud.
 - [x] Log-in / Log-out iOS (stessi pulsanti Android, UI tactical)
 - [x] Mappa TOC in-app iOS (MapKit, squadre/waypoint/allarmi)
 - [x] Session restore + watchdog iOS
-- [ ] Push FCM / APNs
+- [ ] Push FCM / APNs iOS (codice pronto; richiede FIREBASE_IOS_* + iPhone fisico)

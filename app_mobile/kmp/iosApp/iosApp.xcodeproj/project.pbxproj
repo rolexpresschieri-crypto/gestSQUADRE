@@ -21,6 +21,14 @@
 		D1E2F3A41F60718293A4B5E9 /* TocMapViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */; };
 		D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */; };
 		D1E2F3A41F60718293A4B5EB /* logo_open_golf_2026.png in Resources */ = {isa = PBXBuildFile; fileRef = D1E2F3A41F60718293A4B5F0 /* logo_open_golf_2026.png */; };
+		E1F2A3B41F60718293A4B601 /* FcmManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B611 /* FcmManager.swift */; };
+		E1F2A3B41F60718293A4B602 /* PushAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B612 /* PushAppDelegate.swift */; };
+		E1F2A3B41F60718293A4B603 /* TocMessageStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B613 /* TocMessageStorage.swift */; };
+		E1F2A3B41F60718293A4B604 /* FcmPushBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B614 /* FcmPushBus.swift */; };
+		E1F2A3B41F60718293A4B605 /* FcmSessionRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B615 /* FcmSessionRegistry.swift */; };
+		E1F2A3B41F60718293A4B606 /* firebase-config.json in Resources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B616 /* firebase-config.json */; };
+		E1F2A3B41F60718293A4B607 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E1F2A3B41F60718293A4B621 /* FirebaseCore */; };
+		E1F2A3B41F60718293A4B608 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = E1F2A3B41F60718293A4B622 /* FirebaseMessaging */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -41,6 +49,13 @@
 		D1E2F3A41F60718293A4B5F8 /* TocMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocMapView.swift; sourceTree = "<group>"; };
 		D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocMapViewModel.swift; sourceTree = "<group>"; };
 		D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStorage.swift; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B610 /* iosApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = iosApp.entitlements; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B611 /* FcmManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FcmManager.swift; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B612 /* PushAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushAppDelegate.swift; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B613 /* TocMessageStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocMessageStorage.swift; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B614 /* FcmPushBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FcmPushBus.swift; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B615 /* FcmSessionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FcmSessionRegistry.swift; sourceTree = "<group>"; };
+		E1F2A3B41F60718293A4B616 /* firebase-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "firebase-config.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -48,6 +63,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E1F2A3B41F60718293A4B607 /* FirebaseCore in Frameworks */,
+				E1F2A3B41F60718293A4B608 /* FirebaseMessaging in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +92,7 @@
 			isa = PBXGroup;
 			children = (
 				7555FF8C242A565B00829871 /* Info.plist */,
+				E1F2A3B41F60718293A4B610 /* iosApp.entitlements */,
 				B2C3D4E51F60718293A4B5C6 /* iosApp.swift */,
 				D1E2F3A41F60718293A4B5F7 /* GestSquadreRootView.swift */,
 				D1E2F3A41F60718293A4B5F4 /* HomeView.swift */,
@@ -86,8 +104,14 @@
 				D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */,
 				D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */,
 				D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */,
+				E1F2A3B41F60718293A4B611 /* FcmManager.swift */,
+				E1F2A3B41F60718293A4B612 /* PushAppDelegate.swift */,
+				E1F2A3B41F60718293A4B613 /* TocMessageStorage.swift */,
+				E1F2A3B41F60718293A4B614 /* FcmPushBus.swift */,
+				E1F2A3B41F60718293A4B615 /* FcmSessionRegistry.swift */,
 				B2C3D4E51F60718293A4B5C8 /* SquadViewModel.swift */,
 				C2D3E4F51F60718293A4B5DA /* supabase-config.json */,
+				E1F2A3B41F60718293A4B616 /* firebase-config.json */,
 				D1E2F3A41F60718293A4B5F0 /* logo_open_golf_2026.png */,
 			);
 			path = iosApp;
@@ -119,6 +143,10 @@
 			dependencies = (
 			);
 			name = iosApp;
+			packageProductDependencies = (
+				E1F2A3B41F60718293A4B621 /* FirebaseCore */,
+				E1F2A3B41F60718293A4B622 /* FirebaseMessaging */,
+			);
 			productName = iosApp;
 			productReference = B2C3D4E51F60718293A4B5C9 /* gestSQUADRE.app */;
 			productType = "com.apple.product-type.application";
@@ -146,6 +174,9 @@
 				Base,
 			);
 			mainGroup = 7555FF72242A565900829871;
+			packageReferences = (
+				E1F2A3B41F60718293A4B620 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+			);
 			productRefGroup = 7555FF7C242A565900829871 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -161,6 +192,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C2D3E4F51F60718293A4B5DB /* supabase-config.json in Resources */,
+				E1F2A3B41F60718293A4B606 /* firebase-config.json in Resources */,
 				D1E2F3A41F60718293A4B5EB /* logo_open_golf_2026.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -203,6 +235,7 @@
 			outputPaths = (
 				"$(SRCROOT)/Configuration/Config.xcconfig",
 				"$(SRCROOT)/iosApp/supabase-config.json",
+				"$(SRCROOT)/iosApp/firebase-config.json",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -226,6 +259,11 @@
 				D1E2F3A41F60718293A4B5E1 /* TacticalTheme.swift in Sources */,
 				D1E2F3A41F60718293A4B5E2 /* TacticalComponents.swift in Sources */,
 				D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */,
+				E1F2A3B41F60718293A4B601 /* FcmManager.swift in Sources */,
+				E1F2A3B41F60718293A4B602 /* PushAppDelegate.swift in Sources */,
+				E1F2A3B41F60718293A4B603 /* TocMessageStorage.swift in Sources */,
+				E1F2A3B41F60718293A4B604 /* FcmPushBus.swift in Sources */,
+				E1F2A3B41F60718293A4B605 /* FcmSessionRegistry.swift in Sources */,
 				B2C3D4E51F60718293A4B5D3 /* SquadViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -280,6 +318,7 @@
 		7555FFA6242A565B00829871 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 9GZ3AN39J2;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -306,6 +345,7 @@
 		7555FFA7242A565B00829871 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 9GZ3AN39J2;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -351,6 +391,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E1F2A3B41F60718293A4B620 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E1F2A3B41F60718293A4B621 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1F2A3B41F60718293A4B620 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		E1F2A3B41F60718293A4B622 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E1F2A3B41F60718293A4B620 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7555FF73242A565900829871 /* Project object */;
 }

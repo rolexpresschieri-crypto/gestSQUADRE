@@ -18,7 +18,9 @@ struct GestSquadreRootView: View {
 
     var body: some View {
         ZStack {
-            GlobalAppBackground()
+            if screen != .splash {
+                GlobalAppBackground()
+            }
             switch screen {
             case .splash:
                 LaunchSplashView()
@@ -64,16 +66,21 @@ struct GestSquadreRootView: View {
                     .onTapGesture { self.toastMessage = nil }
             }
         }
-        .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5.5) {
-                if screen == .splash {
-                    screen = .home
-                }
+        .task(id: screen) {
+            guard screen == .splash else { return }
+            try? await Task.sleep(nanoseconds: 5_500_000_000)
+            if screen == .splash {
+                screen = .home
             }
         }
         .onChange(of: scenePhase) { phase in
-            if phase == .active, viewModel.isLoggedIn, viewModel.needsLocationPermission {
-                viewModel.onLocationPermissionGranted()
+            if phase == .active {
+                if viewModel.isLoggedIn, viewModel.needsLocationPermission {
+                    viewModel.onLocationPermissionGranted()
+                }
+                if viewModel.isLoggedIn, viewModel.needsNotificationPermission {
+                    viewModel.onNotificationPermissionGranted()
+                }
             }
         }
     }

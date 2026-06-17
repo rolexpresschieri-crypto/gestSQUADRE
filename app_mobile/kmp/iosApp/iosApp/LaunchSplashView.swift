@@ -4,14 +4,18 @@ struct LaunchSplashView: View {
     @State private var progress: CGFloat = 0
 
     var body: some View {
-        ZStack {
-            GlobalAppBackground()
-            GeometryReader { geo in
-                let logoScale = 0.34 + (0.68 * progress)
-                let logoOffsetY = geo.size.height * (-0.37 + (0.18 * progress))
+        GeometryReader { geo in
+            let height = geo.size.height
+            let width = geo.size.width
+            let logoScale = 0.34 + (0.68 * progress)
+            let logoAlignY = -0.74 + (0.36 * progress)
+            let logoY = height * ((1 + logoAlignY) / 2)
+
+            ZStack {
+                GlobalAppBackground()
 
                 OpenGolfLogoBanner(width: 286 * logoScale)
-                    .position(x: geo.size.width / 2, y: logoOffsetY)
+                    .position(x: width / 2, y: logoY)
 
                 Text("GESTIONE\nSQUADRE")
                     .font(.system(size: 44, weight: .black))
@@ -19,7 +23,7 @@ struct LaunchSplashView: View {
                     .foregroundStyle(.white)
                     .shadow(color: .black, radius: 8, y: 2)
                     .opacity(titleAlpha)
-                    .position(x: geo.size.width / 2, y: geo.size.height * 0.56)
+                    .position(x: width / 2, y: height / 2 + 123)
 
                 Text("by R. Ronco")
                     .font(.system(size: 18, weight: .regular))
@@ -30,9 +34,10 @@ struct LaunchSplashView: View {
                     .background(Color.black.opacity(0.42))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .opacity(signatureAlpha)
-                    .position(x: geo.size.width - 72, y: geo.size.height - 52)
+                    .position(x: width - 72, y: height - 52)
             }
         }
+        .ignoresSafeArea()
         .onAppear {
             withAnimation(.easeOut(duration: 4.3)) {
                 progress = 1

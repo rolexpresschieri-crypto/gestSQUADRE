@@ -32,3 +32,18 @@ cd c:\Users\rronc\gestSQUADRE\app_mobile\gest_squadre
 
 - `https://localhost:3000/api/push-health` → `fcmTokenRows` ≥ 1 dopo login sul cell.
 - In app, dopo login: non deve comparire *“Push TOC disabilitata…”*.
+
+## iOS (gestSQUADRE KMP)
+
+1. Firebase Console → app **gestSQUADRE iOS** (`com.ansmi.gestsquadre`) → scarica `GoogleService-Info.plist`
+2. Copia in `app_mobile/gest_squadre/assets/firebase/GoogleService-Info.plist`
+3. Da PowerShell:
+
+```powershell
+cd app_mobile\gest_squadre
+.\scripts\sync-firebase-ios-dart-defines.ps1
+```
+
+4. Sul Mac: `cd app_mobile/kmp && ./iosApp/sync-config.sh` prima del build Xcode su iPhone fisico.
+
+Guida completa: `docs/PUSH-IOS-SETUP.md`.
