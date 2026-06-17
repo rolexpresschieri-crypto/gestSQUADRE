@@ -63,6 +63,7 @@ Il TOC resta su **Windows**; l’app parla solo con **Supabase** in cloud.
 - [x] App iOS SwiftUI — login base (fase 2)
 - [x] GPS iOS (CoreLocation)
 - [x] Allarme mappa TOC (iOS — UI base, tema tactical in seguito)
-- [x] Log-in / Log-out iOS (stessi pulsanti Android, UI base)
-- [ ] Push FCM / APNs
-- [ ] UI iOS completa (mappa, allarmi, pannello TOC)
+- [x] Log-in / Log-out iOS (stessi pulsanti Android, UI tactical)
+- [x] Mappa TOC in-app iOS (MapKit, squadre/waypoint/allarmi)
+- [x] Session restore + watchdog iOS
+- [ ] Push FCM / APNs iOS (codice pronto; richiede FIREBASE_IOS_* + iPhone fisico)

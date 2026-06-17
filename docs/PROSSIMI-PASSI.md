@@ -5,7 +5,7 @@
 | Componente | Stato |
 |------------|--------|
 | App Flutter (home, login, GPS, allarme mappa) | Pronta |
-| App KMP iOS (login, log-out, GPS, allarme mappa) | Pronta (UI base) |
+| App KMP iOS (login, GPS, allarme, UI tactical, mappa, push FCM) | Codice pronto — config Firebase iOS + iPhone fisico |
 | App KMP Android | Pronta (UI tactical completa) |
 | Backend TOC (mappa, rosso allarme, push) | Pronta |
 | SQL Supabase `schema_v1.sql` | Da eseguire sul **nuovo** progetto |
