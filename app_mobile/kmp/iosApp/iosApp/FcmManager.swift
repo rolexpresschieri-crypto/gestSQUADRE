@@ -1,6 +1,7 @@
 import FirebaseCore
 import FirebaseMessaging
 import Foundation
+import shared
 import UIKit
 import UserNotifications
 
@@ -23,7 +24,7 @@ struct FirebaseBundleConfig: Decodable {
 enum TocPushParser {
     static func tocTitle(from userInfo: [AnyHashable: Any]) -> String {
         let title = (userInfo["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return title.isEmpty ? "TOC � ALLARME" : title
+        return title.isEmpty ? "TOC — ALLARME" : title
     }
 
     static func tocBody(from userInfo: [AnyHashable: Any]) -> String {
@@ -43,8 +44,14 @@ final class FcmManager {
     static let shared = FcmManager()
 
     private(set) var isConfigured = false
+    private var pendingTokenUpload: (() -> Void)?
 
     private init() {}
+
+    func onApnsTokenRegistered() {
+        pendingTokenUpload?()
+        pendingTokenUpload = nil
+    }
 
     func configureIfNeeded() {
         guard !isConfigured else { return }
@@ -95,7 +102,7 @@ final class FcmManager {
         hasNotificationPermission { [weak self] granted in
             guard let self else { return }
             if !granted {
-                self.fetchAndUploadToken(facade: facade, session: session, notificationsMissing: true, completion: completion)
+                completion("Abilita le notifiche in Impostazioni → gestSQUADRE, poi tocca «Ripara push TOC».")
                 return
             }
             UIApplication.shared.registerForRemoteNotifications()
@@ -148,6 +155,32 @@ final class FcmManager {
         attempt: Int = 0,
         completion: @escaping (String?) -> Void
     ) {
+        if !notificationsMissing, Messaging.messaging().apnsToken == nil {
+            if attempt < 10 {
+                pendingTokenUpload = { [weak self] in
+                    self?.fetchAndUploadToken(
+                        facade: facade,
+                        session: session,
+                        notificationsMissing: notificationsMissing,
+                        attempt: attempt + 1,
+                        completion: completion
+                    )
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    if Messaging.messaging().apnsToken != nil {
+                        self.onApnsTokenRegistered()
+                    }
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                completion(
+                    "Push in attesa: consenti le notifiche, chiudi e riapri l'app, poi tocca «Ripara push TOC»."
+                )
+            }
+            return
+        }
+
         Messaging.messaging().token { token, error in
             if let token, !token.isEmpty {
                 facade.registerFcmTokenSafe(
@@ -161,7 +194,7 @@ final class FcmManager {
                             return
                         }
                         if notificationsMissing {
-                            completion("Push registrata sul server. Abilita le notifiche in Impostazioni ? gestSQUADRE.")
+                            completion("Push registrata sul server. Abilita le notifiche in Impostazioni → gestSQUADRE.")
                         } else {
                             completion(nil)
                         }

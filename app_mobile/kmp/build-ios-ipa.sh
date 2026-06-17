@@ -43,7 +43,12 @@ OUTPUT_IPA="$ROOT/gestSQUADRE_iOS_${MARKETING_VERSION}.ipa"
 ARCHIVE_DIR="$ROOT/build/ios-archive"
 ARCHIVE_PATH="$ARCHIVE_DIR/gestSQUADRE.xcarchive"
 EXPORT_DIR="$ROOT/build/ios-ipa-export"
-EXPORT_PLIST="$IOS_APP/ExportOptions-${EXPORT_METHOD}.plist"
+case "$EXPORT_METHOD" in
+  development) EXPORT_PLIST_SUFFIX="development" ;;
+  ad-hoc) EXPORT_PLIST_SUFFIX="adhoc" ;;
+  *) EXPORT_PLIST_SUFFIX="$EXPORT_METHOD" ;;
+esac
+EXPORT_PLIST="$IOS_APP/ExportOptions-${EXPORT_PLIST_SUFFIX}.plist"
 
 rm -rf "$ARCHIVE_DIR" "$EXPORT_DIR"
 mkdir -p "$ARCHIVE_DIR"

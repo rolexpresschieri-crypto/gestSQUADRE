@@ -25,7 +25,7 @@ struct HomeView: View {
                             .padding(.bottom, 12)
 
                         TacticalBodyText(
-                            text: "Reset notifica: solo sul telefono (registrato su log). La chiusura evento ù solo dal TOC.",
+                            text: "Reset notifica: solo sul telefono (registrato su log). La chiusura evento √® solo dal TOC.",
                             fontSize: 12
                         )
                         .padding(.bottom, 8)

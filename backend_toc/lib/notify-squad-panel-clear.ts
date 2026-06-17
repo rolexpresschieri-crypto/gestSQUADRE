@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getFirebaseAdminMessaging } from "@/lib/firebase-admin-app";
+import { fcmIosApnsSilentPayload } from "@/lib/fcm-ios-apns";
 
 export async function markLatestTocPushClosed(
   admin: SupabaseClient,
@@ -62,6 +63,7 @@ export async function sendTocPanelClearPush(sessionId: string): Promise<void> {
       token,
       data: { type: "toc_clear_panel" },
       android: { priority: "high" },
+      apns: fcmIosApnsSilentPayload(),
     });
   } catch {
     /* best effort */
