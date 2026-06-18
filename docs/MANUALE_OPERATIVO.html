@@ -280,6 +280,20 @@
       page-break-before: auto;
     }
 
+    .platform-tag {
+      display: inline-block;
+      font-size: 8.5pt;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .platform-android { background: #e8f5e9; color: #2e7d32; }
+    .platform-ios { background: #e3f2fd; color: #1565c0; }
+    .platform-both { background: #f3e5f5; color: #6a0018; }
+
     .status-inviato { color: #1565c0; font-weight: 700; }
     .status-registrato { color: #e65100; font-weight: 700; }
     .status-chiuso { color: #2e7d32; font-weight: 700; }
@@ -309,15 +323,15 @@
     <p class="sub">Manuale operativo — Volontari e TOC</p>
     <p class="sub-toc">Tactical Operations Center</p>
     <p class="meta">
-      Procedure campo, Tactical Operations Center, stati evento
-      (<strong>inviato → registrato → chiuso</strong>) e popolamento log eventi.
+      Installazione APK/IPA, permessi dispositivo, procedure campo, TOC,
+      stati evento (<strong>inviato → registrato → chiuso</strong>) e log eventi.
     </p>
-    <p class="ver">Mobile Android 1.0.15 · Mobile iOS 1.0.15 · Backend TOC 2026</p>
+    <p class="ver">Mobile Android 1.0.18 · Mobile iOS 1.0.2 · Backend TOC 2026</p>
     <p class="meta" style="margin-top:24px;font-size:10pt;">
       Per salvare in PDF: apri questo file nel browser → Stampa → «Salva come PDF»
     </p>
     <p class="chief">Chief T.O.C. - Tactical Operations Center - Roberto Ronco</p>
-    <p class="doc-ver">ver001</p>
+    <p class="doc-ver">ver002</p>
   </section>
 
   <table class="doc-table">
@@ -337,13 +351,197 @@
   <section class="toc">
     <h2>Indice</h2>
     <ol>
+      <li><a href="#s0">Installazione app e permessi (Android · iOS)</a></li>
       <li><a href="#s1">Panoramica sistema</a></li>
-      <li><a href="#s2">App mobile — Volontari</a></li>
+      <li><a href="#s2">App mobile — Volontari (uso operativo)</a></li>
       <li><a href="#s3">TOC web — Operatori</a></li>
       <li><a href="#s4">Regole Volontario vs TOC (definitive)</a></li>
       <li><a href="#s5">Diagrammi di flusso</a></li>
       <li><a href="#s6">Log eventi — cosa e quando</a></li>
       <li><a href="#s7">Ruoli e checklist</a></li>
+    </ol>
+  </section>
+
+  <section id="s0" class="page-section">
+    <h2>0. Installazione app e permessi (Android · iOS)</h2>
+
+    <div class="rule">
+      Prima del servizio in campo ogni volontario deve avere <strong>gestSQUADRE installata</strong>
+      e i <strong>permessi attivi</strong> (posizione + notifiche). Il Chief TOC coordina distribuzione APK/IPA
+      e raccolta UDID per iPhone.
+    </div>
+
+    <h3>0.1 Chi fa cosa</h3>
+    <table>
+      <thead>
+        <tr><th>Ruolo</th><th>Android (APK)</th><th>iOS (IPA / iPhone)</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Chief TOC / tecnico</strong></td>
+          <td>Distribuisce file APK aggiornato ai volontari</td>
+          <td>Raccoglie UDID, registra iPhone su Apple Developer, distribuisce IPA o TestFlight</td>
+        </tr>
+        <tr>
+          <td><strong>Volontario</strong></td>
+          <td>Installa APK e attiva permessi</td>
+          <td>Invia UDID al TOC, installa app, attiva permessi, test login</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3><span class="platform-tag platform-android">ANDROID</span> 0.2 File APK — dove e come si ottiene</h3>
+    <ul>
+      <li><strong>File:</strong> <code>gestSQUADRE_KMP_dev_1.0.18.apk</code> (o versione indicata dal TOC).</li>
+      <li><strong>Chi lo genera:</strong> tecnico su PC Windows con build KMP (<code>kmp-dev.bat</code>).</li>
+      <li><strong>Come arriva al volontario:</strong> USB, email, link cloud, WhatsApp, QR (stesso file per tutti gli Android).</li>
+      <li><strong>Package app:</strong> <code>com.ansmi.gest_squadre</code> — icona gestSQUADRE.</li>
+    </ul>
+
+    <h3><span class="platform-tag platform-android">ANDROID</span> 0.3 Installazione APK sul telefono</h3>
+    <ol>
+      <li>Apri il file APK ricevuto (app <strong>File</strong>, Gmail, Drive, ecc.).</li>
+      <li>Se Android chiede conferma: <strong>Impostazioni → Consenti installazione da questa app</strong>
+        (o «Origini sconosciute» su modelli precedenti).</li>
+      <li>Tocca <strong>Installa</strong> → al termine <strong>Apri</strong>.</li>
+      <li><strong>Alternativa tecnico (USB):</strong> attiva <strong>Opzioni sviluppatore → Debug USB</strong> sul telefono,
+        collega al PC, autorizza il computer, poi <code>adb install -r gestSQUADRE_....apk</code>.</li>
+    </ol>
+
+    <h3><span class="platform-tag platform-android">ANDROID</span> 0.4 Permessi obbligatori</h3>
+    <table>
+      <thead>
+        <tr><th>Permesso</th><th>Quando compare</th><th>Cosa scegliere</th><th>Perché serve</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Posizione</strong> (GPS)</td>
+          <td>Al login o al primo avvio dopo installazione</td>
+          <td><strong>Consenti</strong> — preferibilmente <strong>Mentre usi l'app</strong></td>
+          <td>Invio posizione live al TOC sulla mappa</td>
+        </tr>
+        <tr>
+          <td><strong>Notifiche</strong></td>
+          <td>Al login (Android 13 e successivi)</td>
+          <td><strong>Consenti</strong></td>
+          <td>Ricezione push TOC, allarmi e missioni</td>
+        </tr>
+        <tr>
+          <td><strong>Internet</strong></td>
+          <td>Automatico (non chiede di solito)</td>
+          <td>—</td>
+          <td>Connessione a Supabase (login, GPS, allarmi)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Verifica manuale:</strong> Impostazioni → App → gestSQUADRE → Autorizzazioni →
+      Posizione e Notifiche devono essere <strong>consentite</strong>.</p>
+
+    <h3><span class="platform-tag platform-ios">iOS</span> 0.5 Panoramica installazione iPhone</h3>
+    <ul>
+      <li>Su iPhone <strong>non</strong> si usa un file APK: l'app è distribuita come <strong>IPA</strong>
+        (Ad Hoc), via <strong>TestFlight</strong>, oppure installata dal tecnico con <strong>Mac + Xcode</strong>.</li>
+      <li><strong>Bundle ID:</strong> <code>com.ansmi.gestsquadre</code>.</li>
+      <li>Per distribuzione <strong>Ad Hoc</strong> (tipica in evento): ogni iPhone deve essere
+        <strong>registrato in anticipo</strong> tramite il suo <strong>UDID</strong>.</li>
+    </ul>
+
+    <h3><span class="platform-tag platform-ios">iOS</span> 0.6 Recupero UDID dall'iPhone (obbligatorio)</h3>
+    <p>L'<strong>UDID</strong> è l'identificativo univoco del telefono. Senza UDID registrato,
+      l'IPA Ad Hoc <strong>non si installa</strong>. Inviare l'UDID al Chief TOC <strong>almeno 24–48 ore prima</strong> dell'evento.</p>
+
+    <p><strong>Metodo A — iPhone collegato a Mac (consigliato)</strong></p>
+    <ol>
+      <li>Collega l'iPhone al Mac con cavo USB (accetta «Fidati di questo computer»).</li>
+      <li>Apri <strong>Finder</strong> → seleziona l'iPhone nella barra laterale.</li>
+      <li>Sotto il nome del dispositivo, clicca ripetutamente su <strong>Numero di serie</strong>
+        finché compare <strong>Identificatore (UDID)</strong>.</li>
+      <li>Tasto destro sull'UDID → <strong>Copia</strong> → invia al TOC (email / messaggio con nome squadra).</li>
+    </ol>
+
+    <p><strong>Metodo B — Xcode (tecnico Mac)</strong></p>
+    <ol>
+      <li>Xcode → menu <strong>Window → Devices and Simulators</strong>.</li>
+      <li>Seleziona l'iPhone collegato → campo <strong>Identifier</strong> = UDID → copia e archivia.</li>
+    </ol>
+
+    <p><strong>Metodo C — Volontario senza Mac</strong></p>
+    <ul>
+      <li>Porta l'iPhone al <strong>punto TOC</strong> il giorno prima: il tecnico legge l'UDID con Finder/Xcode.</li>
+      <li>In alternativa il TOC può fornire un <strong>link profilo temporaneo</strong> (MDM/UDID collector) da aprire in Safari — solo se preparato dal tecnico.</li>
+    </ul>
+    <div class="warn">
+      Apple <strong>non mostra</strong> l'UDID completo nelle Impostazioni iPhone in modo diretto.
+      Senza Mac o assistenza TOC l'installazione Ad Hoc non è possibile: usare TestFlight se disponibile.
+    </div>
+
+    <h3><span class="platform-tag platform-ios">iOS</span> 0.7 Registrazione dispositivo (Chief TOC / tecnico Mac)</h3>
+    <ol>
+      <li>Accedi a <strong>developer.apple.com</strong> → Certificates, Identifiers &amp; Profiles → <strong>Devices</strong>.</li>
+      <li><strong>+</strong> nuovo dispositivo → incolla UDID → nome descrittivo (es. <code>GT_SM_01-iPhone15</code>).</li>
+      <li>Rigenera il <strong>Provisioning Profile Ad Hoc</strong> includendo tutti i dispositivi registrati.</li>
+      <li>Ricompila l'IPA in Xcode con il profilo aggiornato (<code>Product → Archive → Distribute → Ad Hoc</code>).</li>
+    </ol>
+
+    <h3><span class="platform-tag platform-ios">iOS</span> 0.8 Installazione app su iPhone</h3>
+
+    <p><strong>Opzione 1 — Ad Hoc (distribuzione evento)</strong></p>
+    <ol>
+      <li>Il TOC invia link di installazione IPA (o file via AirDrop/email se previsto).</li>
+      <li>Al primo avvio: <strong>Impostazioni → Generali → VPN e gestione dispositivo</strong> →
+        seleziona certificato sviluppatore → <strong>Fidati</strong>.</li>
+      <li>Apri gestSQUADRE dall'icona home.</li>
+    </ol>
+
+    <p><strong>Opzione 2 — TestFlight</strong></p>
+    <ol>
+      <li>Ricevi invito email dal TOC / App Store Connect.</li>
+      <li>Installa l'app <strong>TestFlight</strong> dall'App Store → accetta invito gestSQUADRE → Installa.</li>
+    </ol>
+
+    <p><strong>Opzione 3 — Xcode diretto (solo tecnico, test pre-evento)</strong></p>
+    <ol>
+      <li>Mac con progetto <code>app_mobile/kmp/iosApp</code> → iPhone collegato USB.</li>
+      <li>Xcode → seleziona iPhone → <strong>Run</strong> (⌘R). Utile per verifiche, non per tutta la flotta.</li>
+    </ol>
+
+    <h3><span class="platform-tag platform-ios">iOS</span> 0.9 Permessi obbligatori</h3>
+    <table>
+      <thead>
+        <tr><th>Permesso</th><th>Quando compare</th><th>Cosa scegliere</th><th>Perché serve</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Posizione</strong></td>
+          <td>Al login o primo avvio</td>
+          <td><strong>Consenti</strong> → <strong>Durante l'uso dell'app</strong></td>
+          <td>Invio GPS al TOC durante il servizio</td>
+        </tr>
+        <tr>
+          <td><strong>Notifiche</strong></td>
+          <td>Al login o primo avvio</td>
+          <td><strong>Consenti</strong></td>
+          <td>Push TOC, allarmi e messaggi missione</td>
+        </tr>
+        <tr>
+          <td><strong>Rete / dati</strong></td>
+          <td>Automatico</td>
+          <td>Wi‑Fi o dati mobili attivi</td>
+          <td>Comunicazione con Supabase</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><strong>Verifica manuale:</strong> Impostazioni → gestSQUADRE →
+      <strong>Posizione</strong> e <strong>Notifiche</strong> attive.</p>
+
+    <h3><span class="platform-tag platform-both">ENTRAMBI</span> 0.10 Checklist pre-servizio volontario</h3>
+    <ol>
+      <li>App <strong>gestSQUADRE</strong> installata e si apre senza errori.</li>
+      <li><strong>Posizione</strong> consentita.</li>
+      <li><strong>Notifiche</strong> consentite.</li>
+      <li>Login di prova con codice squadra e password forniti dal TOC.</li>
+      <li>In home: indicatore <strong>Push TOC: attiva</strong> (verde). Se rosso → <strong>Ripara push TOC</strong>.</li>
+      <li>Il TOC vede la squadra <strong>online</strong> sulla dashboard.</li>
     </ol>
   </section>
 
@@ -367,11 +565,11 @@
   </section>
 
   <section id="s2" class="page-section">
-    <h2>2. App mobile — Volontari</h2>
+    <h2>2. App mobile — Volontari (uso operativo)</h2>
 
     <div class="note">
-      Le stesse procedure valgono per <strong>Android</strong> (APK) e <strong>iOS</strong> (gestSQUADRE).
-      Le funzionalità operative sono equivalenti; cambia solo l’installazione (APK su Android, app da Xcode su iPhone).
+      Per <strong>installazione APK/IPA e permessi</strong> vedi sezione <strong>§0</strong>.
+      Le procedure sotto valgono per <strong>Android</strong> e <strong>iOS</strong> (stesse funzioni operative).
     </div>
 
     <h3>2.1 Login squadra</h3>
@@ -716,6 +914,7 @@
 
     <h3>Checklist TOC (giorno evento)</h3>
     <ol>
+      <li>Verificato che tutti i volontari abbiano app installata e permessi attivi (§0).</li>
       <li>Login TOC, evento attivo.</li>
       <li>Mappa su schermo grande (secondo monitor).</li>
       <li>Verifica squadre online e log login/logout in «Log evento».</li>
@@ -727,6 +926,7 @@
 
     <h3>Checklist volontario</h3>
     <ol>
+      <li>Completata checklist installazione e permessi (§0.10).</li>
       <li>Login, GPS e push attiva (verde).</li>
       <li>Allarme mappa solo se serve evidenziare al TOC.</li>
       <li>Dopo ordine TOC: esegui, eventualmente «Altro», poi reset notifica.</li>
@@ -734,7 +934,7 @@
     </ol>
 
     <footer class="print-foot">
-      gestSQUADRE — Manuale operativo · Android + iOS · Open Golf / TOC · Chief T.O.C. Roberto Ronco
+      gestSQUADRE — Manuale operativo ver002 · Android + iOS · Open Golf / TOC · Chief T.O.C. Roberto Ronco
     </footer>
   </section>
 
