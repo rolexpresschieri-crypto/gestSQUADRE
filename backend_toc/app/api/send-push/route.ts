@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { getFirebaseAdminMessaging } from "@/lib/firebase-admin-app";
+import { fcmIosApnsPayload } from "@/lib/fcm-ios-apns";
 import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
 import { tocPushTextUpper } from "@/lib/toc-push-text";
 
@@ -217,6 +218,7 @@ export async function POST(request: Request) {
       android: {
         priority: "high",
       },
+      apns: fcmIosApnsPayload(title, bodyText),
     });
     await writePushLog("sent", { fcmMessageId: messageId });
     return NextResponse.json({ ok: true, messageId, alarm: useAlarm });

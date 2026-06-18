@@ -10,11 +10,19 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
         FcmManager.shared.configureIfNeeded()
         UNUserNotificationCenter.current().delegate = self
         Messaging.messaging().delegate = self
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            guard settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional else { return }
+            DispatchQueue.main.async {
+                application.registerForRemoteNotifications()
+            }
+        }
         return true
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         Messaging.messaging().apnsToken = deviceToken
+        FcmManager.shared.onApnsTokenRegistered()
     }
 
     func application(
@@ -28,10 +36,6 @@ final class PushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotification
 
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         FcmManager.shared.onNewToken(fcmToken)
-    }
-
-    func messaging(_ messaging: Messaging, didReceive remoteMessage: MessagingRemoteMessage) {
-        FcmManager.shared.handleRemoteUserInfo(remoteMessage.appData)
     }
 
     func userNotificationCenter(

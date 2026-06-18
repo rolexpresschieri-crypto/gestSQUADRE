@@ -259,18 +259,9 @@ final class SquadViewModel: ObservableObject {
                 let registeredOnServer = err.localizedCaseInsensitiveContains("Push registrata")
                 self.pushStatusLabel = err
                 self.pushStatusOk = registeredOnServer
-                if !registeredOnServer {
-                    self.bannerMessage = err
-                }
             } else {
                 self.pushStatusLabel = "Push TOC: attiva (il server può inviarti allarmi)."
                 self.pushStatusOk = true
-                if let banner = self.bannerMessage,
-                   banner.localizedCaseInsensitiveContains("push") ||
-                   banner.localizedCaseInsensitiveContains("notifiche") ||
-                   banner.localizedCaseInsensitiveContains("firebase") {
-                    self.bannerMessage = nil
-                }
             }
             self.startPushWatchdog(session: session, facade: facade)
         }
