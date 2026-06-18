@@ -1,13 +1,10 @@
 import type { NextConfig } from "next";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const turbopackRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  turbopack: {
-    root: turbopackRoot,
-  },
+  // Solo dev locale: evita che Turbopack usi C:\Users\rronc\ come root (lockfile spurio).
+  ...(process.env.NODE_ENV === "development"
+    ? { turbopack: { root: process.cwd() } }
+    : {}),
 };
 
 export default nextConfig;
