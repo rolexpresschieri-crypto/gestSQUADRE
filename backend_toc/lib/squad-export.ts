@@ -3,7 +3,6 @@ import { normalizeMapColor } from "@/lib/live-squads";
 export type SquadExportRow = {
   squadCode: string;
   squadName: string;
-  contactPhone: string | null;
   isEnabled: boolean;
   mapColor: string | null;
 };
@@ -43,7 +42,6 @@ export function squadsPrintHtml(
           <strong>${escapeHtml(r.squadCode)}</strong>
         </td>
         <td>${escapeHtml(r.squadName)}</td>
-        <td>${escapeHtml(r.contactPhone?.trim() || "—")}</td>
         <td>${r.isEnabled ? "Attiva" : "Disabilitata"}</td>
       </tr>`;
     })
@@ -85,13 +83,12 @@ export function squadsPrintHtml(
       <tr>
         <th>Codice squadra</th>
         <th>Nome squadra</th>
-        <th>Telefono</th>
         <th>Stato</th>
       </tr>
     </thead>
     <tbody>${bodyRows}</tbody>
     <tfoot>
-      <tr><td colspan="4">Totale squadre: ${sorted.length}</td></tr>
+      <tr><td colspan="3">Totale squadre: ${sorted.length}</td></tr>
     </tfoot>
   </table>
 </body>
