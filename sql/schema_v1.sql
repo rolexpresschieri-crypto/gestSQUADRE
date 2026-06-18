@@ -26,6 +26,7 @@ create table if not exists squads (
   squad_code text not null unique,
   squad_name text not null,
   password_hash text not null,
+  contact_phone text,
   map_color text default '#079B42',
   is_enabled boolean not null default true,
   golf_course_id uuid references golf_courses(id) on delete set null,

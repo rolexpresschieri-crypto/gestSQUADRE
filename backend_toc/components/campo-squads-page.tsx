@@ -20,6 +20,7 @@ type SquadRow = {
   squad_code: string;
   squad_name: string;
   password_hash: string;
+  contact_phone: string | null;
   map_color: string | null;
   is_enabled: boolean;
   created_at: string;
@@ -39,6 +40,7 @@ export default function CampoSquadsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [squadCode, setSquadCode] = useState("");
   const [squadName, setSquadName] = useState("");
+  const [squadPhone, setSquadPhone] = useState("");
   const [squadPassword, setSquadPassword] = useState("");
   const [mapColor, setMapColor] = useState(DEFAULT_COLORS[0]);
   const [isEnabled, setIsEnabled] = useState(true);
@@ -89,6 +91,7 @@ export default function CampoSquadsPage() {
     setEditingId(null);
     setSquadCode("");
     setSquadName("");
+    setSquadPhone("");
     setSquadPassword("");
     setMapColor(DEFAULT_COLORS[squads.length % DEFAULT_COLORS.length]);
     setIsEnabled(true);
@@ -99,6 +102,7 @@ export default function CampoSquadsPage() {
     setEditingId(row.id);
     setSquadCode(row.squad_code);
     setSquadName(row.squad_name);
+    setSquadPhone(row.contact_phone?.trim() ?? "");
     setSquadPassword(row.password_hash);
     setMapColor(row.map_color?.trim() || DEFAULT_COLORS[0]);
     setIsEnabled(row.is_enabled);
@@ -114,6 +118,7 @@ export default function CampoSquadsPage() {
 
     const code = squadCode.trim().toUpperCase();
     const name = squadName.trim();
+    const phone = squadPhone.trim();
     const pwd = squadPassword.trim();
     if (!code || !name || !pwd) {
       setFormError("Compila codice, nome e password squadra.");
@@ -128,6 +133,7 @@ export default function CampoSquadsPage() {
           .from("squads")
           .update({
             squad_name: name,
+            contact_phone: phone || null,
             password_hash: pwd,
             map_color: mapColor,
             is_enabled: isEnabled,
@@ -143,6 +149,7 @@ export default function CampoSquadsPage() {
         const { error } = await supabase.from("squads").insert({
           squad_code: code,
           squad_name: name,
+          contact_phone: phone || null,
           password_hash: pwd,
           map_color: mapColor,
           is_enabled: isEnabled,
@@ -174,6 +181,7 @@ export default function CampoSquadsPage() {
     const rows: SquadExportRow[] = squads.map((row) => ({
       squadCode: row.squad_code.toUpperCase(),
       squadName: row.squad_name,
+      contactPhone: row.contact_phone,
       isEnabled: row.is_enabled,
       mapColor: row.map_color,
     }));
@@ -347,6 +355,17 @@ export default function CampoSquadsPage() {
                     required
                   />
                 </label>
+                <label>
+                  Telefono
+                  <input
+                    type="tel"
+                    value={squadPhone}
+                    onChange={(e) => setSquadPhone(e.target.value)}
+                    disabled={busy}
+                    placeholder="Es. +39 333 1234567"
+                    autoComplete="tel"
+                  />
+                </label>
               </div>
               <div className={styles.fieldRow}>
                 <label>
@@ -405,6 +424,7 @@ export default function CampoSquadsPage() {
                   <tr>
                     <th>Codice</th>
                     <th>Nome</th>
+                    <th>Telefono</th>
                     <th>Password</th>
                     <th>Stato</th>
                     <th />
@@ -421,6 +441,7 @@ export default function CampoSquadsPage() {
                         {row.squad_code}
                       </td>
                       <td>{row.squad_name}</td>
+                      <td>{row.contact_phone?.trim() || "—"}</td>
                       <td>{row.password_hash}</td>
                       <td>
                         <button
