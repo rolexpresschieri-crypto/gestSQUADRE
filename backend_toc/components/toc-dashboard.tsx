@@ -30,6 +30,11 @@ import {
   formatAutoNotifyMissionDetail,
   type ActiveAutoNotifyDelivery,
 } from "@/lib/active-auto-notify";
+import {
+  activeTocPushSig,
+  formatTocPushMissionDetail,
+  type ActiveTocPushDelivery,
+} from "@/lib/active-toc-push";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { openExternalMapWindow } from "@/lib/open-external-map";
 import {
@@ -89,6 +94,9 @@ export default function TocDashboard() {
   const [activeAutoNotifies, setActiveAutoNotifies] = useState<
     ActiveAutoNotifyDelivery[]
   >([]);
+  const [activeTocPushes, setActiveTocPushes] = useState<ActiveTocPushDelivery[]>(
+    [],
+  );
   const [pushHealth, setPushHealth] = useState<{
     supabaseServiceRole: boolean;
     firebaseAdmin: boolean;
@@ -172,7 +180,8 @@ export default function TocDashboard() {
     [routeAssignmentsBySession, squads, onlineSessionIds],
   );
 
-  const activeMissionCount = activeTocMissions.length + activeAutoNotifies.length;
+  const activeMissionCount =
+    activeTocMissions.length + activeTocPushes.length + activeAutoNotifies.length;
 
   const handleSquadRowSelect = useCallback((squad: LiveSquad) => {
     setSelectedSessionId(squad.sessionId);
@@ -351,6 +360,7 @@ export default function TocDashboard() {
   const loadActiveAutoNotifies = useCallback(async () => {
     if (!session) {
       setActiveAutoNotifies([]);
+      setActiveTocPushes([]);
       return;
     }
 
@@ -394,14 +404,19 @@ export default function TocDashboard() {
       }
       const body = (await res.json()) as {
         rows: ActiveAutoNotifyDelivery[];
+        tocPushes?: ActiveTocPushDelivery[];
         error: string | null;
       };
       if (seq !== activeAutoNotifyFetchSeq.current) {
         return;
       }
-      const next = body.rows ?? [];
+      const nextAuto = body.rows ?? [];
+      const nextPush = body.tocPushes ?? [];
       setActiveAutoNotifies((prev) =>
-        activeAutoNotifySig(prev) === activeAutoNotifySig(next) ? prev : next,
+        activeAutoNotifySig(prev) === activeAutoNotifySig(nextAuto) ? prev : nextAuto,
+      );
+      setActiveTocPushes((prev) =>
+        activeTocPushSig(prev) === activeTocPushSig(nextPush) ? prev : nextPush,
       );
       if (body.error) {
         setStatusMessage(body.error);
@@ -562,6 +577,15 @@ export default function TocDashboard() {
       )
       .subscribe();
 
+    const tocPushChannel = supabase
+      .channel("gest-toc-push-logs")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "toc_push_logs" },
+        () => debouncedLoadActiveAutoNotifies(),
+      )
+      .subscribe();
+
     const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
@@ -572,6 +596,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(routeChannel);
       void supabase.removeChannel(autoNotifyChannel);
       void supabase.removeChannel(mobileDismissChannel);
+      void supabase.removeChannel(tocPushChannel);
     };
   }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies]);
 
@@ -849,12 +874,14 @@ export default function TocDashboard() {
       writeStoredPushMessage(title, body);
       setPushOpen(false);
       setStatusMessage(`Push inviate con successo: ${ok} squadra/e.`);
+      debouncedLoadActiveAutoNotifies();
     } else {
       setStatusMessage(
         `Push: ${ok} ok, ${fail} errori. ${errors.slice(0, 2).join(" | ")}`,
       );
       if (ok > 0) {
         writeStoredPushMessage(title, body);
+        debouncedLoadActiveAutoNotifies();
       }
     }
   }
@@ -1135,14 +1162,14 @@ export default function TocDashboard() {
             Missioni TOC attive ({activeMissionCount})
           </h2>
           <p className={styles.opsColumnHint}>
-            Via TRK + target assegnati, oppure inoltro automatico allarme verso squadre GT
-            (FIG/Sanitari). Sparisce dalla lista quando il destinatario preme «Reset notifica»
-            sull&apos;app.
+            Via TRK + target, push allarme inviata dal TOC, oppure inoltro automatico
+            verso squadre GT (FIG/Sanitari). Sparisce quando il destinatario preme
+            «Reset notifica» sull&apos;app.
           </p>
           <div className={styles.opsColumnBody}>
             {activeMissionCount === 0 ? (
               <p className={styles.opsEmpty}>
-                Nessuna missione attiva né inoltro automatico in attesa di presa in carico.
+                Nessuna missione attiva, push TOC in attesa, né inoltro GT.
               </p>
             ) : (
               <>
@@ -1192,6 +1219,57 @@ export default function TocDashboard() {
                     </div>
                   </div>
                 ))}
+                {activeTocPushes.map((row) => {
+                  const recipientSquad =
+                    (row.sessionId
+                      ? squads.find((s) => s.sessionId === row.sessionId)
+                      : null) ??
+                    squads.find(
+                      (s) =>
+                        s.squadCode.trim().toUpperCase() ===
+                        row.squadCode.trim().toUpperCase(),
+                    );
+                  const selected =
+                    row.sessionId != null && selectedSessionId === row.sessionId;
+                  return (
+                    <div
+                      key={row.id}
+                      className={
+                        selected
+                          ? `${styles.tocPushMissionItem} ${styles.opsRowSelected}`
+                          : styles.tocPushMissionItem
+                      }
+                      onClick={() => {
+                        if (recipientSquad) {
+                          handleSquadRowSelect(recipientSquad);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <div className={styles.tocPushMissionDot} aria-hidden>
+                        TOC
+                      </div>
+                      <div className={styles.alarmBody}>
+                        <p className={styles.alarmTitle}>
+                          {row.squadCode} — {row.squadName}
+                        </p>
+                        <p className={styles.alarmMessage}>
+                          Push da <strong>{row.adminCode}</strong>
+                          {" · "}
+                          {formatTocPushMissionDetail(row)}
+                        </p>
+                        <p className={styles.alarmMeta}>
+                          Inviato {new Date(row.createdAt).toLocaleString("it-IT")}
+                          {!recipientSquad ? " · destinatario non online" : ""}
+                        </p>
+                        <p className={styles.autoNotifyHint}>
+                          In attesa presa in carico (reset sul telefono destinatario)
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
                 {activeAutoNotifies.map((row) => {
                   const recipientSquad =
                     squads.find((s) => s.sessionId === row.recipientSessionId) ??

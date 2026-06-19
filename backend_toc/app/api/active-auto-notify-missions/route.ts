@@ -5,6 +5,10 @@ import {
   supplementMissionsFromOpenAlarms,
   type FetchActiveAutoNotifyOptions,
 } from "@/lib/active-auto-notify";
+import {
+  fetchActiveTocPushDeliveries,
+  type FetchActiveTocPushOptions,
+} from "@/lib/active-toc-push";
 import { fetchGolfCourseSquadIds } from "@/lib/golf-course-scope";
 
 export const runtime = "nodejs";
@@ -36,7 +40,7 @@ export async function GET(request: Request) {
   const admin = getServiceSupabase();
   if (!admin) {
     return NextResponse.json(
-      { error: "SUPABASE_SERVICE_ROLE_KEY mancante.", rows: [] },
+      { error: "SUPABASE_SERVICE_ROLE_KEY mancante.", rows: [], tocPushes: [] },
       { status: 501 },
     );
   }
@@ -46,33 +50,46 @@ export async function GET(request: Request) {
   const eventIds = parseListParam(url.searchParams.get("eventIds"));
   const openAlarmIds = parseListParam(url.searchParams.get("alarmIds"));
 
-  const options: FetchActiveAutoNotifyOptions = {
+  const autoOptions: FetchActiveAutoNotifyOptions = {
     eventIds,
     openAlarmIds,
     sourceSquadCodes: null,
+  };
+  const pushOptions: FetchActiveTocPushOptions = {
+    eventIds,
+    recipientSquadIds: null,
   };
 
   if (golfCourseId) {
     const squadIds = await fetchGolfCourseSquadIds(admin, golfCourseId);
     if (squadIds.length === 0) {
-      return NextResponse.json({ rows: [], error: null });
+      return NextResponse.json({ rows: [], tocPushes: [], error: null });
     }
+    pushOptions.recipientSquadIds = squadIds;
     const { data } = await admin
       .from("squads")
       .select("squad_code")
       .in("id", squadIds);
-    options.sourceSquadCodes =
+    autoOptions.sourceSquadCodes =
       (data ?? [])
         .map((row) => String(row.squad_code ?? "").trim().toUpperCase())
         .filter(Boolean) ?? [];
   }
 
-  const { rows, error } = await fetchActiveAutoNotifyDeliveries(admin, options);
-  const merged = await supplementMissionsFromOpenAlarms(
-    admin,
-    openAlarmIds,
-    rows,
-    options.sourceSquadCodes,
-  );
-  return NextResponse.json({ rows: merged, error });
+  const [{ rows, error }, { rows: tocPushes, error: pushError }] =
+    await Promise.all([
+      fetchActiveAutoNotifyDeliveries(admin, autoOptions).then(async (result) => ({
+        ...result,
+        rows: await supplementMissionsFromOpenAlarms(
+          admin,
+          openAlarmIds,
+          result.rows,
+          autoOptions.sourceSquadCodes,
+        ),
+      })),
+      fetchActiveTocPushDeliveries(admin, pushOptions),
+    ]);
+
+  const combinedError = error ?? pushError;
+  return NextResponse.json({ rows, tocPushes, error: combinedError });
 }
