@@ -1,3 +1,5 @@
+import { normalizeSquadIconKey } from "@/lib/squad-icons";
+
 export type LiveSquad = {
   sessionId: string;
   eventId: string;
@@ -10,6 +12,7 @@ export type LiveSquad = {
   lastAccuracy: number | null;
   lastFixAt: string | null;
   mapColor: string;
+  mapIconKey: string;
 };
 
 export function formatGpsAccuracyMeters(
@@ -70,5 +73,6 @@ export function liveSquadsFromRows(rows: Record<string, unknown>[]): LiveSquad[]
     lastAccuracy: (row.last_accuracy as number | null) ?? null,
     lastFixAt: (row.last_fix_at as string | null) ?? null,
     mapColor: normalizeMapColor((row.map_color as string | null) ?? null),
+    mapIconKey: normalizeSquadIconKey((row.map_icon_key as string | null) ?? null),
   }));
 }

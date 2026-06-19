@@ -6,7 +6,8 @@ export type WaypointIconKey =
   | "driving_range"
   | "villaggio_comm"
   | "welcome"
-  | "media_center";
+  | "media_center"
+  | "toc";
 
 /** Valori legacy salvati in DB. */
 const LEGACY_ICON_ALIASES: Record<string, WaypointIconKey> = {
@@ -28,6 +29,7 @@ export const WAYPOINT_ICON_OPTIONS: WaypointIconOption[] = [
   { key: "villaggio_comm", label: "Villaggio commerciale", mapUrl: "/map/villaggio_comm.png" },
   { key: "welcome", label: "Welcome", mapUrl: "/map/welcome.png" },
   { key: "media_center", label: "Media center", mapUrl: "/map/media_center.png" },
+  { key: "toc", label: "T.O.C.", mapUrl: "/map/toc.png" },
 ];
 
 const DEFAULT_KEY: WaypointIconKey = "buche";

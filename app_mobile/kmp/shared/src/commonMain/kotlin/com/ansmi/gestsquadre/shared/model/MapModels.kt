@@ -16,6 +16,7 @@ data class ActiveSquadSummaryRow(
     @SerialName("last_latitude") val lastLatitude: Double? = null,
     @SerialName("last_longitude") val lastLongitude: Double? = null,
     @SerialName("map_color") val mapColor: String? = null,
+    @SerialName("map_icon_key") val mapIconKey: String? = null,
     @SerialName("last_accuracy") val lastAccuracy: Double? = null,
 )
 
@@ -40,6 +41,7 @@ data class LiveSquadPin(
     val latitude: Double,
     val longitude: Double,
     val mapColorArgb: Long,
+    val mapIconKey: String,
     val accuracyM: Double?,
 )
 
@@ -67,6 +69,7 @@ fun ActiveSquadSummaryRow.toLiveSquadPin(): LiveSquadPin? {
         latitude = lat,
         longitude = lon,
         mapColorArgb = parseMapColorArgb(mapColor),
+        mapIconKey = mapIconKey?.trim()?.ifEmpty { "squadre_a_piedi" } ?: "squadre_a_piedi",
         accuracyM = lastAccuracy,
     )
 }

@@ -229,28 +229,56 @@ class _TocMapScreenState extends State<TocMapScreen> {
       final alarming = _alarmingSessionIds.contains(s.sessionId);
       final isSelf = selfId != null && s.sessionId == selfId;
       final fill = alarming ? const Color(0xFFC62828) : s.mapColor;
+      final ringSize = isSelf ? 36.0 : 32.0;
+      final iconSize = isSelf ? 22.0 : 20.0;
       markers.add(
         Marker(
           point: LatLng(s.latitude, s.longitude),
           width: 110,
-          height: 52,
+          height: 56,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: isSelf ? 22 : 18,
-                height: isSelf ? 22 : 18,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: fill,
-                  border: Border.all(
-                    color: isSelf ? tacticalYellow : Colors.white,
-                    width: isSelf ? 3 : 2.5,
-                  ),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x88000000),
-                      blurRadius: 4,
+              SizedBox(
+                width: isSelf ? ringSize + 8 : ringSize,
+                height: isSelf ? ringSize + 8 : ringSize,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (isSelf)
+                      Container(
+                        width: ringSize + 8,
+                        height: ringSize + 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: tacticalYellow, width: 3),
+                        ),
+                      ),
+                    Container(
+                      width: ringSize,
+                      height: ringSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(
+                          color: fill,
+                          width: isSelf ? 4 : 3.5,
+                        ),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x88000000),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Image.asset(
+                          WaypointIcons.assetPath(s.mapIconKey),
+                          width: iconSize,
+                          height: iconSize,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
                     ),
                   ],
                 ),

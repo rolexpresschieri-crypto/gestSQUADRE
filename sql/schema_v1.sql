@@ -28,6 +28,7 @@ create table if not exists squads (
   password_hash text not null,
   contact_phone text,
   map_color text default '#079B42',
+  map_icon_key text default 'squadre_a_piedi',
   is_enabled boolean not null default true,
   golf_course_id uuid references golf_courses(id) on delete set null,
   created_at timestamptz not null default now()
@@ -140,6 +141,7 @@ select
   s.squad_code,
   s.squad_name,
   s.map_color,
+  s.map_icon_key,
   ss.is_online,
   ss.login_at,
   ss.last_latitude,

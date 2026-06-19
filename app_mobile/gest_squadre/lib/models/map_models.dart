@@ -8,6 +8,7 @@ class LiveSquadPin {
     required this.latitude,
     required this.longitude,
     required this.mapColor,
+    required this.mapIconKey,
     this.accuracyM,
   });
 
@@ -17,6 +18,7 @@ class LiveSquadPin {
   final double latitude;
   final double longitude;
   final Color mapColor;
+  final String mapIconKey;
   final double? accuracyM;
 
   static LiveSquadPin? fromSummaryRow(Map<String, dynamic> row) {
@@ -37,6 +39,7 @@ class LiveSquadPin {
       latitude: latN,
       longitude: lonN,
       mapColor: _parseColor(row['map_color'] as String?),
+      mapIconKey: _parseIconKey(row['map_icon_key'] as String?),
       accuracyM: (row['last_accuracy'] as num?)?.toDouble(),
     );
   }
@@ -50,6 +53,11 @@ class LiveSquadPin {
       }
     }
     return const Color(0xFF079B42);
+  }
+
+  static String _parseIconKey(String? raw) {
+    final v = (raw ?? '').trim();
+    return v.isEmpty ? 'croce_rossa' : v;
   }
 }
 

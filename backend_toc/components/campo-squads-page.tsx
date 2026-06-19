@@ -12,6 +12,13 @@ import {
   deleteSquadForCourse,
 } from "@/lib/golf-course-scope";
 import { printSquadsAsPdf, type SquadExportRow } from "@/lib/squad-export";
+import {
+  DEFAULT_SQUAD_ICON_KEY,
+  SQUAD_ICON_OPTIONS,
+  normalizeSquadIconKey,
+  squadIconMapUrl,
+  type SquadIconKey,
+} from "@/lib/squad-icons";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./campo-squads-page.module.css";
 
@@ -21,6 +28,7 @@ type SquadRow = {
   squad_name: string;
   password_hash: string;
   map_color: string | null;
+  map_icon_key: string | null;
   is_enabled: boolean;
   created_at: string;
 };
@@ -41,6 +49,7 @@ export default function CampoSquadsPage() {
   const [squadName, setSquadName] = useState("");
   const [squadPassword, setSquadPassword] = useState("");
   const [mapColor, setMapColor] = useState(DEFAULT_COLORS[0]);
+  const [mapIconKey, setMapIconKey] = useState<SquadIconKey>(DEFAULT_SQUAD_ICON_KEY);
   const [isEnabled, setIsEnabled] = useState(true);
 
   useEffect(() => {
@@ -91,6 +100,10 @@ export default function CampoSquadsPage() {
     setSquadName("");
     setSquadPassword("");
     setMapColor(DEFAULT_COLORS[squads.length % DEFAULT_COLORS.length]);
+    setMapIconKey(
+      SQUAD_ICON_OPTIONS[squads.length % SQUAD_ICON_OPTIONS.length]?.key ??
+        DEFAULT_SQUAD_ICON_KEY,
+    );
     setIsEnabled(true);
     setFormError(null);
   }
@@ -101,6 +114,7 @@ export default function CampoSquadsPage() {
     setSquadName(row.squad_name);
     setSquadPassword(row.password_hash);
     setMapColor(row.map_color?.trim() || DEFAULT_COLORS[0]);
+    setMapIconKey(normalizeSquadIconKey(row.map_icon_key));
     setIsEnabled(row.is_enabled);
     setFormError(null);
   }
@@ -130,6 +144,7 @@ export default function CampoSquadsPage() {
             squad_name: name,
             password_hash: pwd,
             map_color: mapColor,
+            map_icon_key: mapIconKey,
             is_enabled: isEnabled,
           })
           .eq("id", editingId)
@@ -145,6 +160,7 @@ export default function CampoSquadsPage() {
           squad_name: name,
           password_hash: pwd,
           map_color: mapColor,
+          map_icon_key: mapIconKey,
           is_enabled: isEnabled,
           golf_course_id: golfCourseId,
         });
@@ -360,14 +376,47 @@ export default function CampoSquadsPage() {
                   />
                 </label>
                 <label>
-                  Colore mappa
+                  Colore anello mappa
                   <input
                     type="color"
                     value={mapColor}
                     onChange={(e) => setMapColor(e.target.value)}
                     disabled={busy}
+                    title="Cerchio colorato attorno all'icona sulla mappa"
                   />
                 </label>
+              </div>
+              <div className={styles.fieldGroup}>
+                <span className={styles.iconPickerLabel}>Icona sulla mappa</span>
+                <div className={styles.iconPicker} role="radiogroup" aria-label="Icona squadra">
+                  {SQUAD_ICON_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.key}
+                      className={
+                        mapIconKey === opt.key
+                          ? `${styles.iconOption} ${styles.iconOptionActive}`
+                          : styles.iconOption
+                      }
+                      style={
+                        mapIconKey === opt.key
+                          ? { boxShadow: `inset 0 0 0 2px ${mapColor}` }
+                          : undefined
+                      }
+                    >
+                      <input
+                        type="radio"
+                        name="squad-icon"
+                        value={opt.key}
+                        checked={mapIconKey === opt.key}
+                        onChange={() => setMapIconKey(opt.key)}
+                        disabled={busy}
+                      />
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={opt.mapUrl} alt="" width={40} height={40} />
+                      <span>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
               <label className={styles.checkLabel}>
                 <input
@@ -415,9 +464,17 @@ export default function CampoSquadsPage() {
                     <tr key={row.id}>
                       <td>
                         <span
-                          className={styles.colorDot}
-                          style={{ background: row.map_color ?? "#079B42" }}
-                        />
+                          className={styles.squadIconPreview}
+                          style={{ borderColor: row.map_color ?? "#079B42" }}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={squadIconMapUrl(row.map_icon_key)}
+                            alt=""
+                            width={16}
+                            height={16}
+                          />
+                        </span>
                         {row.squad_code}
                       </td>
                       <td>{row.squad_name}</td>

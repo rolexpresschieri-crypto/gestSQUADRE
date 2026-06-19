@@ -203,6 +203,74 @@
   margin-right: 6px;
 }
 
+.squadIconPreview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 3px solid #079b42;
+  background: #fff;
+  vertical-align: middle;
+}
+
+.squadIconPreview img {
+  object-fit: contain;
+}
+
+.fieldGroup {
+  margin-bottom: 14px;
+}
+
+.iconPickerLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #e8e8e8;
+}
+
+.iconPicker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 8px;
+}
+
+.iconOption {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ddd;
+  min-width: 0;
+}
+
+.iconOption input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.iconOption img {
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.iconOptionActive {
+  border-color: #e0be3a;
+  background: rgba(224, 190, 58, 0.12);
+}
+
 .rowActions {
   display: flex;
   gap: 8px;

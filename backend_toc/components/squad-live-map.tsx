@@ -32,6 +32,7 @@ import {
   type SquadWaypoint,
 } from "@/lib/waypoints";
 import { waypointIconMapUrl } from "@/lib/waypoint-icons";
+import { squadIconMapUrl } from "@/lib/squad-icons";
 
 const defaultCenter: LatLngExpression = [45.0703, 7.6869];
 const ROUTE_HALO_WEIGHT = 5;
@@ -137,23 +138,17 @@ function squadDivIcon(
   isAlarming: boolean,
 ): L.DivIcon {
   const chip = escapeHtml((squad.squadName || squad.squadCode).slice(0, 18).toUpperCase());
-  const sel = selected ? " gs-dot--selected" : "";
-  if (isAlarming) {
-    return L.divIcon({
-      className: "gs-squad-divicon",
-      html: `<div class="gs-pin"><div class="gs-dot gs-dot--alarm${sel}"></div><div class="gs-chip gs-chip--alarm">${chip}</div></div>`,
-      iconSize: [96, 44],
-      iconAnchor: [48, 10],
-      popupAnchor: [0, -30],
-    });
-  }
-  const fill = squad.mapColor;
+  const sel = selected ? " gs-squad-ring--selected" : "";
+  const alarm = isAlarming ? " gs-squad-ring--alarm" : "";
+  const ringColor = isAlarming ? ALARM_RED : squad.mapColor;
+  const iconUrl = squadIconMapUrl(squad.mapIconKey);
+  const chipClass = isAlarming ? "gs-chip gs-chip--alarm" : "gs-chip";
   return L.divIcon({
     className: "gs-squad-divicon",
-    html: `<div class="gs-pin"><div class="gs-dot${sel}" style="background:${fill}"></div><div class="gs-chip">${chip}</div></div>`,
-    iconSize: [96, 44],
-    iconAnchor: [48, 10],
-    popupAnchor: [0, -30],
+    html: `<div class="gs-pin"><div class="gs-squad-ring${sel}${alarm}" style="--squad-ring:${ringColor}"><img class="gs-squad-icon" src="${iconUrl}" width="22" height="22" alt="" /></div><div class="${chipClass}">${chip}</div></div>`,
+    iconSize: [96, 48],
+    iconAnchor: [48, 12],
+    popupAnchor: [0, -32],
   });
 }
 
@@ -162,7 +157,7 @@ function squadMarkerIconKey(
   selected: boolean,
   isAlarming: boolean,
 ): string {
-  return `${squad.sessionId}:${selected}:${isAlarming}:${squad.mapColor}:${squad.squadCode}:${squad.squadName}`;
+  return `${squad.sessionId}:${selected}:${isAlarming}:${squad.mapColor}:${squad.mapIconKey}:${squad.squadCode}:${squad.squadName}`;
 }
 
 function squadMarkerPopupHtml(squad: LiveSquad, isAlarming: boolean): string {

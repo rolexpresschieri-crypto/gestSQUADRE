@@ -1,6 +1,7 @@
 import type { AdminSessionData } from "@/lib/admin-auth";
 import type { getSupabaseBrowserClient } from "@/lib/supabase-browser";
-import { liveSquadsFromRows, type LiveSquad } from "@/lib/live-squads";
+import { liveSquadsFromRows, normalizeMapColor, type LiveSquad } from "@/lib/live-squads";
+import { normalizeSquadIconKey } from "@/lib/squad-icons";
 
 type SupabaseClient = NonNullable<ReturnType<typeof getSupabaseBrowserClient>>;
 
@@ -83,7 +84,7 @@ export async function fetchLiveSquads(
     const { data, error } = await supabase
       .from("squad_sessions")
       .select(
-        "id, event_id, squad_id, is_online, login_at, last_latitude, last_longitude, last_accuracy, last_fix_at, squads!inner(squad_code, squad_name, map_color, golf_course_id)",
+        "id, event_id, squad_id, is_online, login_at, last_latitude, last_longitude, last_accuracy, last_fix_at, squads!inner(squad_code, squad_name, map_color, map_icon_key, golf_course_id)",
       )
       .eq("is_online", true)
       .eq("squads.golf_course_id", golfCourseId)
@@ -95,8 +96,18 @@ export async function fetchLiveSquads(
 
     return data.map((row) => {
       const squad = row.squads as
-        | { squad_code: string; squad_name: string; map_color: string | null }
-        | { squad_code: string; squad_name: string; map_color: string | null }[]
+        | {
+            squad_code: string;
+            squad_name: string;
+            map_color: string | null;
+            map_icon_key: string | null;
+          }
+        | {
+            squad_code: string;
+            squad_name: string;
+            map_color: string | null;
+            map_icon_key: string | null;
+          }[]
         | null;
       const s = Array.isArray(squad) ? squad[0] : squad;
       return {
@@ -110,7 +121,8 @@ export async function fetchLiveSquads(
         lastLongitude: (row.last_longitude as number | null) ?? null,
         lastAccuracy: (row.last_accuracy as number | null) ?? null,
         lastFixAt: (row.last_fix_at as string | null) ?? null,
-        mapColor: s?.map_color ?? "#079B42",
+        mapColor: normalizeMapColor(s?.map_color ?? null),
+        mapIconKey: normalizeSquadIconKey(s?.map_icon_key ?? null),
       } satisfies LiveSquad;
     });
   }
