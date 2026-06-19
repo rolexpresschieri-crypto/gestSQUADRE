@@ -21,6 +21,7 @@ import {
   type SquadMobileDismissLogRow,
   type SquadSessionAuthLogRow,
   type TocMissionCloseLogRow,
+  type TocMissionForceDismissLogRow,
   type TocPushLogRow,
 } from "@/lib/event-logs";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -38,6 +39,7 @@ export default function EventLogsPage() {
   const [mobileDismisses, setMobileDismisses] = useState<SquadMobileDismissLogRow[]>([]);
   const [sessionAuthLogs, setSessionAuthLogs] = useState<SquadSessionAuthLogRow[]>([]);
   const [autoNotifies, setAutoNotifies] = useState<AlarmAutoNotifyLogRow[]>([]);
+  const [forceDismisses, setForceDismisses] = useState<TocMissionForceDismissLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
@@ -66,6 +68,7 @@ export default function EventLogsPage() {
       setMobileDismisses([]);
       setSessionAuthLogs([]);
       setAutoNotifies([]);
+      setForceDismisses([]);
       return;
     }
 
@@ -80,6 +83,7 @@ export default function EventLogsPage() {
         setMobileDismisses([]);
         setSessionAuthLogs([]);
         setAutoNotifies([]);
+        setForceDismisses([]);
         return;
       }
     }
@@ -140,6 +144,12 @@ export default function EventLogsPage() {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500);
+    let forceDismissQuery = supabase
+      .from("toc_mission_force_dismiss_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (squadCodes) {
       alarmQuery = alarmQuery.in("squad_id", squadIds!);
@@ -148,6 +158,7 @@ export default function EventLogsPage() {
       mobileDismissQuery = mobileDismissQuery.in("squad_id", squadIds!);
       sessionAuthQuery = sessionAuthQuery.in("squad_id", squadIds!);
       autoNotifyQuery = autoNotifyQuery.in("squad_code", squadCodes);
+      forceDismissQuery = forceDismissQuery.in("squad_code", squadCodes);
     }
 
     const [
@@ -157,6 +168,7 @@ export default function EventLogsPage() {
       mobileDismissRes,
       sessionAuthRes,
       autoNotifyRes,
+      forceDismissRes,
     ] = await Promise.all([
       alarmQuery,
       pushQuery,
@@ -164,6 +176,7 @@ export default function EventLogsPage() {
       mobileDismissQuery,
       sessionAuthQuery,
       autoNotifyQuery,
+      forceDismissQuery,
     ]);
 
     if (alarmRes.error) {
@@ -222,6 +235,17 @@ export default function EventLogsPage() {
     } else {
       setAutoNotifies((autoNotifyRes.data ?? []) as AlarmAutoNotifyLogRow[]);
     }
+
+    if (forceDismissRes.error) {
+      if (forceDismissRes.error.message.includes("toc_mission_force_dismiss_logs")) {
+        setStatus(
+          "Esegui sql/toc_mission_force_dismiss_logs.sql su Supabase per i log reset forzato TOC.",
+        );
+      }
+      setForceDismisses([]);
+    } else {
+      setForceDismisses((forceDismissRes.data ?? []) as TocMissionForceDismissLogRow[]);
+    }
   }, [supabase, eventId, session?.golfCourseId]);
 
   useEffect(() => {
@@ -267,8 +291,9 @@ export default function EventLogsPage() {
         mobileDismisses,
         sessionAuthLogs,
         autoNotifies,
+        forceDismisses,
       ),
-    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies],
+    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies, forceDismisses],
   );
 
   function exportCsv() {

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   }
 
   if (kind === "gt_notify") {
-    const result = await forceDismissGtNotifyLog(admin, {
+    const result = await forceDismissGtNotifyLog(admin, adminSession.code, {
       logId: payload.id,
       alarmId: payload.alarmId,
       recipientSquadCode: payload.recipientSquadCode,

@@ -120,6 +120,18 @@ function autoNotifyRecipientCode(row: AlarmAutoNotifyLogRow): string {
   return (row.recipient_squad_code ?? row.admin_code ?? "").trim() || "—";
 }
 
+export type TocMissionForceDismissLogRow = {
+  id: string;
+  event_id: string;
+  mission_kind: "toc_push" | "gt_notify" | string;
+  squad_code: string;
+  squad_name: string | null;
+  admin_code: string;
+  source_ref: string | null;
+  detail: string | null;
+  created_at: string;
+};
+
 export type UnifiedEventLog = {
   id: string;
   kind:
@@ -130,6 +142,7 @@ export type UnifiedEventLog = {
     | "toc_push"
     | "toc_push_close"
     | "toc_mission_close"
+    | "toc_force_dismiss"
     | "mobile_dismiss"
     | "alarm_auto_notify";
   createdAt: string;
@@ -148,6 +161,7 @@ export function mergeEventLogs(
   mobileDismisses: SquadMobileDismissLogRow[] = [],
   sessionAuthLogs: SquadSessionAuthLogRow[] = [],
   autoNotifies: AlarmAutoNotifyLogRow[] = [],
+  forceDismisses: TocMissionForceDismissLogRow[] = [],
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
@@ -263,12 +277,26 @@ export function mergeEventLogs(
       createdAt: d.created_at,
       squadCode: d.squad_code,
       squadName: d.squad_name,
-      summary: "Reset notifica mobile",
+      summary: "Reset notifica mobile (squadra)",
       detail:
         d.panel_message?.trim() ||
-        "Pannello TOC azzerato sul telefono; evento ancora aperto sul TOC.",
+        "Pannello TOC azzerato dal telefono della squadra destinatario.",
       status: "registrato" as const,
       actor: d.squad_code,
+    })),
+    ...forceDismisses.map((f) => ({
+      id: f.id,
+      kind: "toc_force_dismiss" as const,
+      createdAt: f.created_at,
+      squadCode: f.squad_code,
+      squadName: f.squad_name?.trim() || f.squad_code,
+      summary:
+        f.mission_kind === "gt_notify"
+          ? "Reset forzato da TOC — inoltro GT"
+          : "Reset forzato da TOC — push",
+      detail: f.detail?.trim() || "Chiusura missione dall'operatore in dashboard TOC.",
+      status: "forzato" as const,
+      actor: f.admin_code,
     })),
     ...missionCloses.map((m) => ({
       id: m.id,

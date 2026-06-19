@@ -77,6 +77,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: mobileDismissErr.message }, { status: 500 });
   }
 
+  const { error: forceDismissErr } = await admin
+    .from("toc_mission_force_dismiss_logs")
+    .delete()
+    .eq("event_id", eventId);
+
+  if (
+    forceDismissErr &&
+    !forceDismissErr.message.includes("toc_mission_force_dismiss_logs")
+  ) {
+    return NextResponse.json({ error: forceDismissErr.message }, { status: 500 });
+  }
+
   const { error: sessionAuthErr } = await admin
     .from("squad_session_auth_logs")
     .delete()
