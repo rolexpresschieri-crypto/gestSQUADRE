@@ -224,19 +224,24 @@ export default function AlarmNotifyRoutingPage() {
     setStatus(null);
 
     if (next) {
-      const payload = usesLegacyAdminColumn
-        ? { alarm_type: alarmType, admin_code: squadCode, is_enabled: true }
-        : {
-            alarm_type: alarmType,
-            recipient_squad_code: squadCode,
-            is_enabled: true,
-          };
-      const conflict = usesLegacyAdminColumn
-        ? "alarm_type,admin_code"
-        : "alarm_type,recipient_squad_code";
-      const { error } = await supabase
-        .from("alarm_notify_routing")
-        .upsert(payload, { onConflict: conflict });
+      const upsertRes = usesLegacyAdminColumn
+        ? await supabase.from("alarm_notify_routing").upsert(
+            {
+              alarm_type: alarmType,
+              admin_code: squadCode,
+              is_enabled: true,
+            },
+            { onConflict: "alarm_type,admin_code" },
+          )
+        : await supabase.from("alarm_notify_routing").upsert(
+            {
+              alarm_type: alarmType,
+              recipient_squad_code: squadCode,
+              is_enabled: true,
+            },
+            { onConflict: "alarm_type,recipient_squad_code" },
+          );
+      const { error } = upsertRes;
       if (error) {
         setStatus(error.message);
       } else {
