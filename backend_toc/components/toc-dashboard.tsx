@@ -25,7 +25,6 @@ import {
   fetchLiveSquads,
 } from "@/lib/golf-course-scope";
 import {
-  fetchActiveAutoNotifyDeliveries,
   formatAutoNotifyMissionDetail,
   type ActiveAutoNotifyDelivery,
 } from "@/lib/active-auto-notify";
@@ -343,37 +342,58 @@ export default function TocDashboard() {
   }, [supabase, selectedSessionId, pendingAlarmSessionIds]);
 
   const loadActiveAutoNotifies = useCallback(async () => {
-    if (!supabase || !activeEventId) {
+    if (!session) {
       setActiveAutoNotifies([]);
       return;
     }
 
-    let sourceSquadCodes: string[] | null = null;
-    if (golfCourseId) {
-      const squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
-      if (squadIds.length > 0) {
-        const { data } = await supabase
-          .from("squads")
-          .select("squad_code")
-          .in("id", squadIds);
-        sourceSquadCodes = (data ?? [])
-          .map((row) => String(row.squad_code ?? "").trim().toUpperCase())
-          .filter(Boolean);
-      } else {
-        sourceSquadCodes = [];
+    const eventIds = new Set<string>();
+    if (activeEventId) {
+      eventIds.add(activeEventId);
+    }
+    for (const squad of squads) {
+      if (squad.eventId) {
+        eventIds.add(squad.eventId);
       }
     }
 
-    const { rows, error } = await fetchActiveAutoNotifyDeliveries(
-      supabase,
-      activeEventId,
-      sourceSquadCodes,
-    );
-    setActiveAutoNotifies(rows);
-    if (error) {
-      setStatusMessage(error);
+    const openAlarmIds = alarms
+      .filter((alarm) => !alarm.acknowledged_at)
+      .map((alarm) => alarm.id);
+
+    const params = new URLSearchParams();
+    if (golfCourseId) {
+      params.set("golfCourseId", golfCourseId);
     }
-  }, [supabase, activeEventId, golfCourseId]);
+    if (eventIds.size > 0) {
+      params.set("eventIds", [...eventIds].join(","));
+    }
+    if (openAlarmIds.length > 0) {
+      params.set("alarmIds", openAlarmIds.join(","));
+    }
+
+    try {
+      const res = await fetch(
+        `/api/active-auto-notify-missions?${params.toString()}`,
+      );
+      if (!res.ok) {
+        setActiveAutoNotifies([]);
+        setStatusMessage(`Missioni GT: errore HTTP ${res.status}`);
+        return;
+      }
+      const body = (await res.json()) as {
+        rows: ActiveAutoNotifyDelivery[];
+        error: string | null;
+      };
+      setActiveAutoNotifies(body.rows ?? []);
+      if (body.error) {
+        setStatusMessage(body.error);
+      }
+    } catch {
+      setActiveAutoNotifies([]);
+      setStatusMessage("Missioni GT: impossibile caricare gli inoltri automatici.");
+    }
+  }, [session, activeEventId, golfCourseId, squads, alarms]);
 
   useEffect(() => {
     void loadActiveAutoNotifies();
@@ -1116,7 +1136,9 @@ export default function TocDashboard() {
                         s.squadCode.trim().toUpperCase() ===
                         row.recipientSquadCode.trim().toUpperCase(),
                     );
-                  const selected = selectedSessionId === row.recipientSessionId;
+                  const selected =
+                    row.recipientSessionId != null &&
+                    selectedSessionId === row.recipientSessionId;
                   return (
                     <div
                       key={row.id}

@@ -7,11 +7,20 @@ export type ActiveAutoNotifyDelivery = {
   sourceSquadCode: string;
   sourceSquadName: string;
   recipientSquadCode: string;
-  recipientSessionId: string;
+  recipientSessionId: string | null;
   pushTitle: string | null;
   pushBody: string | null;
   requestTypes: unknown;
   createdAt: string;
+};
+
+export type FetchActiveAutoNotifyOptions = {
+  /** Eventi da includere (squadre online, evento attivo, ecc.). */
+  eventIds?: string[] | null;
+  /** Allarmi volontario ancora aperti sul TOC — include inoltri anche se event_id non coincide. */
+  openAlarmIds?: string[] | null;
+  /** Per TOC campo: solo allarmi inviati da squadre di quel golf course. */
+  sourceSquadCodes?: string[] | null;
 };
 
 type AutoNotifyLogRow = {
@@ -72,67 +81,33 @@ async function onlineSessionIdBySquadCode(
   return out;
 }
 
-export async function fetchActiveAutoNotifyDeliveries(
-  supabase: SupabaseClient,
-  eventId: string | null,
-  /** Codici squadra mittente (volontario sul campo). Per TOC campo: solo allarmi di quelle squadre. */
+function normalizeIds(ids?: string[] | null): string[] {
+  if (!ids?.length) {
+    return [];
+  }
+  return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+}
+
+function mapRowsToDeliveries(
+  data: AutoNotifyLogRow[],
+  sessionByCode: Map<string, string>,
   sourceSquadCodes?: string[] | null,
-): Promise<{ rows: ActiveAutoNotifyDelivery[]; error: string | null }> {
-  if (!eventId) {
-    return { rows: [], error: null };
-  }
-
-  const modernResult = await supabase
-    .from("alarm_auto_notify_logs")
-    .select(
-      "id, alarm_id, event_id, squad_code, squad_name, recipient_squad_code, admin_code, recipient_session_id, push_title, push_body, request_types, created_at, status, mobile_dismissed_at",
-    )
-    .eq("event_id", eventId)
-    .eq("status", "sent")
-    .is("mobile_dismissed_at", null)
-    .order("created_at", { ascending: false })
-    .limit(80);
-
-  let legacySchema = false;
-  let data: AutoNotifyLogRow[] | null = (modernResult.data ?? null) as AutoNotifyLogRow[] | null;
-  let error = modernResult.error;
-
-  if (
-    error &&
-    /recipient_session_id|push_title|push_body|mobile_dismissed_at|column/i.test(
-      error.message,
-    )
-  ) {
-    legacySchema = true;
-    const legacyResult = await supabase
-      .from("alarm_auto_notify_logs")
-      .select(
-        "id, alarm_id, event_id, squad_code, squad_name, recipient_squad_code, admin_code, request_types, created_at, status",
-      )
-      .eq("event_id", eventId)
-      .eq("status", "sent")
-      .order("created_at", { ascending: false })
-      .limit(80);
-    data = (legacyResult.data ?? null) as AutoNotifyLogRow[] | null;
-    error = legacyResult.error;
-  }
-
-  if (error) {
-    if (error.message.includes("alarm_auto_notify_logs")) {
-      return { rows: [], error: null };
-    }
-    return { rows: [], error: error.message };
-  }
-
-  const sessionByCode = await onlineSessionIdBySquadCode(supabase);
-
+  filterDismissed = true,
+): ActiveAutoNotifyDelivery[] {
   const allowedSources =
     sourceSquadCodes === undefined || sourceSquadCodes === null
       ? null
       : new Set(sourceSquadCodes.map((c) => c.trim().toUpperCase()));
 
-  const rows = ((data ?? []) as AutoNotifyLogRow[])
+  return data
     .map((row) => {
+      if (row.status !== "sent") {
+        return null;
+      }
+      if (filterDismissed && row.mobile_dismissed_at) {
+        return null;
+      }
+
       const sourceCode = String(row.squad_code ?? "").trim().toUpperCase();
       if (allowedSources && !allowedSources.has(sourceCode)) {
         return null;
@@ -145,9 +120,6 @@ export async function fetchActiveAutoNotifyDeliveries(
 
       const sessionId =
         row.recipient_session_id ?? sessionByCode.get(recipient) ?? null;
-      if (!sessionId) {
-        return null;
-      }
 
       return {
         id: row.id,
@@ -155,7 +127,7 @@ export async function fetchActiveAutoNotifyDeliveries(
         sourceSquadCode: row.squad_code,
         sourceSquadName: row.squad_name,
         recipientSquadCode: recipient,
-        recipientSessionId: String(sessionId),
+        recipientSessionId: sessionId ? String(sessionId) : null,
         pushTitle: row.push_title ?? null,
         pushBody: row.push_body ?? null,
         requestTypes: row.request_types,
@@ -163,6 +135,85 @@ export async function fetchActiveAutoNotifyDeliveries(
       } satisfies ActiveAutoNotifyDelivery;
     })
     .filter((row): row is ActiveAutoNotifyDelivery => row !== null);
+}
+
+export async function fetchActiveAutoNotifyDeliveries(
+  supabase: SupabaseClient,
+  options: FetchActiveAutoNotifyOptions = {},
+): Promise<{ rows: ActiveAutoNotifyDelivery[]; error: string | null }> {
+  const eventIds = normalizeIds(options.eventIds);
+  const openAlarmIds = normalizeIds(options.openAlarmIds);
+  const sourceSquadCodes = options.sourceSquadCodes;
+
+  const modernSelect =
+    "id, alarm_id, event_id, squad_code, squad_name, recipient_squad_code, admin_code, recipient_session_id, push_title, push_body, request_types, created_at, status, mobile_dismissed_at";
+
+  let query = supabase
+    .from("alarm_auto_notify_logs")
+    .select(modernSelect)
+    .eq("status", "sent")
+    .is("mobile_dismissed_at", null)
+    .order("created_at", { ascending: false })
+    .limit(120);
+
+  const orParts: string[] = [];
+  if (eventIds.length > 0) {
+    orParts.push(`event_id.in.(${eventIds.join(",")})`);
+  }
+  if (openAlarmIds.length > 0) {
+    orParts.push(`alarm_id.in.(${openAlarmIds.join(",")})`);
+  }
+  if (orParts.length > 0) {
+    query = query.or(orParts.join(","));
+  }
+
+  let legacySchema = false;
+  let data: AutoNotifyLogRow[] | null = null;
+  let error: { message: string } | null = null;
+
+  const modernResult = await query;
+  data = (modernResult.data ?? null) as AutoNotifyLogRow[] | null;
+  error = modernResult.error;
+
+  if (
+    error &&
+    /recipient_session_id|push_title|push_body|mobile_dismissed_at|column/i.test(
+      error.message,
+    )
+  ) {
+    legacySchema = true;
+    let legacyQuery = supabase
+      .from("alarm_auto_notify_logs")
+      .select(
+        "id, alarm_id, event_id, squad_code, squad_name, recipient_squad_code, admin_code, request_types, created_at, status",
+      )
+      .eq("status", "sent")
+      .order("created_at", { ascending: false })
+      .limit(120);
+
+    if (orParts.length > 0) {
+      legacyQuery = legacyQuery.or(orParts.join(","));
+    }
+
+    const legacyResult = await legacyQuery;
+    data = (legacyResult.data ?? null) as AutoNotifyLogRow[] | null;
+    error = legacyResult.error;
+  }
+
+  if (error) {
+    if (error.message.includes("alarm_auto_notify_logs")) {
+      return { rows: [], error: null };
+    }
+    return { rows: [], error: error.message };
+  }
+
+  const sessionByCode = await onlineSessionIdBySquadCode(supabase);
+  const rows = mapRowsToDeliveries(
+    (data ?? []) as AutoNotifyLogRow[],
+    sessionByCode,
+    sourceSquadCodes,
+    !legacySchema,
+  );
 
   if (legacySchema && (data?.length ?? 0) > 0 && rows.length === 0) {
     return {

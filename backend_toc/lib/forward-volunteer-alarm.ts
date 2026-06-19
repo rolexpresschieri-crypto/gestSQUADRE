@@ -46,58 +46,62 @@ async function writeAutoNotifyLog(
     pushTitle?: string | null;
     pushBody?: string | null;
   },
-) {
-  const fullPayload: Record<string, unknown> = {
+): Promise<boolean> {
+  const base: Record<string, unknown> = {
     alarm_id: row.alarmId,
     event_id: row.eventId,
     squad_code: row.sourceSquadCode,
     squad_name: row.sourceSquadName,
-    recipient_squad_code: row.recipientSquadCode,
-    recipient_session_id: row.recipientSessionId ?? null,
     fcm_token: row.fcmToken,
     status: row.status,
     fcm_message_id: row.fcmMessageId ?? null,
     error_message: row.errorMessage ?? null,
     request_types: row.requestTypes ?? [],
-    push_title: row.pushTitle ?? null,
-    push_body: row.pushBody ?? null,
   };
 
-  let payload: Record<string, unknown> = { ...fullPayload };
-  let { error } = await admin.from("alarm_auto_notify_logs").insert(payload);
-
-  if (
-    error &&
-    /recipient_session_id|push_title|push_body|mobile_dismissed_at/i.test(
-      error.message,
-    )
-  ) {
-    const {
-      recipient_session_id,
-      push_title,
-      push_body,
-      mobile_dismissed_at,
-      ...legacy
-    } = payload;
-    void recipient_session_id;
-    void push_title;
-    void push_body;
-    void mobile_dismissed_at;
-    payload = legacy;
-    ({ error } = await admin.from("alarm_auto_notify_logs").insert(payload));
-  }
-
-  if (error && /recipient_squad_code/i.test(error.message)) {
-    ({ error } = await admin.from("alarm_auto_notify_logs").insert({
-      ...payload,
+  const variants: Record<string, unknown>[] = [
+    {
+      ...base,
+      recipient_squad_code: row.recipientSquadCode,
+      recipient_session_id: row.recipientSessionId ?? null,
+      push_title: row.pushTitle ?? null,
+      push_body: row.pushBody ?? null,
+    },
+    {
+      ...base,
+      recipient_squad_code: row.recipientSquadCode,
+      push_title: row.pushTitle ?? null,
+      push_body: row.pushBody ?? null,
+    },
+    {
+      ...base,
+      recipient_squad_code: row.recipientSquadCode,
+    },
+    {
+      ...base,
       admin_code: row.recipientSquadCode,
-      recipient_squad_code: undefined,
-    }));
+    },
+  ];
+
+  for (const payload of variants) {
+    const { error } = await admin.from("alarm_auto_notify_logs").insert(payload);
+    if (!error) {
+      return true;
+    }
+    if (
+      !/recipient_session_id|push_title|push_body|mobile_dismissed_at|recipient_squad_code|admin_code|column/i.test(
+        error.message,
+      )
+    ) {
+      console.error("alarm_auto_notify_logs insert failed:", error.message);
+      return false;
+    }
   }
 
-  if (error) {
-    console.error("alarm_auto_notify_logs insert failed:", error.message);
-  }
+  console.error(
+    "alarm_auto_notify_logs insert failed: nessuna variante colonne accettata.",
+  );
+  return false;
 }
 
 export async function forwardVolunteerAlarmToOperators(
