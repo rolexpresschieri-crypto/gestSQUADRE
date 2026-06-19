@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { resolveSquadCodesFromRouting } from "@/lib/alarm-notify-routing";
+import { loadAlarmNotifyRoutingRows } from "@/lib/load-alarm-notify-routing";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
+import { tocPushTextUpper } from "@/lib/toc-push-text";
 
 export type ActiveAutoNotifyDelivery = {
   id: string;
@@ -233,4 +236,97 @@ export function formatAutoNotifyMissionDetail(row: ActiveAutoNotifyDelivery): st
   return formatAlarmRequestDetail({
     request_types: row.requestTypes,
   });
+}
+
+type OpenAlarmRow = {
+  id: string;
+  squad_code: string;
+  squad_name: string;
+  request_types?: unknown;
+  other_detail?: string | null;
+  created_at: string;
+};
+
+/** Se il log DB manca ma l'allarme è aperto e il destinatario è online, mostra comunque la missione GT. */
+export async function supplementMissionsFromOpenAlarms(
+  supabase: SupabaseClient,
+  openAlarmIds: string[],
+  existing: ActiveAutoNotifyDelivery[],
+  sourceSquadCodes?: string[] | null,
+): Promise<ActiveAutoNotifyDelivery[]> {
+  if (openAlarmIds.length === 0) {
+    return existing;
+  }
+
+  const allowedSources =
+    sourceSquadCodes === undefined || sourceSquadCodes === null
+      ? null
+      : new Set(sourceSquadCodes.map((c) => c.trim().toUpperCase()));
+
+  const { data: alarms, error: alarmsErr } = await supabase
+    .from("squad_alarms")
+    .select("id, squad_code, squad_name, request_types, other_detail, created_at")
+    .in("id", openAlarmIds)
+    .is("acknowledged_at", null);
+
+  if (alarmsErr || !alarms?.length) {
+    return existing;
+  }
+
+  const { rows: routingRows, error: routingErr } =
+    await loadAlarmNotifyRoutingRows(supabase);
+  if (routingErr) {
+    return existing;
+  }
+
+  const sessionByCode = await onlineSessionIdBySquadCode(supabase);
+  const covered = new Set(
+    existing.map((row) => `${row.alarmId}|${row.recipientSquadCode}`),
+  );
+
+  const supplement: ActiveAutoNotifyDelivery[] = [];
+
+  for (const alarm of alarms as OpenAlarmRow[]) {
+    const sourceCode = String(alarm.squad_code ?? "").trim().toUpperCase();
+    if (allowedSources && !allowedSources.has(sourceCode)) {
+      continue;
+    }
+
+    const detail = formatAlarmRequestDetail(alarm);
+    const title = tocPushTextUpper(`ALLARME — ${alarm.squad_code}`);
+    const body = tocPushTextUpper(`${alarm.squad_name} — ${detail}`);
+    const recipients = resolveSquadCodesFromRouting(
+      alarm.request_types,
+      routingRows,
+    );
+
+    for (const recipient of recipients) {
+      const key = `${alarm.id}|${recipient}`;
+      if (covered.has(key)) {
+        continue;
+      }
+      const sessionId = sessionByCode.get(recipient);
+      if (!sessionId) {
+        continue;
+      }
+
+      supplement.push({
+        id: `open-${alarm.id}-${recipient}`,
+        alarmId: alarm.id,
+        sourceSquadCode: alarm.squad_code,
+        sourceSquadName: alarm.squad_name,
+        recipientSquadCode: recipient,
+        recipientSessionId: sessionId,
+        pushTitle: title,
+        pushBody: body,
+        requestTypes: alarm.request_types,
+        createdAt: alarm.created_at,
+      });
+      covered.add(key);
+    }
+  }
+
+  return [...existing, ...supplement].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
 }

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
   fetchActiveAutoNotifyDeliveries,
+  supplementMissionsFromOpenAlarms,
   type FetchActiveAutoNotifyOptions,
 } from "@/lib/active-auto-notify";
 import { fetchGolfCourseSquadIds } from "@/lib/golf-course-scope";
@@ -67,5 +68,11 @@ export async function GET(request: Request) {
   }
 
   const { rows, error } = await fetchActiveAutoNotifyDeliveries(admin, options);
-  return NextResponse.json({ rows, error });
+  const merged = await supplementMissionsFromOpenAlarms(
+    admin,
+    openAlarmIds,
+    rows,
+    options.sourceSquadCodes,
+  );
+  return NextResponse.json({ rows: merged, error });
 }
