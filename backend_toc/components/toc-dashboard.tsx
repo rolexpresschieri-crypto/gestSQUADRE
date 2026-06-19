@@ -50,7 +50,7 @@ import {
 } from "@/lib/squad-map-points-feed";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
-import { type SquadWaypoint } from "@/lib/waypoints";
+import { type SquadWaypoint, waypointDisplayName } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
 
 const TOC_PUSH_TITLE = "TOC — ALLARME";
@@ -84,8 +84,9 @@ export default function TocDashboard() {
   const [pushBody, setPushBody] = useState(TOC_PUSH_BODY);
   const [pushAlert, setPushAlert] = useState<string | null>(null);
   const [pushSending, setPushSending] = useState(false);
-  const [pushTargetAll, setPushTargetAll] = useState(true);
+  const [pushTargetAll, setPushTargetAll] = useState(false);
   const [pushSelected, setPushSelected] = useState<Record<string, boolean>>({});
+  const [pushTargetWaypointId, setPushTargetWaypointId] = useState("");
   const [selectedRouteAssignment, setSelectedRouteAssignment] =
     useState<SquadRouteAssignment | null>(null);
   const [routeAssignmentsBySession, setRouteAssignmentsBySession] = useState<
@@ -182,6 +183,14 @@ export default function TocDashboard() {
 
   const activeMissionCount =
     activeTocMissions.length + activeTocPushes.length + activeAutoNotifies.length;
+
+  const pushSingleTarget = useMemo(() => {
+    if (pushTargetAll) {
+      return null;
+    }
+    const picked = squads.filter((s) => pushSelected[s.sessionId]);
+    return picked.length === 1 ? picked[0]! : null;
+  }, [pushTargetAll, pushSelected, squads]);
 
   const handleSquadRowSelect = useCallback((squad: LiveSquad) => {
     setSelectedSessionId(squad.sessionId);
@@ -789,8 +798,19 @@ export default function TocDashboard() {
   function openPushModal() {
     setPushTitle(tocPushTextUpper(readStoredPushTitle(TOC_PUSH_TITLE)));
     setPushBody(tocPushTextUpper(readStoredPushBody(TOC_PUSH_BODY)));
+    setPushTargetWaypointId(waypoints[0]?.id ?? "");
     setPushAlert(null);
     setPushSending(false);
+    setPushTargetAll(false);
+    const initialSelected: Record<string, boolean> = {};
+    const preselect =
+      (selectedSessionId && squads.some((s) => s.sessionId === selectedSessionId)
+        ? selectedSessionId
+        : null) ?? squads[0]?.sessionId;
+    if (preselect) {
+      initialSelected[preselect] = true;
+    }
+    setPushSelected(initialSelected);
     setPushOpen(true);
     void loadPushHealth();
   }
@@ -815,7 +835,11 @@ export default function TocDashboard() {
       : squads.filter((s) => pushSelected[s.sessionId]);
 
     if (targets.length === 0) {
-      setPushAlert("Nessuna squadra selezionata.");
+      setPushAlert("Seleziona una squadra destinataria.");
+      return;
+    }
+    if (!pushTargetAll && targets.length !== 1) {
+      setPushAlert("Seleziona una sola squadra, oppure attiva «Tutte le squadre online».");
       return;
     }
 
@@ -851,6 +875,10 @@ export default function TocDashboard() {
           title,
           body,
           alarm: true,
+          targetWaypointId:
+            pushSingleTarget?.sessionId === squad.sessionId && pushTargetWaypointId
+              ? pushTargetWaypointId
+              : null,
         }),
       });
       let payload: { error?: string; code?: string } = {};
@@ -1451,7 +1479,18 @@ export default function TocDashboard() {
               <input
                 type="checkbox"
                 checked={pushTargetAll}
-                onChange={(e) => setPushTargetAll(e.target.checked)}
+                onChange={(e) => {
+                  const all = e.target.checked;
+                  setPushTargetAll(all);
+                  if (!all) {
+                    const preselect =
+                      (selectedSessionId &&
+                      squads.some((s) => s.sessionId === selectedSessionId)
+                        ? selectedSessionId
+                        : null) ?? squads[0]?.sessionId;
+                    setPushSelected(preselect ? { [preselect]: true } : {});
+                  }
+                }}
               />{" "}
               Tutte le squadre online
             </label>
@@ -1463,14 +1502,10 @@ export default function TocDashboard() {
                   return (
                     <label key={s.sessionId} className={styles.squadCheck}>
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="pushSquadTarget"
                         checked={Boolean(pushSelected[s.sessionId])}
-                        onChange={(e) =>
-                          setPushSelected((prev) => ({
-                            ...prev,
-                            [s.sessionId]: e.target.checked,
-                          }))
-                        }
+                        onChange={() => setPushSelected({ [s.sessionId]: true })}
                       />{" "}
                       {s.squadCode} — {s.squadName}
                       {missingPush ? (
@@ -1480,6 +1515,41 @@ export default function TocDashboard() {
                   );
                 })
               : null}
+            {pushSingleTarget ? (
+              <>
+                <p className={styles.pushHint}>
+                  Destinatario: <strong>{pushSingleTarget.squadCode}</strong> — scegli il{" "}
+                  <strong>target</strong> (waypoint) da indicare nella notifica.
+                </p>
+                {waypoints.length > 0 ? (
+                  <label className={styles.pushField}>
+                    Target (waypoint)
+                    <select
+                      className={styles.pushInput}
+                      value={pushTargetWaypointId}
+                      onChange={(e) => setPushTargetWaypointId(e.target.value)}
+                    >
+                      <option value="">— Nessun target —</option>
+                      {waypoints.map((wp) => (
+                        <option key={wp.id} value={wp.id}>
+                          {waypointDisplayName(wp)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
+                    Nessun waypoint caricato: apri la pagina Waypoint o verifica l&apos;evento
+                    attivo.
+                  </p>
+                )}
+              </>
+            ) : pushTargetAll ? (
+              <p className={styles.pushHint}>
+                Push verso tutte le squadre online ({squads.length}). Il target waypoint non si
+                applica in invio multiplo.
+              </p>
+            ) : null}
             <label className={styles.pushField}>
               Titolo notifica
               <input
