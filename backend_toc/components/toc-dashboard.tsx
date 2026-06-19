@@ -25,6 +25,8 @@ import {
   fetchLiveSquads,
 } from "@/lib/golf-course-scope";
 import {
+  activeAutoNotifySig,
+  autoNotifyMissionKey,
   formatAutoNotifyMissionDetail,
   type ActiveAutoNotifyDelivery,
 } from "@/lib/active-auto-notify";
@@ -124,6 +126,11 @@ export default function TocDashboard() {
 
   const squadsRef = useRef(squads);
   squadsRef.current = squads;
+
+  const alarmsRef = useRef(alarms);
+  alarmsRef.current = alarms;
+
+  const activeAutoNotifyFetchSeq = useRef(0);
 
   const onlineSessionIds = useMemo(
     () => new Set(squads.map((s) => s.sessionId)),
@@ -347,17 +354,19 @@ export default function TocDashboard() {
       return;
     }
 
+    const seq = ++activeAutoNotifyFetchSeq.current;
+
     const eventIds = new Set<string>();
     if (activeEventId) {
       eventIds.add(activeEventId);
     }
-    for (const squad of squads) {
+    for (const squad of squadsRef.current) {
       if (squad.eventId) {
         eventIds.add(squad.eventId);
       }
     }
 
-    const openAlarmIds = alarms
+    const openAlarmIds = alarmsRef.current
       .filter((alarm) => !alarm.acknowledged_at)
       .map((alarm) => alarm.id);
 
@@ -376,8 +385,10 @@ export default function TocDashboard() {
       const res = await fetch(
         `/api/active-auto-notify-missions?${params.toString()}`,
       );
+      if (seq !== activeAutoNotifyFetchSeq.current) {
+        return;
+      }
       if (!res.ok) {
-        setActiveAutoNotifies([]);
         setStatusMessage(`Missioni GT: errore HTTP ${res.status}`);
         return;
       }
@@ -385,19 +396,62 @@ export default function TocDashboard() {
         rows: ActiveAutoNotifyDelivery[];
         error: string | null;
       };
-      setActiveAutoNotifies(body.rows ?? []);
+      if (seq !== activeAutoNotifyFetchSeq.current) {
+        return;
+      }
+      const next = body.rows ?? [];
+      setActiveAutoNotifies((prev) =>
+        activeAutoNotifySig(prev) === activeAutoNotifySig(next) ? prev : next,
+      );
       if (body.error) {
         setStatusMessage(body.error);
       }
     } catch {
-      setActiveAutoNotifies([]);
+      if (seq !== activeAutoNotifyFetchSeq.current) {
+        return;
+      }
       setStatusMessage("Missioni GT: impossibile caricare gli inoltri automatici.");
     }
-  }, [session, activeEventId, golfCourseId, squads, alarms]);
+  }, [session, activeEventId, golfCourseId]);
+
+  const debouncedLoadActiveAutoNotifies = useMemo(() => {
+    let timer: number | null = null;
+    return () => {
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      timer = window.setTimeout(() => {
+        timer = null;
+        void loadActiveAutoNotifies();
+      }, 400);
+    };
+  }, [loadActiveAutoNotifies]);
 
   useEffect(() => {
+    if (!session) {
+      return;
+    }
     void loadActiveAutoNotifies();
-  }, [loadActiveAutoNotifies]);
+    const timer = window.setInterval(() => void loadActiveAutoNotifies(), 5_000);
+    return () => window.clearInterval(timer);
+  }, [session, loadActiveAutoNotifies]);
+
+  const openAlarmIdsSig = useMemo(
+    () =>
+      alarms
+        .filter((alarm) => !alarm.acknowledged_at)
+        .map((alarm) => alarm.id)
+        .sort()
+        .join("|"),
+    [alarms],
+  );
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    debouncedLoadActiveAutoNotifies();
+  }, [session, openAlarmIdsSig, debouncedLoadActiveAutoNotifies]);
 
   useEffect(() => {
     void loadSelectedRouteAssignment();
@@ -462,11 +516,11 @@ export default function TocDashboard() {
               `ALLARME: ${row.squad_code} — ${formatAlarmRequestDetail(row)}`,
             );
             void loadSelectedRouteAssignment([row.session_id]);
-            void loadActiveAutoNotifies();
+            debouncedLoadActiveAutoNotifies();
           } else {
             void loadAlarms();
             void loadSelectedRouteAssignment();
-            void loadActiveAutoNotifies();
+            debouncedLoadActiveAutoNotifies();
           }
         },
       )
@@ -495,7 +549,7 @@ export default function TocDashboard() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "alarm_auto_notify_logs" },
-        () => void loadActiveAutoNotifies(),
+        () => debouncedLoadActiveAutoNotifies(),
       )
       .subscribe();
 
@@ -509,7 +563,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(routeChannel);
       void supabase.removeChannel(autoNotifyChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, loadActiveAutoNotifies]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1141,7 +1195,7 @@ export default function TocDashboard() {
                     selectedSessionId === row.recipientSessionId;
                   return (
                     <div
-                      key={row.id}
+                      key={autoNotifyMissionKey(row)}
                       className={
                         selected
                           ? `${styles.autoNotifyMissionItem} ${styles.opsRowSelected}`

@@ -125,7 +125,7 @@ function mapRowsToDeliveries(
         row.recipient_session_id ?? sessionByCode.get(recipient) ?? null;
 
       return {
-        id: row.id,
+        id: `mission-${row.alarm_id}-${recipient}`,
         alarmId: row.alarm_id,
         sourceSquadCode: row.squad_code,
         sourceSquadName: row.squad_name,
@@ -229,6 +229,16 @@ export async function fetchActiveAutoNotifyDeliveries(
   return { rows, error: null };
 }
 
+export function autoNotifyMissionKey(
+  row: Pick<ActiveAutoNotifyDelivery, "alarmId" | "recipientSquadCode">,
+): string {
+  return `${row.alarmId}|${row.recipientSquadCode.trim().toUpperCase()}`;
+}
+
+export function activeAutoNotifySig(rows: ActiveAutoNotifyDelivery[]): string {
+  return rows.map(autoNotifyMissionKey).sort().join(";");
+}
+
 export function formatAutoNotifyMissionDetail(row: ActiveAutoNotifyDelivery): string {
   if (row.pushBody?.trim()) {
     return row.pushBody.trim();
@@ -311,7 +321,7 @@ export async function supplementMissionsFromOpenAlarms(
       }
 
       supplement.push({
-        id: `open-${alarm.id}-${recipient}`,
+        id: `mission-${alarm.id}-${recipient}`,
         alarmId: alarm.id,
         sourceSquadCode: alarm.squad_code,
         sourceSquadName: alarm.squad_name,
