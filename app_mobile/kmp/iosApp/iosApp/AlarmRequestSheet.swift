@@ -5,11 +5,9 @@ struct AlarmRequestSheet: View {
     let onShowMessage: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    @State private var ambulanza = false
-    @State private var medico = false
-    @State private var dae = false
-    @State private var forzeOrdine = false
-    @State private var vvf = false
+    @State private var sanitario = false
+    @State private var security = false
+    @State private var vigiliFuoco = false
     @State private var altro = false
     @State private var otherDetail = ""
     @State private var validationError: String?
@@ -26,12 +24,10 @@ struct AlarmRequestSheet: View {
                         Text("Cosa richiedi? (scelta multipla)")
                             .font(.subheadline.bold())
                             .foregroundStyle(TacticalColors.yellow)
-                        alarmRow("1. Ambulanza", $ambulanza, highlighted: false)
-                        alarmRow("2. Medico", $medico, highlighted: false)
-                        alarmRow("3. DAE", $dae, highlighted: false)
-                        alarmRow("4. Forze dell'ordine", $forzeOrdine, highlighted: true)
-                        alarmRow("5. V.V.F.", $vvf, highlighted: true)
-                        alarmRow("6. Altro", $altro, highlighted: false)
+                        alarmRow("1. Sanitario", $sanitario)
+                        alarmRow("2. Security", $security)
+                        alarmRow("3. Vigili del Fuoco", $vigiliFuoco)
+                        alarmRow("4. Altro", $altro)
                         if altro {
                             TextField("Descrivi la richiesta", text: $otherDetail)
                                 .textFieldStyle(.roundedBorder)
@@ -60,11 +56,10 @@ struct AlarmRequestSheet: View {
         }
     }
 
-    private func alarmRow(_ label: String, _ value: Binding<Bool>, highlighted: Bool) -> some View {
+    private func alarmRow(_ label: String, _ value: Binding<Bool>) -> some View {
         Toggle(isOn: value) {
             Text(label)
-                .foregroundStyle(highlighted ? TacticalColors.alarmHighlightYellow : .white)
-                .fontWeight(highlighted ? .bold : .regular)
+                .foregroundStyle(.white)
         }
         .tint(TacticalColors.red)
     }
@@ -72,11 +67,9 @@ struct AlarmRequestSheet: View {
     private func submit() {
         validationError = nil
         viewModel.sendAlarm(
-            ambulanza: ambulanza,
-            medico: medico,
-            dae: dae,
-            forzeOrdine: forzeOrdine,
-            vvf: vvf,
+            sanitario: sanitario,
+            security: security,
+            vigiliFuoco: vigiliFuoco,
             altro: altro,
             otherDetail: otherDetail
         ) { errorMessage in

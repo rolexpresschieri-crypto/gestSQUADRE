@@ -25,6 +25,7 @@ val firebaseProjectId =
     defineValue("FIREBASE_PROJECT_ID").ifBlank { "allarme-app-2026-b9f74" }
 val firebaseStorageBucket =
     defineValue("FIREBASE_STORAGE_BUCKET").ifBlank { "allarme-app-2026-b9f74.firebasestorage.app" }
+val tocBackendUrl = defineValue("TOC_BACKEND_URL").ifBlank { "https://gest-squadre.vercel.app" }
 
 android {
     namespace = "com.ansmi.gestsquadre.kmp"
@@ -34,8 +35,8 @@ android {
         applicationId = "com.ansmi.gest_squadre"
         minSdk = 24
         targetSdk = 35
-        versionCode = 18
-        versionName = "1.0.18"
+        versionCode = 20
+        versionName = "1.0.20"
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "FIREBASE_ANDROID_API_KEY", "\"$firebaseApiKey\"")
@@ -43,6 +44,7 @@ android {
         buildConfigField("String", "FIREBASE_MESSAGING_SENDER_ID", "\"$firebaseSenderId\"")
         buildConfigField("String", "FIREBASE_PROJECT_ID", "\"$firebaseProjectId\"")
         buildConfigField("String", "FIREBASE_STORAGE_BUCKET", "\"$firebaseStorageBucket\"")
+        buildConfigField("String", "TOC_BACKEND_URL", "\"$tocBackendUrl\"")
     }
 
     buildFeatures {

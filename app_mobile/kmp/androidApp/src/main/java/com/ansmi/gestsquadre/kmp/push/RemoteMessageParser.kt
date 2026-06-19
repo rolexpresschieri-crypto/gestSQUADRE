@@ -12,7 +12,13 @@ fun RemoteMessage.tocBody(): String =
         data["body"]?.trim().orEmpty()
     }
 
+fun RemoteMessage.isVolunteerAlarm(): Boolean =
+    data["type"]?.equals("volunteer_alarm", ignoreCase = true) == true
+
 fun RemoteMessage.isTocAlarm(): Boolean {
+    if (isVolunteerAlarm()) {
+        return true
+    }
     val type = data["type"]?.equals("toc_alarm", ignoreCase = true) == true
     val channel = notification?.channelId == FcmManager.CHANNEL_ALARM
     return type || channel

@@ -16,6 +16,7 @@ import {
   eventLogsToCsv,
   mergeEventLogs,
   printEventLogsAsPdf,
+  type AlarmAutoNotifyLogRow,
   type SquadAlarmLogRow,
   type SquadMobileDismissLogRow,
   type SquadSessionAuthLogRow,
@@ -36,6 +37,7 @@ export default function EventLogsPage() {
   const [missionCloses, setMissionCloses] = useState<TocMissionCloseLogRow[]>([]);
   const [mobileDismisses, setMobileDismisses] = useState<SquadMobileDismissLogRow[]>([]);
   const [sessionAuthLogs, setSessionAuthLogs] = useState<SquadSessionAuthLogRow[]>([]);
+  const [autoNotifies, setAutoNotifies] = useState<AlarmAutoNotifyLogRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
@@ -63,6 +65,7 @@ export default function EventLogsPage() {
       setMissionCloses([]);
       setMobileDismisses([]);
       setSessionAuthLogs([]);
+      setAutoNotifies([]);
       return;
     }
 
@@ -76,6 +79,27 @@ export default function EventLogsPage() {
         setMissionCloses([]);
         setMobileDismisses([]);
         setSessionAuthLogs([]);
+        setAutoNotifies([]);
+        return;
+      }
+    }
+
+    let squadCodes: string[] | null = null;
+    if (squadIds) {
+      const { data: squadRows } = await supabase
+        .from("squads")
+        .select("squad_code")
+        .in("id", squadIds);
+      squadCodes =
+        squadRows?.map((r) => String(r.squad_code).trim().toUpperCase()).filter(Boolean) ??
+        [];
+      if (squadCodes.length === 0) {
+        setAlarms([]);
+        setPushes([]);
+        setMissionCloses([]);
+        setMobileDismisses([]);
+        setSessionAuthLogs([]);
+        setAutoNotifies([]);
         return;
       }
     }
@@ -110,22 +134,36 @@ export default function EventLogsPage() {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500);
+    let autoNotifyQuery = supabase
+      .from("alarm_auto_notify_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
-    if (squadIds) {
-      alarmQuery = alarmQuery.in("squad_id", squadIds);
-      pushQuery = pushQuery.in("squad_id", squadIds);
-      missionCloseQuery = missionCloseQuery.in("squad_id", squadIds);
-      mobileDismissQuery = mobileDismissQuery.in("squad_id", squadIds);
-      sessionAuthQuery = sessionAuthQuery.in("squad_id", squadIds);
+    if (squadCodes) {
+      alarmQuery = alarmQuery.in("squad_id", squadIds!);
+      pushQuery = pushQuery.in("squad_id", squadIds!);
+      missionCloseQuery = missionCloseQuery.in("squad_id", squadIds!);
+      mobileDismissQuery = mobileDismissQuery.in("squad_id", squadIds!);
+      sessionAuthQuery = sessionAuthQuery.in("squad_id", squadIds!);
+      autoNotifyQuery = autoNotifyQuery.in("squad_code", squadCodes);
     }
 
-    const [alarmRes, pushRes, missionCloseRes, mobileDismissRes, sessionAuthRes] =
-      await Promise.all([
+    const [
+      alarmRes,
+      pushRes,
+      missionCloseRes,
+      mobileDismissRes,
+      sessionAuthRes,
+      autoNotifyRes,
+    ] = await Promise.all([
       alarmQuery,
       pushQuery,
       missionCloseQuery,
       mobileDismissQuery,
       sessionAuthQuery,
+      autoNotifyQuery,
     ]);
 
     if (alarmRes.error) {
@@ -175,6 +213,15 @@ export default function EventLogsPage() {
     } else {
       setSessionAuthLogs((sessionAuthRes.data ?? []) as SquadSessionAuthLogRow[]);
     }
+
+    if (autoNotifyRes.error) {
+      if (autoNotifyRes.error.message.includes("alarm_auto_notify_logs")) {
+        setStatus("Esegui sql/alarm_auto_notify.sql su Supabase per i log inoltro automatico.");
+      }
+      setAutoNotifies([]);
+    } else {
+      setAutoNotifies((autoNotifyRes.data ?? []) as AlarmAutoNotifyLogRow[]);
+    }
   }, [supabase, eventId, session?.golfCourseId]);
 
   useEffect(() => {
@@ -212,8 +259,16 @@ export default function EventLogsPage() {
   }, [eventId, refreshLogs]);
 
   const unified = useMemo(
-    () => mergeEventLogs(alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs),
-    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs],
+    () =>
+      mergeEventLogs(
+        alarms,
+        pushes,
+        missionCloses,
+        mobileDismisses,
+        sessionAuthLogs,
+        autoNotifies,
+      ),
+    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies],
   );
 
   function exportCsv() {

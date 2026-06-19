@@ -115,11 +115,9 @@ final class SquadViewModel: ObservableObject {
     }
 
     func sendAlarm(
-        ambulanza: Bool,
-        medico: Bool,
-        dae: Bool,
-        forzeOrdine: Bool,
-        vvf: Bool,
+        sanitario: Bool,
+        security: Bool,
+        vigiliFuoco: Bool,
         altro: Bool,
         otherDetail: String,
         onComplete: @escaping (String?) -> Void
@@ -130,11 +128,9 @@ final class SquadViewModel: ObservableObject {
         }
 
         let request = facade.makeSquadAlarmRequest(
-            ambulanza: ambulanza,
-            medico: medico,
-            dae: dae,
-            forzeOrdine: forzeOrdine,
-            vvf: vvf,
+            sanitario: sanitario,
+            security: security,
+            vigiliFuoco: vigiliFuoco,
             altro: altro,
             otherDetail: otherDetail
         )

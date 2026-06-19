@@ -61,7 +61,6 @@ import com.ansmi.gestsquadre.kmp.ui.theme.TacticalMuted
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalNavy
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalOrange
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalRed
-import com.ansmi.gestsquadre.kmp.ui.theme.AlarmHighlightYellow
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
@@ -82,6 +81,7 @@ enum class AppScreen {
     Home,
     Login,
     Map,
+    TocOperatorNotify,
 }
 
 private fun gpsLabelColor(accuracyM: Double?): Color {
@@ -187,6 +187,7 @@ fun GestSquadreApp(
                         viewModel = viewModel,
                         onNavigateLogin = { screen = AppScreen.Login },
                         onNavigateMap = { screen = AppScreen.Map },
+                        onNavigateTocOperator = { screen = AppScreen.TocOperatorNotify },
                         onShowMessage = ::showSnack,
                     )
                 AppScreen.Login ->
@@ -202,6 +203,12 @@ fun GestSquadreApp(
                         currentSession = uiState.session,
                         onClose = { screen = AppScreen.Home },
                     )
+                AppScreen.TocOperatorNotify ->
+                    TocOperatorNotifyScreen(
+                        viewModel = viewModel,
+                        onBack = { screen = AppScreen.Home },
+                        onShowMessage = ::showSnack,
+                    )
             }
         }
     }
@@ -212,6 +219,7 @@ fun HomeScreen(
     viewModel: SquadViewModel,
     onNavigateLogin: () -> Unit,
     onNavigateMap: () -> Unit,
+    onNavigateTocOperator: () -> Unit,
     onShowMessage: (String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -398,6 +406,18 @@ fun HomeScreen(
                             onNavigateMap
                         },
                 )
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "Operatore TOC: registra notifiche allarme",
+                    color = TacticalYellow,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier =
+                        Modifier
+                            .clickable(enabled = !uiState.isBusy) { onNavigateTocOperator() }
+                            .padding(vertical = 4.dp),
+                    textAlign = TextAlign.Center,
+                )
             }
         }
 
@@ -419,22 +439,18 @@ private fun SquadAlarmRequestDialog(
     onDismiss: () -> Unit,
     onConfirm: (SquadAlarmRequest) -> Unit,
 ) {
-    var ambulanza by remember { mutableStateOf(false) }
-    var medico by remember { mutableStateOf(false) }
-    var dae by remember { mutableStateOf(false) }
-    var forzeOrdine by remember { mutableStateOf(false) }
-    var vvf by remember { mutableStateOf(false) }
+    var sanitario by remember { mutableStateOf(false) }
+    var security by remember { mutableStateOf(false) }
+    var vigiliFuoco by remember { mutableStateOf(false) }
     var altro by remember { mutableStateOf(false) }
     var otherDetail by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
 
     fun buildRequest(): SquadAlarmRequest {
         val types = buildSet {
-            if (ambulanza) add(SquadAlarmRequestType.AMBULANZA)
-            if (medico) add(SquadAlarmRequestType.MEDICO)
-            if (dae) add(SquadAlarmRequestType.DAE)
-            if (forzeOrdine) add(SquadAlarmRequestType.FORZE_ORDINE)
-            if (vvf) add(SquadAlarmRequestType.VVF)
+            if (sanitario) add(SquadAlarmRequestType.SANITARIO)
+            if (security) add(SquadAlarmRequestType.SECURITY)
+            if (vigiliFuoco) add(SquadAlarmRequestType.VIGILI_FUOCO)
             if (altro) add(SquadAlarmRequestType.ALTRO)
         }
         return SquadAlarmRequest(
@@ -471,51 +487,31 @@ private fun SquadAlarmRequestDialog(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 AlarmRequestCheckboxRow(
-                    label = "1. Ambulanza",
-                    checked = ambulanza,
+                    label = "1. Sanitario",
+                    checked = sanitario,
                     onCheckedChange = {
-                        ambulanza = it
+                        sanitario = it
                         validationError = null
                     },
                 )
                 AlarmRequestCheckboxRow(
-                    label = "2. Medico",
-                    checked = medico,
+                    label = "2. Security",
+                    checked = security,
                     onCheckedChange = {
-                        medico = it
+                        security = it
                         validationError = null
                     },
                 )
                 AlarmRequestCheckboxRow(
-                    label = "3. DAE",
-                    checked = dae,
+                    label = "3. Vigili del Fuoco",
+                    checked = vigiliFuoco,
                     onCheckedChange = {
-                        dae = it
+                        vigiliFuoco = it
                         validationError = null
                     },
                 )
                 AlarmRequestCheckboxRow(
-                    label = "4. FORZE DELL'ORDINE",
-                    checked = forzeOrdine,
-                    onCheckedChange = {
-                        forzeOrdine = it
-                        validationError = null
-                    },
-                    labelColor = Color.Black,
-                    highlightBackground = AlarmHighlightYellow,
-                )
-                AlarmRequestCheckboxRow(
-                    label = "5. V.V.F.",
-                    checked = vvf,
-                    onCheckedChange = {
-                        vvf = it
-                        validationError = null
-                    },
-                    labelColor = Color.Black,
-                    highlightBackground = AlarmHighlightYellow,
-                )
-                AlarmRequestCheckboxRow(
-                    label = "6. Altro",
+                    label = "4. Altro",
                     checked = altro,
                     onCheckedChange = {
                         altro = it

@@ -47,3 +47,11 @@ export function canViewEventLogs(role: AdminRole): boolean {
 export function canManageEventLogs(role: AdminRole): boolean {
   return role === "admin";
 }
+
+export function canManageAlarmRouting(role: AdminRole): boolean {
+  return role === "admin";
+}
+
+export function canViewAlarmRouting(role: AdminRole): boolean {
+  return role === "admin" || role === "viewer";
+}

@@ -100,6 +100,21 @@ function formatTocPushDetail(p: TocPushLogRow): string {
   );
 }
 
+export type AlarmAutoNotifyLogRow = {
+  id: string;
+  alarm_id: string;
+  event_id: string;
+  squad_code: string;
+  squad_name: string;
+  admin_code: string;
+  fcm_token: string | null;
+  status: string;
+  fcm_message_id: string | null;
+  error_message: string | null;
+  request_types?: unknown;
+  created_at: string;
+};
+
 export type UnifiedEventLog = {
   id: string;
   kind:
@@ -110,7 +125,8 @@ export type UnifiedEventLog = {
     | "toc_push"
     | "toc_push_close"
     | "toc_mission_close"
-    | "mobile_dismiss";
+    | "mobile_dismiss"
+    | "alarm_auto_notify";
   createdAt: string;
   squadCode: string;
   squadName: string;
@@ -126,6 +142,7 @@ export function mergeEventLogs(
   missionCloses: TocMissionCloseLogRow[] = [],
   mobileDismisses: SquadMobileDismissLogRow[] = [],
   sessionAuthLogs: SquadSessionAuthLogRow[] = [],
+  autoNotifies: AlarmAutoNotifyLogRow[] = [],
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
@@ -210,8 +227,29 @@ export function mergeEventLogs(
     }
   }
 
+  const autoNotifyRows: UnifiedEventLog[] = autoNotifies.map((n) => {
+    const failed = n.status === "failed";
+    const skipped = n.status === "skipped";
+    return {
+      id: n.id,
+      kind: "alarm_auto_notify" as const,
+      createdAt: n.created_at,
+      squadCode: n.squad_code,
+      squadName: n.squad_name,
+      summary: "Inoltro automatico allarme → operatore",
+      detail: skipped
+        ? `Operatore ${n.admin_code}: nessun telefono registrato`
+        : failed
+          ? `Operatore ${n.admin_code}${n.error_message?.trim() ? `: ${n.error_message.trim()}` : ""}`
+          : `Operatore ${n.admin_code}`,
+      status: skipped ? "saltato" : failed ? "fallito" : "inviato",
+      actor: n.admin_code,
+    };
+  });
+
   const rows: UnifiedEventLog[] = [
     ...alarmRows,
+    ...autoNotifyRows,
     ...pushRows,
     ...mobileDismisses.map((d) => ({
       id: d.id,

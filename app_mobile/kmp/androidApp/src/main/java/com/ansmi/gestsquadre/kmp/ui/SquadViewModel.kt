@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.ansmi.gestsquadre.kmp.BuildConfig
 import com.ansmi.gestsquadre.kmp.data.SessionStorage
 import com.ansmi.gestsquadre.kmp.data.TocMessageStorage
+import com.ansmi.gestsquadre.kmp.data.TocOperatorStorage
+import com.ansmi.gestsquadre.kmp.network.TocOperatorNotifyClient
 import com.ansmi.gestsquadre.kmp.push.FcmManager
 import com.ansmi.gestsquadre.kmp.map.RouteRefreshBus
 import com.ansmi.gestsquadre.kmp.push.FcmPushBus
@@ -39,6 +41,7 @@ data class SquadUiState(
     val requestNotificationPermission: Boolean = false,
     val pushStatusLabel: String? = null,
     val pushStatusOk: Boolean = false,
+    val tocOperatorAdminCode: String? = null,
 )
 
 class SquadViewModel(
@@ -46,6 +49,7 @@ class SquadViewModel(
     private val locationTracker: LocationTracker,
     private val sessionStorage: SessionStorage,
     private val tocMessageStorage: TocMessageStorage,
+    private val tocOperatorStorage: TocOperatorStorage,
     private val fcmManager: FcmManager,
 ) : ViewModel() {
 
@@ -54,6 +58,7 @@ class SquadViewModel(
             backendConfigured =
                 BuildConfig.SUPABASE_URL.isNotBlank() &&
                     BuildConfig.SUPABASE_ANON_KEY.isNotBlank(),
+            tocOperatorAdminCode = tocOperatorStorage.registeredAdminCode(),
         ),
     )
     val uiState: StateFlow<SquadUiState> = _uiState.asStateFlow()
@@ -158,6 +163,60 @@ class SquadViewModel(
             } catch (e: Exception) {
                 _uiState.update { it.copy(isBusy = false) }
                 onResult(e.message ?: "Invio allarme fallito.")
+            }
+        }
+    }
+
+    fun registerTocOperatorNotify(
+        adminCode: String,
+        password: String,
+        onResult: (String?) -> Unit,
+    ) {
+        val code = adminCode.trim().uppercase()
+        val pwd = password.trim()
+        if (code.isEmpty() || pwd.isEmpty()) {
+            onResult("Inserisci codice operatore e password TOC.")
+            return
+        }
+        if (!fcmManager.isConfigured) {
+            onResult("Push disabilitata: configura FIREBASE_* in dart-defines.json.")
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true) }
+            try {
+                if (!fcmManager.ensureNotificationPermission() &&
+                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                ) {
+                    _uiState.update { it.copy(requestNotificationPermission = true) }
+                }
+                val token = fcmManager.fetchFcmToken()
+                if (token.isNullOrBlank()) {
+                    _uiState.update { it.copy(isBusy = false) }
+                    onResult("Token push non ottenuto. Verifica Firebase e notifiche.")
+                    return@launch
+                }
+                val err =
+                    TocOperatorNotifyClient.registerOperatorFcm(
+                        adminCode = code,
+                        password = pwd,
+                        fcmToken = token,
+                        deviceLabel = android.os.Build.MODEL,
+                    )
+                if (err != null) {
+                    _uiState.update { it.copy(isBusy = false) }
+                    onResult(err)
+                    return@launch
+                }
+                tocOperatorStorage.saveRegisteredAdminCode(code)
+                _uiState.update {
+                    it.copy(isBusy = false, tocOperatorAdminCode = code)
+                }
+                onResult(null)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isBusy = false) }
+                onResult(e.message ?: "Registrazione notifiche TOC fallita.")
             }
         }
     }

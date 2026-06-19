@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
   canViewEventLogs,
+  canViewAlarmRouting,
   isCampoGolfSession,
   type AdminSessionData,
 } from "@/lib/admin-auth";
@@ -102,6 +103,7 @@ export default function TocDashboard() {
 
   const canForceSquadLogout = session?.role === "admin";
   const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
+  const canOpenAlarmRouting = session ? canViewAlarmRouting(session.role) : false;
 
   const alarmingSessionIds = useMemo(() => {
     const ids = new Set<string>();
@@ -923,6 +925,11 @@ export default function TocDashboard() {
           {canOpenEventLogs ? (
             <Link className={`${styles.btn} ${styles.btnYellow}`} href="/logs">
               Log evento
+            </Link>
+          ) : null}
+          {canOpenAlarmRouting ? (
+            <Link className={`${styles.btn} ${styles.btnPrimary}`} href="/alarm-routing">
+              Destinatari allarme
             </Link>
           ) : null}
           <button className={`${styles.btn} ${styles.btnDanger}`} type="button" onClick={handleLogout}>

@@ -39,6 +39,13 @@ class FcmManager(
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    suspend fun fetchFcmToken(): String? {
+        if (!isConfigured) {
+            return null
+        }
+        return runCatching { FirebaseMessaging.getInstance().token.await() }.getOrNull()
+    }
+
     suspend fun registerToken(
         facade: GestSquadreFacade,
         session: SquadSession,

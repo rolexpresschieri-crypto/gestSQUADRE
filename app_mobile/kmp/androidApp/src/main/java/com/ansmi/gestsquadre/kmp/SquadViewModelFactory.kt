@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.ansmi.gestsquadre.kmp.data.SessionStorage
 import com.ansmi.gestsquadre.kmp.data.TocMessageStorage
+import com.ansmi.gestsquadre.kmp.data.TocOperatorStorage
 import com.ansmi.gestsquadre.kmp.push.FcmManager
 import com.ansmi.gestsquadre.kmp.ui.SquadViewModel
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
@@ -22,6 +23,7 @@ class SquadViewModelFactory(
                 locationTracker = LocationTracker(appContext),
                 sessionStorage = SessionStorage(appContext),
                 tocMessageStorage = TocMessageStorage(appContext),
+                tocOperatorStorage = TocOperatorStorage(appContext),
                 fcmManager = FcmManager(appContext),
             ) as T
         }

@@ -12,6 +12,17 @@ class GestSquadreMessagingService : FirebaseMessagingService() {
             return
         }
 
+        if (message.isVolunteerAlarm()) {
+            val title = message.tocTitle()
+            val body = message.tocBody()
+            FcmManager(applicationContext).showLocalNotification(
+                title = title,
+                body = body,
+                isAlarm = true,
+            )
+            return
+        }
+
         val title = message.tocTitle()
         val body = message.tocBody()
         val isAlarm = message.isTocAlarm()

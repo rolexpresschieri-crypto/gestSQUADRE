@@ -23,7 +23,7 @@ export function SquadAlarmRequestDetail({ row }: { row: AlarmDetailRow }) {
       {parts.map((part, index) => (
         <Fragment key={part.code}>
           {index > 0 ? <span className={styles.sep}> · </span> : null}
-          {part.variant === "forze_ordine" || part.variant === "vvf" ? (
+          {part.variant === "legacy_highlight" ? (
             <span className={styles.flagHighlight}>{part.label}</span>
           ) : (
             <span>{part.label}</span>

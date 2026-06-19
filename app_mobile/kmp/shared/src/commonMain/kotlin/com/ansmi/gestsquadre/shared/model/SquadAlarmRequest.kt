@@ -4,11 +4,9 @@ enum class SquadAlarmRequestType(
     val code: String,
     val label: String,
 ) {
-    AMBULANZA("ambulanza", "Ambulanza"),
-    MEDICO("medico", "Medico"),
-    DAE("dae", "DAE"),
-    FORZE_ORDINE("forze_ordine", "FORZE DELL'ORDINE"),
-    VVF("vvf", "V.V.F."),
+    SANITARIO("sanitario", "Sanitario"),
+    SECURITY("security", "Security"),
+    VIGILI_FUOCO("vvf", "Vigili del Fuoco"),
     ALTRO("altro", "Altro"),
     ;
 

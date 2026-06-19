@@ -61,21 +61,17 @@ fun GestSquadreFacade.updatePositionSafe(
 
 /** Evita Set<Kotlin> da Swift per la scelta multipla allarme. */
 fun GestSquadreFacade.makeSquadAlarmRequest(
-    ambulanza: Boolean,
-    medico: Boolean,
-    dae: Boolean,
-    forzeOrdine: Boolean,
-    vvf: Boolean,
+    sanitario: Boolean,
+    security: Boolean,
+    vigiliFuoco: Boolean,
     altro: Boolean,
     otherDetail: String?,
 ): SquadAlarmRequest {
     val types =
         buildSet {
-            if (ambulanza) add(SquadAlarmRequestType.AMBULANZA)
-            if (medico) add(SquadAlarmRequestType.MEDICO)
-            if (dae) add(SquadAlarmRequestType.DAE)
-            if (forzeOrdine) add(SquadAlarmRequestType.FORZE_ORDINE)
-            if (vvf) add(SquadAlarmRequestType.VVF)
+            if (sanitario) add(SquadAlarmRequestType.SANITARIO)
+            if (security) add(SquadAlarmRequestType.SECURITY)
+            if (vigiliFuoco) add(SquadAlarmRequestType.VIGILI_FUOCO)
             if (altro) add(SquadAlarmRequestType.ALTRO)
         }
     return SquadAlarmRequest(
