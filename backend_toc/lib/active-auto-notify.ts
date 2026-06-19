@@ -75,7 +75,8 @@ async function onlineSessionIdBySquadCode(
 export async function fetchActiveAutoNotifyDeliveries(
   supabase: SupabaseClient,
   eventId: string | null,
-  recipientSquadCodes?: string[] | null,
+  /** Codici squadra mittente (volontario sul campo). Per TOC campo: solo allarmi di quelle squadre. */
+  sourceSquadCodes?: string[] | null,
 ): Promise<{ rows: ActiveAutoNotifyDelivery[]; error: string | null }> {
   if (!eventId) {
     return { rows: [], error: null };
@@ -92,7 +93,7 @@ export async function fetchActiveAutoNotifyDeliveries(
     .order("created_at", { ascending: false })
     .limit(80);
 
-  let needsSessionLookup = false;
+  let legacySchema = false;
   let data: AutoNotifyLogRow[] | null = (modernResult.data ?? null) as AutoNotifyLogRow[] | null;
   let error = modernResult.error;
 
@@ -102,7 +103,7 @@ export async function fetchActiveAutoNotifyDeliveries(
       error.message,
     )
   ) {
-    needsSessionLookup = true;
+    legacySchema = true;
     const legacyResult = await supabase
       .from("alarm_auto_notify_logs")
       .select(
@@ -123,36 +124,37 @@ export async function fetchActiveAutoNotifyDeliveries(
     return { rows: [], error: error.message };
   }
 
-  const sessionByCode = needsSessionLookup
-    ? await onlineSessionIdBySquadCode(supabase)
-    : null;
+  const sessionByCode = await onlineSessionIdBySquadCode(supabase);
 
-  const allowed =
-    recipientSquadCodes && recipientSquadCodes.length > 0
-      ? new Set(recipientSquadCodes.map((c) => c.trim().toUpperCase()))
-      : null;
+  const allowedSources =
+    sourceSquadCodes === undefined || sourceSquadCodes === null
+      ? null
+      : new Set(sourceSquadCodes.map((c) => c.trim().toUpperCase()));
 
   const rows = ((data ?? []) as AutoNotifyLogRow[])
     .map((row) => {
-      const code = recipientCode(row);
-      if (!code) {
+      const sourceCode = String(row.squad_code ?? "").trim().toUpperCase();
+      if (allowedSources && !allowedSources.has(sourceCode)) {
         return null;
       }
-      if (allowed && !allowed.has(code)) {
+
+      const recipient = recipientCode(row);
+      if (!recipient) {
         return null;
       }
+
       const sessionId =
-        row.recipient_session_id ??
-        (needsSessionLookup ? sessionByCode?.get(code) ?? null : null);
+        row.recipient_session_id ?? sessionByCode.get(recipient) ?? null;
       if (!sessionId) {
         return null;
       }
+
       return {
         id: row.id,
         alarmId: row.alarm_id,
         sourceSquadCode: row.squad_code,
         sourceSquadName: row.squad_name,
-        recipientSquadCode: code,
+        recipientSquadCode: recipient,
         recipientSessionId: String(sessionId),
         pushTitle: row.push_title ?? null,
         pushBody: row.push_body ?? null,
@@ -162,7 +164,7 @@ export async function fetchActiveAutoNotifyDeliveries(
     })
     .filter((row): row is ActiveAutoNotifyDelivery => row !== null);
 
-  if (needsSessionLookup && rows.length === 0) {
+  if (legacySchema && (data?.length ?? 0) > 0 && rows.length === 0) {
     return {
       rows: [],
       error:

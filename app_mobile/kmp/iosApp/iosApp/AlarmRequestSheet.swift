@@ -31,7 +31,8 @@ struct AlarmRequestSheet: View {
                         alarmRow("4. Strutture", $strutture)
                         alarmRow("5. Altro", $altro)
                         if altro {
-                            TextField("Descrivi la richiesta", text: $otherDetail)
+                            TextField("Descrizione breve", text: $otherDetail, axis: .vertical)
+                                .lineLimit(2...5)
                                 .textFieldStyle(.roundedBorder)
                         }
                         if let validationError {
@@ -42,6 +43,7 @@ struct AlarmRequestSheet: View {
                     }
                     .padding()
                 }
+                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(SquadAlarmCopy.dialogTitle)
             .navigationBarTitleDisplayMode(.inline)

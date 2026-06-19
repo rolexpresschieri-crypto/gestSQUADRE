@@ -7,6 +7,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.LinearProgressIndicator
@@ -48,6 +51,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ansmi.gestsquadre.kmp.ui.components.AppTitleBlock
 import com.ansmi.gestsquadre.kmp.ui.components.MainButton
@@ -470,133 +475,159 @@ private fun SquadAlarmRequestDialog(
         )
     }
 
-    AlertDialog(
+    val scrollState = rememberScrollState()
+    LaunchedEffect(altro, otherDetail.length) {
+        if (altro) {
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF1A2E1A),
-        title = {
-            Text(
-                text = SquadAlarmDialogTitle,
-                color = Color.White,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 20.sp,
-            )
-        },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.92f)
+                    .imePadding()
+                    .padding(vertical = 16.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF1A2E1A),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    text = SquadAlarmDialogBody,
+                    text = SquadAlarmDialogTitle,
                     color = Color.White,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Cosa richiedi? (scelta multipla)",
-                    color = TacticalYellow,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                AlarmRequestCheckboxRow(
-                    label = "1. Sanitario",
-                    checked = sanitario,
-                    onCheckedChange = {
-                        sanitario = it
-                        validationError = null
-                    },
-                )
-                AlarmRequestCheckboxRow(
-                    label = "2. Security",
-                    checked = security,
-                    onCheckedChange = {
-                        security = it
-                        validationError = null
-                    },
-                )
-                AlarmRequestCheckboxRow(
-                    label = "3. Vigili del Fuoco",
-                    checked = vigiliFuoco,
-                    onCheckedChange = {
-                        vigiliFuoco = it
-                        validationError = null
-                    },
-                )
-                AlarmRequestCheckboxRow(
-                    label = "4. Strutture",
-                    checked = strutture,
-                    onCheckedChange = {
-                        strutture = it
-                        validationError = null
-                    },
-                )
-                AlarmRequestCheckboxRow(
-                    label = "5. Altro",
-                    checked = altro,
-                    onCheckedChange = {
-                        altro = it
-                        validationError = null
-                    },
-                )
-                if (altro) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = otherDetail,
-                        onValueChange = {
-                            otherDetail = it
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp)
+                            .verticalScroll(scrollState),
+                ) {
+                    Text(
+                        text = SquadAlarmDialogBody,
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Cosa richiedi? (scelta multipla)",
+                        color = TacticalYellow,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AlarmRequestCheckboxRow(
+                        label = "1. Sanitario",
+                        checked = sanitario,
+                        onCheckedChange = {
+                            sanitario = it
                             validationError = null
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Descrizione breve") },
-                        singleLine = false,
-                        maxLines = 3,
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                focusedBorderColor = TacticalYellow,
-                                unfocusedBorderColor = TacticalMuted,
-                                focusedLabelColor = TacticalYellow,
-                                unfocusedLabelColor = TacticalMuted,
-                                cursorColor = TacticalYellow,
-                            ),
                     )
-                }
-                validationError?.let { err ->
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = err,
-                        color = TacticalRed,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    AlarmRequestCheckboxRow(
+                        label = "2. Security",
+                        checked = security,
+                        onCheckedChange = {
+                            security = it
+                            validationError = null
+                        },
                     )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val request = buildRequest()
-                    val err = request.validate()
-                    if (err != null) {
-                        validationError = err
-                    } else {
-                        onConfirm(request)
+                    AlarmRequestCheckboxRow(
+                        label = "3. Vigili del Fuoco",
+                        checked = vigiliFuoco,
+                        onCheckedChange = {
+                            vigiliFuoco = it
+                            validationError = null
+                        },
+                    )
+                    AlarmRequestCheckboxRow(
+                        label = "4. Strutture",
+                        checked = strutture,
+                        onCheckedChange = {
+                            strutture = it
+                            validationError = null
+                        },
+                    )
+                    AlarmRequestCheckboxRow(
+                        label = "5. Altro",
+                        checked = altro,
+                        onCheckedChange = {
+                            altro = it
+                            validationError = null
+                        },
+                    )
+                    if (altro) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        OutlinedTextField(
+                            value = otherDetail,
+                            onValueChange = {
+                                otherDetail = it
+                                validationError = null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Descrizione breve") },
+                            singleLine = false,
+                            minLines = 2,
+                            maxLines = 5,
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    focusedBorderColor = TacticalYellow,
+                                    unfocusedBorderColor = TacticalMuted,
+                                    focusedLabelColor = TacticalYellow,
+                                    unfocusedLabelColor = TacticalMuted,
+                                    cursorColor = TacticalYellow,
+                                ),
+                        )
                     }
-                },
-            ) {
-                Text(
-                    text = "INVIA ALLARME",
-                    color = Color.White,
-                    fontWeight = FontWeight.Black,
-                )
+                    validationError?.let { err ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = err,
+                            color = TacticalRed,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(text = "Annulla", color = TacticalMuted)
+                    }
+                    TextButton(
+                        onClick = {
+                            val request = buildRequest()
+                            val err = request.validate()
+                            if (err != null) {
+                                validationError = err
+                            } else {
+                                onConfirm(request)
+                            }
+                        },
+                    ) {
+                        Text(
+                            text = "INVIA ALLARME",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(text = "Annulla", color = TacticalMuted)
-            }
-        },
-    )
+        }
+    }
 }
 
 @Composable

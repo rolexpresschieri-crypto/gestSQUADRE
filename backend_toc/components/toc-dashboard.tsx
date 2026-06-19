@@ -348,7 +348,7 @@ export default function TocDashboard() {
       return;
     }
 
-    let recipientSquadCodes: string[] | null = null;
+    let sourceSquadCodes: string[] | null = null;
     if (golfCourseId) {
       const squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
       if (squadIds.length > 0) {
@@ -356,18 +356,18 @@ export default function TocDashboard() {
           .from("squads")
           .select("squad_code")
           .in("id", squadIds);
-        recipientSquadCodes = (data ?? [])
+        sourceSquadCodes = (data ?? [])
           .map((row) => String(row.squad_code ?? "").trim().toUpperCase())
           .filter(Boolean);
       } else {
-        recipientSquadCodes = [];
+        sourceSquadCodes = [];
       }
     }
 
     const { rows, error } = await fetchActiveAutoNotifyDeliveries(
       supabase,
       activeEventId,
-      recipientSquadCodes,
+      sourceSquadCodes,
     );
     setActiveAutoNotifies(rows);
     if (error) {
