@@ -10,10 +10,11 @@ import {
   type AdminSessionData,
 } from "@/lib/admin-auth";
 import {
+  ALARM_NOTIFY_SQUAD_CODE_PREFIX,
   buildRoutingSet,
   ROUTING_ALARM_ROWS,
   routingKey,
-  type TocOperatorRow,
+  type SquadRecipientRow,
 } from "@/lib/alarm-notify-admin";
 import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
@@ -21,24 +22,42 @@ import styles from "./alarm-notify-routing-page.module.css";
 
 type RoutingRow = {
   alarm_type: string;
-  admin_code: string;
+  recipient_squad_code?: string | null;
+  admin_code?: string | null;
   is_enabled: boolean;
 };
 
-type TokenRow = {
-  admin_code: string;
+type OnlineSessionRow = {
+  id: string;
+  squads: { squad_code: string } | { squad_code: string }[] | null;
 };
+
+function squadCodeFromSession(row: OnlineSessionRow): string {
+  const squads = row.squads;
+  if (!squads) {
+    return "";
+  }
+  if (Array.isArray(squads)) {
+    return String(squads[0]?.squad_code ?? "").trim().toUpperCase();
+  }
+  return String(squads.squad_code ?? "").trim().toUpperCase();
+}
+
+function routingRecipientCode(row: RoutingRow): string {
+  return (row.recipient_squad_code ?? row.admin_code ?? "").trim().toUpperCase();
+}
 
 export default function AlarmNotifyRoutingPage() {
   const [supabase, setSupabase] = useState<ReturnType<typeof getSupabaseBrowserClient>>(null);
   const [session, setSession] = useState<AdminSessionData | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [operators, setOperators] = useState<TocOperatorRow[]>([]);
+  const [recipients, setRecipients] = useState<SquadRecipientRow[]>([]);
   const [routing, setRouting] = useState<Set<string>>(new Set());
-  const [phonesRegistered, setPhonesRegistered] = useState<Set<string>>(new Set());
+  const [phonesOnline, setPhonesOnline] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [usesLegacyAdminColumn, setUsesLegacyAdminColumn] = useState(false);
 
   const role = session ? normalizeAdminRole(session.role) : "admin";
   const canView = canViewAlarmRouting(role);
@@ -60,41 +79,78 @@ export default function AlarmNotifyRoutingPage() {
 
   const refresh = useCallback(async () => {
     if (!supabase || !canView) {
-      setOperators([]);
+      setRecipients([]);
       setRouting(new Set());
-      setPhonesRegistered(new Set());
+      setPhonesOnline(new Set());
       return;
     }
 
-    const [opsRes, routingRes, tokensRes] = await Promise.all([
-      supabase
-        .from("toc_admins")
-        .select("admin_code, admin_name, is_enabled, role")
-        .in("role", ["admin", "viewer"])
-        .order("admin_code", { ascending: true }),
-      supabase
-        .from("alarm_notify_routing")
-        .select("alarm_type, admin_code, is_enabled"),
-      supabase.from("toc_admin_fcm_tokens").select("admin_code"),
-    ]);
+    const squadsRes = await supabase
+      .from("squads")
+      .select("squad_code, squad_name, is_enabled")
+      .like("squad_code", `${ALARM_NOTIFY_SQUAD_CODE_PREFIX}%`)
+      .order("squad_code", { ascending: true });
 
-    if (opsRes.error) {
-      setStatus(
-        opsRes.error.message.includes("toc_admins")
-          ? "Errore caricamento operatori."
-          : opsRes.error.message,
-      );
-      setOperators([]);
+    let routingRes = await supabase
+      .from("alarm_notify_routing")
+      .select("alarm_type, recipient_squad_code, is_enabled");
+
+    if (routingRes.error?.message.includes("recipient_squad_code")) {
+      setUsesLegacyAdminColumn(true);
+      routingRes = await supabase
+        .from("alarm_notify_routing")
+        .select("alarm_type, admin_code, is_enabled");
     } else {
-      setOperators(
-        (opsRes.data ?? [])
-          .filter((row) => row.is_enabled !== false)
-          .map((row) => ({
-            admin_code: String(row.admin_code).trim().toUpperCase(),
-            admin_name: String(row.admin_name ?? "").trim(),
-            is_enabled: row.is_enabled !== false,
-          })),
+      setUsesLegacyAdminColumn(false);
+    }
+
+    const sessionsRes = await supabase
+      .from("squad_sessions")
+      .select("id, squads(squad_code)")
+      .eq("is_online", true);
+
+    const squadMap = new Map<string, SquadRecipientRow>();
+    if (!squadsRes.error) {
+      for (const row of squadsRes.data ?? []) {
+        const code = String(row.squad_code ?? "").trim().toUpperCase();
+        if (!code) {
+          continue;
+        }
+        squadMap.set(code, {
+          squad_code: code,
+          squad_name: String(row.squad_name ?? "").trim(),
+          is_enabled: row.is_enabled !== false,
+        });
+      }
+    }
+
+    if (!routingRes.error) {
+      for (const row of (routingRes.data ?? []) as RoutingRow[]) {
+        const code = routingRecipientCode(row);
+        if (!code || squadMap.has(code)) {
+          continue;
+        }
+        squadMap.set(code, {
+          squad_code: code,
+          squad_name: code,
+          is_enabled: true,
+        });
+      }
+    }
+
+    const recipientList = [...squadMap.values()]
+      .filter((row) => row.is_enabled)
+      .sort((a, b) => a.squad_code.localeCompare(b.squad_code));
+
+    if (squadsRes.error) {
+      setStatus(
+        squadsRes.error.message.includes("squads")
+          ? "Errore caricamento squadre."
+          : squadsRes.error.message,
       );
+      setRecipients([]);
+    } else {
+      setRecipients(recipientList);
     }
 
     if (routingRes.error) {
@@ -108,16 +164,39 @@ export default function AlarmNotifyRoutingPage() {
       setRouting(buildRoutingSet((routingRes.data ?? []) as RoutingRow[]));
     }
 
-    if (!tokensRes.error) {
-      const codes = new Set<string>();
-      for (const row of (tokensRes.data ?? []) as TokenRow[]) {
-        const code = String(row.admin_code ?? "").trim().toUpperCase();
+    const onlineCodes = new Set<string>();
+    const sessionIds: string[] = [];
+    if (!sessionsRes.error) {
+      for (const row of (sessionsRes.data ?? []) as OnlineSessionRow[]) {
+        const code = squadCodeFromSession(row);
         if (code) {
-          codes.add(code);
+          sessionIds.push(String(row.id));
         }
       }
-      setPhonesRegistered(codes);
     }
+
+    if (sessionIds.length > 0) {
+      const tokensRes = await supabase
+        .from("squad_fcm_tokens")
+        .select("session_id")
+        .in("session_id", sessionIds);
+
+      if (!tokensRes.error) {
+        const sessionsWithToken = new Set(
+          (tokensRes.data ?? []).map((r) => String(r.session_id)),
+        );
+        for (const row of (sessionsRes.data ?? []) as OnlineSessionRow[]) {
+          if (!sessionsWithToken.has(String(row.id))) {
+            continue;
+          }
+          const code = squadCodeFromSession(row);
+          if (code) {
+            onlineCodes.add(code);
+          }
+        }
+      }
+    }
+    setPhonesOnline(onlineCodes);
   }, [supabase, canView]);
 
   useEffect(() => {
@@ -131,39 +210,45 @@ export default function AlarmNotifyRoutingPage() {
     })();
   }, [authChecked, refresh]);
 
-  const operatorCodes = useMemo(
-    () => operators.map((op) => op.admin_code),
-    [operators],
+  const recipientCodes = useMemo(
+    () => recipients.map((row) => row.squad_code),
+    [recipients],
   );
 
-  async function toggleCell(alarmType: string, adminCode: string, next: boolean) {
+  async function toggleCell(alarmType: string, squadCode: string, next: boolean) {
     if (!supabase || !canEdit) {
       return;
     }
-    const key = routingKey(alarmType, adminCode);
+    const key = routingKey(alarmType, squadCode);
     setBusyKey(key);
     setStatus(null);
 
     if (next) {
-      const { error } = await supabase.from("alarm_notify_routing").upsert(
-        {
-          alarm_type: alarmType,
-          admin_code: adminCode,
-          is_enabled: true,
-        },
-        { onConflict: "alarm_type,admin_code" },
-      );
+      const payload = usesLegacyAdminColumn
+        ? { alarm_type: alarmType, admin_code: squadCode, is_enabled: true }
+        : {
+            alarm_type: alarmType,
+            recipient_squad_code: squadCode,
+            is_enabled: true,
+          };
+      const conflict = usesLegacyAdminColumn
+        ? "alarm_type,admin_code"
+        : "alarm_type,recipient_squad_code";
+      const { error } = await supabase
+        .from("alarm_notify_routing")
+        .upsert(payload, { onConflict: conflict });
       if (error) {
         setStatus(error.message);
       } else {
         setRouting((prev) => new Set([...prev, key]));
       }
     } else {
+      const column = usesLegacyAdminColumn ? "admin_code" : "recipient_squad_code";
       const { error } = await supabase
         .from("alarm_notify_routing")
         .delete()
         .eq("alarm_type", alarmType)
-        .eq("admin_code", adminCode);
+        .eq(column, squadCode);
       if (error) {
         setStatus(error.message);
       } else {
@@ -220,11 +305,11 @@ export default function AlarmNotifyRoutingPage() {
             segnalazione (mappa rossa, colonna allarmi, stato in attesa).
           </p>
           <p>
-            Le caselle qui sotto definiscono a quali operatori il sistema tenta l&apos;
-            <strong>inoltro push automatico sul telefono</strong>. La push arriva solo se
-            l&apos;operatore ha registrato il cellulare dall&apos;app («Operatore TOC:
-            registra notifiche allarme»).{" "}
-            <strong>Non serve essere loggati sul TOC web.</strong>
+            Le caselle qui sotto definiscono a quali <strong>squadre FIG/Sanitari (GT_*)</strong>{" "}
+            il sistema tenta l&apos;
+            <strong>inoltro push automatico sul telefono</strong>. La push arriva se la squadra
+            ha fatto <strong>login squadra</strong> nell&apos;app (stesso flusso dei volontari:
+            mappa, allarmi, ecc.). <strong>Non serve il TOC web.</strong>
           </p>
           <p>
             Regola: unione delle tipologie selezionate (es. Sanitario + Security → tutti i
@@ -234,9 +319,9 @@ export default function AlarmNotifyRoutingPage() {
 
         {loading ? (
           <p className={styles.status}>Caricamento…</p>
-        ) : operatorCodes.length === 0 ? (
+        ) : recipientCodes.length === 0 ? (
           <p className={styles.status}>
-            Nessun operatore TOC (admin/viewer) trovato in anagrafica.
+            Nessuna squadra GT_* trovata in anagrafica squads.
           </p>
         ) : (
           <div className={styles.matrixWrap}>
@@ -244,14 +329,14 @@ export default function AlarmNotifyRoutingPage() {
               <thead>
                 <tr>
                   <th className={styles.rowHead}>Tipologia allarme</th>
-                  {operators.map((op) => (
-                    <th key={op.admin_code}>
-                      <span className={styles.operatorCode}>{op.admin_code}</span>
-                      <span className={styles.operatorName}>{op.admin_name}</span>
-                      {phonesRegistered.has(op.admin_code) ? (
-                        <span className={styles.phoneOk}>Telefono OK</span>
+                  {recipients.map((row) => (
+                    <th key={row.squad_code}>
+                      <span className={styles.operatorCode}>{row.squad_code}</span>
+                      <span className={styles.operatorName}>{row.squad_name}</span>
+                      {phonesOnline.has(row.squad_code) ? (
+                        <span className={styles.phoneOk}>App online · push OK</span>
                       ) : (
-                        <span className={styles.phoneMissing}>Telefono non registrato</span>
+                        <span className={styles.phoneMissing}>Non online / senza push</span>
                       )}
                     </th>
                   ))}
@@ -264,21 +349,21 @@ export default function AlarmNotifyRoutingPage() {
                       {row.label}
                       <span style={{ color: "#9baccc", fontWeight: 400 }}> ({row.code})</span>
                     </td>
-                    {operators.map((op) => {
-                      const key = routingKey(row.code, op.admin_code);
+                    {recipients.map((recipient) => {
+                      const key = routingKey(row.code, recipient.squad_code);
                       const checked = routing.has(key);
                       const busy = busyKey === key;
                       return (
-                        <td key={op.admin_code}>
+                        <td key={recipient.squad_code}>
                           <input
                             type="checkbox"
                             className={styles.checkbox}
                             checked={checked}
                             disabled={!canEdit || busy}
                             onChange={(e) =>
-                              void toggleCell(row.code, op.admin_code, e.target.checked)
+                              void toggleCell(row.code, recipient.squad_code, e.target.checked)
                             }
-                            aria-label={`${row.label} → ${op.admin_code}`}
+                            aria-label={`${row.label} → ${recipient.squad_code}`}
                           />
                         </td>
                       );

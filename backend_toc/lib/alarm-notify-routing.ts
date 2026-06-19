@@ -35,11 +35,16 @@ export function routingTypesFromRequest(raw: unknown): RoutingAlarmType[] {
 
 export type AlarmNotifyRoutingRow = {
   alarm_type: string;
-  admin_code: string;
+  recipient_squad_code?: string | null;
+  admin_code?: string | null;
   is_enabled: boolean;
 };
 
-export function resolveAdminCodesFromRouting(
+function rowRecipientCode(row: AlarmNotifyRoutingRow): string {
+  return (row.recipient_squad_code ?? row.admin_code ?? "").trim().toUpperCase();
+}
+
+export function resolveSquadCodesFromRouting(
   requestTypes: unknown,
   routingRows: AlarmNotifyRoutingRow[],
 ): string[] {
@@ -52,7 +57,10 @@ export function resolveAdminCodesFromRouting(
   for (const type of types) {
     for (const row of enabled) {
       if (row.alarm_type === type) {
-        codes.add(row.admin_code.trim().toUpperCase());
+        const code = rowRecipientCode(row);
+        if (code) {
+          codes.add(code);
+        }
       }
     }
   }

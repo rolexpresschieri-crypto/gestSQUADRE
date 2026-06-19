@@ -408,7 +408,16 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Operatore TOC: registra notifiche allarme",
+                    text =
+                        "Squadre FIG/Sanitari (GT_*): login squadra = mappa, allarmi e push automatici",
+                    color = Color.White.copy(alpha = 0.78f),
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "TOC da campo (senza squadra): registra notifiche",
                     color = TacticalYellow,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,

@@ -106,7 +106,8 @@ export type AlarmAutoNotifyLogRow = {
   event_id: string;
   squad_code: string;
   squad_name: string;
-  admin_code: string;
+  recipient_squad_code?: string | null;
+  admin_code?: string | null;
   fcm_token: string | null;
   status: string;
   fcm_message_id: string | null;
@@ -114,6 +115,10 @@ export type AlarmAutoNotifyLogRow = {
   request_types?: unknown;
   created_at: string;
 };
+
+function autoNotifyRecipientCode(row: AlarmAutoNotifyLogRow): string {
+  return (row.recipient_squad_code ?? row.admin_code ?? "").trim() || "—";
+}
 
 export type UnifiedEventLog = {
   id: string;
@@ -230,20 +235,21 @@ export function mergeEventLogs(
   const autoNotifyRows: UnifiedEventLog[] = autoNotifies.map((n) => {
     const failed = n.status === "failed";
     const skipped = n.status === "skipped";
+    const recipient = autoNotifyRecipientCode(n);
     return {
       id: n.id,
       kind: "alarm_auto_notify" as const,
       createdAt: n.created_at,
       squadCode: n.squad_code,
       squadName: n.squad_name,
-      summary: "Inoltro automatico allarme → operatore",
+      summary: "Inoltro automatico allarme → squadra GT",
       detail: skipped
-        ? `Operatore ${n.admin_code}: nessun telefono registrato`
+        ? `Squadra ${recipient}${n.error_message?.trim() ? `: ${n.error_message.trim()}` : ""}`
         : failed
-          ? `Operatore ${n.admin_code}${n.error_message?.trim() ? `: ${n.error_message.trim()}` : ""}`
-          : `Operatore ${n.admin_code}`,
+          ? `Squadra ${recipient}${n.error_message?.trim() ? `: ${n.error_message.trim()}` : ""}`
+          : `Squadra ${recipient}`,
       status: skipped ? "saltato" : failed ? "fallito" : "inviato",
-      actor: n.admin_code,
+      actor: recipient,
     };
   });
 
