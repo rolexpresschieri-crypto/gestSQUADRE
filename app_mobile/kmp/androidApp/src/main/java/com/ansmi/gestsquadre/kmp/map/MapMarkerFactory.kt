@@ -42,11 +42,14 @@ object MapMarkerFactory {
         alarming: Boolean,
         isSelf: Boolean,
     ): Bitmap {
-        val ringSize = MapMarkerMetrics.dp(context, if (isSelf) 36f else 32f).roundToInt()
-        val iconSize = MapMarkerMetrics.dp(context, if (isSelf) 22f else 20f).roundToInt()
+        val iconHeightPx =
+            MapMarkerMetrics.dp(context, when {
+                isSelf -> 32f
+                alarming -> 30f
+                else -> 28f
+            }).roundToInt()
+        val iconBitmap = loadIconBitmap(context, squad.mapIconKey, iconHeightPx, SquadIcons::drawableRes)
         val label = squadMapChipLabel(squad, alarming)
-        val ringColor = if (alarming) 0xFFC62828.toInt() else squad.mapColorArgb.toInt()
-        val selfOutlineColor = if (isSelf) 0xFFE0BE3A.toInt() else Color.TRANSPARENT
         val labelBg = if (alarming) 0xFFC62828.toInt() else 0xFF111111.toInt()
         val labelBorder = if (alarming) Color.WHITE else 0xFF4A5568.toInt()
 
@@ -60,45 +63,24 @@ object MapMarkerFactory {
         val textWidth = textPaint.measureText(label)
         val width =
             max(
-                textWidth + MapMarkerMetrics.dp(context, 32f),
+                max(iconBitmap.width.toFloat(), textWidth) + MapMarkerMetrics.dp(context, 14f),
                 MapMarkerMetrics.dp(context, 110f),
             ).roundToInt()
-        val height = (ringSize + MapMarkerMetrics.dp(context, 30f)).roundToInt()
+        val labelHeight = MapMarkerMetrics.dp(context, 16f).roundToInt()
+        val height = iconBitmap.height + labelHeight + MapMarkerMetrics.dp(context, 4f).roundToInt()
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.TRANSPARENT)
         val canvas = Canvas(bitmap)
-
         val cx = width / 2f
-        val ringCy = ringSize / 2f + MapMarkerMetrics.dp(context, 2f)
-        val ringRadius = ringSize / 2f
-        val ringBorder = MapMarkerMetrics.dp(context, if (isSelf) 4f else 3.5f)
 
-        if (isSelf) {
-            val selfPaint =
-                Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = selfOutlineColor
-                    style = Paint.Style.STROKE
-                    strokeWidth = MapMarkerMetrics.dp(context, 3f)
-                }
-            canvas.drawCircle(cx, ringCy, ringRadius + MapMarkerMetrics.dp(context, 2f), selfPaint)
-        }
+        canvas.drawBitmap(
+            iconBitmap,
+            (cx - iconBitmap.width / 2f).roundToInt().toFloat(),
+            MapMarkerMetrics.dp(context, 1f),
+            null,
+        )
 
-        val ringFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
-        canvas.drawCircle(cx, ringCy, ringRadius, ringFill)
-        val ringStroke =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = ringColor
-                style = Paint.Style.STROKE
-                strokeWidth = ringBorder
-            }
-        canvas.drawCircle(cx, ringCy, ringRadius - ringBorder / 2f, ringStroke)
-
-        val iconBitmap = loadIconBitmap(context, squad.mapIconKey, iconSize, SquadIcons::drawableRes)
-        val iconLeft = (cx - iconBitmap.width / 2f).roundToInt()
-        val iconTop = (ringCy - iconBitmap.height / 2f).roundToInt()
-        canvas.drawBitmap(iconBitmap, iconLeft.toFloat(), iconTop.toFloat(), null)
-
-        val labelTop = ringSize + MapMarkerMetrics.dp(context, 5f)
+        val labelTop = iconBitmap.height + MapMarkerMetrics.dp(context, 3f)
         val labelRect =
             RectF(
                 MapMarkerMetrics.dp(context, 8f),

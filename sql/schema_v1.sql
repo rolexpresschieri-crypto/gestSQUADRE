@@ -141,13 +141,13 @@ select
   s.squad_code,
   s.squad_name,
   s.map_color,
-  s.map_icon_key,
   ss.is_online,
   ss.login_at,
   ss.last_latitude,
   ss.last_longitude,
   ss.last_accuracy,
-  ss.last_fix_at
+  ss.last_fix_at,
+  s.map_icon_key
 from squad_sessions ss
 join squads s on s.id = ss.squad_id
 where ss.is_online = true;

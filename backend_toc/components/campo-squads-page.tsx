@@ -376,13 +376,13 @@ export default function CampoSquadsPage() {
                   />
                 </label>
                 <label>
-                  Colore anello mappa
+                  Colore cerchio GPS
                   <input
                     type="color"
                     value={mapColor}
                     onChange={(e) => setMapColor(e.target.value)}
                     disabled={busy}
-                    title="Cerchio colorato attorno all'icona sulla mappa"
+                    title="Colore del cerchio di precisione GPS sulla mappa"
                   />
                 </label>
               </div>
@@ -396,11 +396,6 @@ export default function CampoSquadsPage() {
                         mapIconKey === opt.key
                           ? `${styles.iconOption} ${styles.iconOptionActive}`
                           : styles.iconOption
-                      }
-                      style={
-                        mapIconKey === opt.key
-                          ? { boxShadow: `inset 0 0 0 2px ${mapColor}` }
-                          : undefined
                       }
                     >
                       <input
@@ -463,16 +458,13 @@ export default function CampoSquadsPage() {
                   {squads.map((row) => (
                     <tr key={row.id}>
                       <td>
-                        <span
-                          className={styles.squadIconPreview}
-                          style={{ borderColor: row.map_color ?? "#079B42" }}
-                        >
+                        <span className={styles.squadIconPreview}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={squadIconMapUrl(row.map_icon_key)}
                             alt=""
-                            width={16}
-                            height={16}
+                            width={22}
+                            height={22}
                           />
                         </span>
                         {row.squad_code}

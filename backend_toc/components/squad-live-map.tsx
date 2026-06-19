@@ -138,17 +138,16 @@ function squadDivIcon(
   isAlarming: boolean,
 ): L.DivIcon {
   const chip = escapeHtml((squad.squadName || squad.squadCode).slice(0, 18).toUpperCase());
-  const sel = selected ? " gs-squad-ring--selected" : "";
-  const alarm = isAlarming ? " gs-squad-ring--alarm" : "";
-  const ringColor = isAlarming ? ALARM_RED : squad.mapColor;
+  const sel = selected ? " gs-squad-icon-wrap--selected" : "";
+  const alarm = isAlarming ? " gs-squad-icon-wrap--alarm" : "";
   const iconUrl = squadIconMapUrl(squad.mapIconKey);
   const chipClass = isAlarming ? "gs-chip gs-chip--alarm" : "gs-chip";
   return L.divIcon({
     className: "gs-squad-divicon",
-    html: `<div class="gs-pin"><div class="gs-squad-ring${sel}${alarm}" style="--squad-ring:${ringColor}"><img class="gs-squad-icon" src="${iconUrl}" width="22" height="22" alt="" /></div><div class="${chipClass}">${chip}</div></div>`,
-    iconSize: [96, 48],
-    iconAnchor: [48, 12],
-    popupAnchor: [0, -32],
+    html: `<div class="gs-pin"><div class="gs-squad-icon-wrap${sel}${alarm}"><img class="gs-squad-icon" src="${iconUrl}" width="28" height="28" alt="" /></div><div class="${chipClass}">${chip}</div></div>`,
+    iconSize: [96, 46],
+    iconAnchor: [48, 14],
+    popupAnchor: [0, -18],
   });
 }
 

@@ -207,12 +207,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   margin-right: 6px;
-  border-radius: 50%;
-  border: 3px solid #079b42;
-  background: #fff;
   vertical-align: middle;
 }
 
