@@ -63,26 +63,38 @@ async function writeAutoNotifyLog(
     push_body: row.pushBody ?? null,
   };
 
-  let { error } = await admin.from("alarm_auto_notify_logs").insert(fullPayload);
-  if (error && /recipient_squad_code|column/i.test(error.message)) {
-    ({ error } = await admin.from("alarm_auto_notify_logs").insert({
-      ...fullPayload,
-      admin_code: row.recipientSquadCode,
-      recipient_squad_code: undefined,
-      recipient_session_id: undefined,
-      push_title: undefined,
-      push_body: undefined,
-    }));
-  } else if (
+  let payload: Record<string, unknown> = { ...fullPayload };
+  let { error } = await admin.from("alarm_auto_notify_logs").insert(payload);
+
+  if (
     error &&
-    /recipient_session_id|push_title|push_body|column/i.test(error.message)
+    /recipient_session_id|push_title|push_body|mobile_dismissed_at/i.test(
+      error.message,
+    )
   ) {
-    const { recipient_session_id, push_title, push_body, ...legacy } = fullPayload;
+    const {
+      recipient_session_id,
+      push_title,
+      push_body,
+      mobile_dismissed_at,
+      ...legacy
+    } = payload;
     void recipient_session_id;
     void push_title;
     void push_body;
-    ({ error } = await admin.from("alarm_auto_notify_logs").insert(legacy));
+    void mobile_dismissed_at;
+    payload = legacy;
+    ({ error } = await admin.from("alarm_auto_notify_logs").insert(payload));
   }
+
+  if (error && /recipient_squad_code/i.test(error.message)) {
+    ({ error } = await admin.from("alarm_auto_notify_logs").insert({
+      ...payload,
+      admin_code: row.recipientSquadCode,
+      recipient_squad_code: undefined,
+    }));
+  }
+
   if (error) {
     console.error("alarm_auto_notify_logs insert failed:", error.message);
   }
