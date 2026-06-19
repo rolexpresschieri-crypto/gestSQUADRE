@@ -257,6 +257,65 @@ type OpenAlarmRow = {
   created_at: string;
 };
 
+async function dismissedMissionKeysForOpenAlarms(
+  supabase: SupabaseClient,
+  openAlarmIds: string[],
+  alarms: OpenAlarmRow[],
+  sessionByCode: Map<string, string>,
+): Promise<Set<string>> {
+  const dismissed = new Set<string>();
+
+  const { data: logs } = await supabase
+    .from("alarm_auto_notify_logs")
+    .select(
+      "alarm_id, recipient_squad_code, admin_code, mobile_dismissed_at",
+    )
+    .in("alarm_id", openAlarmIds);
+
+  for (const row of (logs ?? []) as AutoNotifyLogRow[]) {
+    if (!row.mobile_dismissed_at) {
+      continue;
+    }
+    const code = recipientCode(row);
+    if (code) {
+      dismissed.add(`${row.alarm_id}|${code}`);
+    }
+  }
+
+  const sessionIds = [...new Set(sessionByCode.values())];
+  if (sessionIds.length === 0 || alarms.length === 0) {
+    return dismissed;
+  }
+
+  const { data: dismissRows } = await supabase
+    .from("squad_mobile_dismiss_logs")
+    .select("session_id, created_at")
+    .in("session_id", sessionIds)
+    .order("created_at", { ascending: false });
+
+  const latestDismissBySession = new Map<string, string>();
+  for (const row of dismissRows ?? []) {
+    const sessionId = String(row.session_id ?? "");
+    if (!sessionId || latestDismissBySession.has(sessionId)) {
+      continue;
+    }
+    latestDismissBySession.set(sessionId, String(row.created_at ?? ""));
+  }
+
+  for (const alarm of alarms) {
+    const alarmAt = alarm.created_at;
+    for (const [code, sessionId] of sessionByCode) {
+      const dismissAt = latestDismissBySession.get(sessionId);
+      if (!dismissAt || dismissAt < alarmAt) {
+        continue;
+      }
+      dismissed.add(`${alarm.id}|${code}`);
+    }
+  }
+
+  return dismissed;
+}
+
 /** Se il log DB manca ma l'allarme è aperto e il destinatario è online, mostra comunque la missione GT. */
 export async function supplementMissionsFromOpenAlarms(
   supabase: SupabaseClient,
@@ -290,6 +349,12 @@ export async function supplementMissionsFromOpenAlarms(
   }
 
   const sessionByCode = await onlineSessionIdBySquadCode(supabase);
+  const dismissedKeys = await dismissedMissionKeysForOpenAlarms(
+    supabase,
+    openAlarmIds,
+    alarms as OpenAlarmRow[],
+    sessionByCode,
+  );
   const covered = new Set(
     existing.map((row) => `${row.alarmId}|${row.recipientSquadCode}`),
   );
@@ -312,7 +377,7 @@ export async function supplementMissionsFromOpenAlarms(
 
     for (const recipient of recipients) {
       const key = `${alarm.id}|${recipient}`;
-      if (covered.has(key)) {
+      if (covered.has(key) || dismissedKeys.has(key)) {
         continue;
       }
       const sessionId = sessionByCode.get(recipient);

@@ -553,6 +553,15 @@ export default function TocDashboard() {
       )
       .subscribe();
 
+    const mobileDismissChannel = supabase
+      .channel("gest-mobile-dismiss")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "squad_mobile_dismiss_logs" },
+        () => debouncedLoadActiveAutoNotifies(),
+      )
+      .subscribe();
+
     const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
@@ -562,6 +571,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(wpChannel);
       void supabase.removeChannel(routeChannel);
       void supabase.removeChannel(autoNotifyChannel);
+      void supabase.removeChannel(mobileDismissChannel);
     };
   }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies]);
 
