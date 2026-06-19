@@ -120,6 +120,17 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
+const SQUAD_CHIP_MAX_CHARS = 28;
+
+function squadMapChipLabel(squad: LiveSquad): string {
+  const raw = (squad.squadName || squad.squadCode).trim();
+  return raw.slice(0, SQUAD_CHIP_MAX_CHARS).toUpperCase();
+}
+
+function squadMarkerWidth(chip: string): number {
+  return Math.max(112, Math.min(chip.length * 7 + 28, 220));
+}
+
 function waypointDivIcon(waypoint: SquadWaypoint): L.DivIcon {
   const name = escapeHtml(waypointDisplayName(waypoint).slice(0, 22).toUpperCase());
   const iconUrl = waypointIconMapUrl(waypoint.iconKey);
@@ -137,16 +148,17 @@ function squadDivIcon(
   selected: boolean,
   isAlarming: boolean,
 ): L.DivIcon {
-  const chip = escapeHtml((squad.squadName || squad.squadCode).slice(0, 18).toUpperCase());
+  const chip = escapeHtml(squadMapChipLabel(squad));
   const sel = selected ? " gs-squad-icon-wrap--selected" : "";
   const alarm = isAlarming ? " gs-squad-icon-wrap--alarm" : "";
   const iconUrl = squadIconMapUrl(squad.mapIconKey);
   const chipClass = isAlarming ? "gs-chip gs-chip--alarm" : "gs-chip";
+  const markerWidth = squadMarkerWidth(chip);
   return L.divIcon({
     className: "gs-squad-divicon",
     html: `<div class="gs-pin"><div class="gs-squad-icon-wrap${sel}${alarm}"><img class="gs-squad-icon" src="${iconUrl}" width="28" height="28" alt="" /></div><div class="${chipClass}">${chip}</div></div>`,
-    iconSize: [96, 46],
-    iconAnchor: [48, 14],
+    iconSize: [markerWidth, 46],
+    iconAnchor: [markerWidth / 2, 14],
     popupAnchor: [0, -18],
   });
 }

@@ -84,11 +84,14 @@
   padding: 3px 10px;
   background: #111;
   color: #fff;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   border-radius: 6px;
   border: 2px solid #4a5568;
   white-space: nowrap;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gs-chip--alarm {

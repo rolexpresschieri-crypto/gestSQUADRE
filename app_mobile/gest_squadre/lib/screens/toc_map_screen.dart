@@ -16,7 +16,7 @@ import '../theme/tactical_theme.dart';
 
 String _squadMapChipLabel(LiveSquadPin squad, bool alarming) {
   final raw = squad.squadName.trim().isEmpty ? squad.squadCode : squad.squadName;
-  final base = raw.length > 18 ? raw.substring(0, 18) : raw;
+  final base = raw.length > 28 ? raw.substring(0, 28) : raw;
   final chip = base.toUpperCase();
   return alarming ? '⚠ $chip' : chip;
 }
@@ -234,7 +234,7 @@ class _TocMapScreenState extends State<TocMapScreen> {
       markers.add(
         Marker(
           point: LatLng(s.latitude, s.longitude),
-          width: 110,
+          width: 180,
           height: 56,
           child: Column(
             mainAxisSize: MainAxisSize.min,

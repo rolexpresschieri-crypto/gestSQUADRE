@@ -25,12 +25,14 @@ private object MapMarkerMetrics {
         value * context.resources.displayMetrics.scaledDensity
 }
 
+private const val SQUAD_CHIP_MAX_CHARS = 28
+
 private fun squadMapChipLabel(squad: LiveSquadPin, alarming: Boolean): String {
     val base =
         squad.squadName
             .trim()
             .ifEmpty { squad.squadCode }
-            .take(18)
+            .take(SQUAD_CHIP_MAX_CHARS)
             .uppercase()
     return if (alarming) "⚠ $base" else base
 }
@@ -63,8 +65,8 @@ object MapMarkerFactory {
         val textWidth = textPaint.measureText(label)
         val width =
             max(
-                max(iconBitmap.width.toFloat(), textWidth) + MapMarkerMetrics.dp(context, 14f),
-                MapMarkerMetrics.dp(context, 110f),
+                max(iconBitmap.width.toFloat(), textWidth) + MapMarkerMetrics.dp(context, 18f),
+                MapMarkerMetrics.dp(context, 168f),
             ).roundToInt()
         val labelHeight = MapMarkerMetrics.dp(context, 16f).roundToInt()
         val height = iconBitmap.height + labelHeight + MapMarkerMetrics.dp(context, 4f).roundToInt()

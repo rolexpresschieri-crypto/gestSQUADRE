@@ -4,7 +4,8 @@ export type SquadIconKey =
   | "coordinatore_cri"
   | "vigili_fuoco"
   | "forze_ordine"
-  | "medico";
+  | "medico"
+  | "fig";
 
 export type SquadIconOption = {
   key: SquadIconKey;
@@ -24,6 +25,7 @@ export const SQUAD_ICON_OPTIONS: SquadIconOption[] = [
   { key: "vigili_fuoco", label: "Vigili del fuoco", mapUrl: "/map/squad/vigili_fuoco.png" },
   { key: "forze_ordine", label: "Forze dell'ordine", mapUrl: "/map/squad/forze_ordine.png" },
   { key: "medico", label: "Medico", mapUrl: "/map/squad/medico.png" },
+  { key: "fig", label: "FIG", mapUrl: "/map/squad/fig.png" },
 ];
 
 export const DEFAULT_SQUAD_ICON_KEY: SquadIconKey = "squadre_a_piedi";

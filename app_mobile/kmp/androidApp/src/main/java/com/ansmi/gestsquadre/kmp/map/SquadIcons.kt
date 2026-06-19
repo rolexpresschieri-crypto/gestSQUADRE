@@ -12,6 +12,7 @@ object SquadIcons {
             "vigili_fuoco" -> R.drawable.squad_vigili_fuoco
             "forze_ordine" -> R.drawable.squad_forze_ordine
             "medico" -> R.drawable.squad_medico
+            "fig" -> R.drawable.squad_fig
             "squadre_a_piedi", "" -> R.drawable.squad_squadre_a_piedi
             else -> R.drawable.squad_squadre_a_piedi
         }

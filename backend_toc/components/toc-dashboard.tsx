@@ -84,6 +84,7 @@ export default function TocDashboard() {
   const [pushBody, setPushBody] = useState(TOC_PUSH_BODY);
   const [pushAlert, setPushAlert] = useState<string | null>(null);
   const [pushSending, setPushSending] = useState(false);
+  const [missionResetBusy, setMissionResetBusy] = useState<string | null>(null);
   const [pushTargetAll, setPushTargetAll] = useState(false);
   const [pushSelected, setPushSelected] = useState<Record<string, boolean>>({});
   const [pushTargetWaypointId, setPushTargetWaypointId] = useState("");
@@ -764,6 +765,44 @@ export default function TocDashboard() {
     );
   }
 
+  async function forceMissionReset(
+    busyKey: string,
+    label: string,
+    payload: Record<string, unknown>,
+  ) {
+    if (!session) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Forzare reset notifica per ${label}?\n` +
+          "La missione sparisce dalla colonna (come se il destinatario avesse premuto Reset sull'app).",
+      )
+    ) {
+      return;
+    }
+
+    setMissionResetBusy(busyKey);
+    try {
+      const res = await fetch("/api/force-mission-dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, ...payload }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setStatusMessage(data.error ?? `Reset missione fallito (HTTP ${res.status}).`);
+        return;
+      }
+      setStatusMessage(`Reset forzato — ${label}`);
+      await loadActiveAutoNotifies();
+    } catch {
+      setStatusMessage("Reset missione: errore di rete.");
+    } finally {
+      setMissionResetBusy(null);
+    }
+  }
+
   async function acknowledgeAlarm(alarm: AlarmRow) {
     if (!supabase || !session) {
       return;
@@ -1191,8 +1230,8 @@ export default function TocDashboard() {
           </h2>
           <p className={styles.opsColumnHint}>
             Via TRK + target, push allarme inviata dal TOC, oppure inoltro automatico
-            verso squadre GT (FIG/Sanitari). Sparisce quando il destinatario preme
-            «Reset notifica» sull&apos;app.
+            verso squadre GT (FIG/Sanitari). Sparisce con «Reset notifica» sull&apos;app
+            oppure con <strong>Reset forzato TOC</strong> qui sotto.
           </p>
           <div className={styles.opsColumnBody}>
             {activeMissionCount === 0 ? (
@@ -1294,6 +1333,20 @@ export default function TocDashboard() {
                         <p className={styles.autoNotifyHint}>
                           In attesa presa in carico (reset sul telefono destinatario)
                         </p>
+                        <button
+                          className={styles.btnSmall}
+                          type="button"
+                          disabled={missionResetBusy === `toc-push-${row.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void forceMissionReset(`toc-push-${row.id}`, row.squadCode, {
+                              kind: "toc_push",
+                              id: row.id,
+                            });
+                          }}
+                        >
+                          Reset forzato TOC
+                        </button>
                       </div>
                     </div>
                   );
@@ -1345,6 +1398,29 @@ export default function TocDashboard() {
                         <p className={styles.autoNotifyHint}>
                           In attesa presa in carico (reset sul telefono destinatario)
                         </p>
+                        <button
+                          className={styles.btnSmall}
+                          type="button"
+                          disabled={
+                            missionResetBusy === `gt-${autoNotifyMissionKey(row)}`
+                          }
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void forceMissionReset(
+                              `gt-${autoNotifyMissionKey(row)}`,
+                              row.recipientSquadCode,
+                              {
+                                kind: "gt_notify",
+                                id: row.id,
+                                alarmId: row.alarmId,
+                                recipientSquadCode: row.recipientSquadCode,
+                                recipientSessionId: row.recipientSessionId,
+                              },
+                            );
+                          }}
+                        >
+                          Reset forzato TOC
+                        </button>
                       </div>
                     </div>
                   );
