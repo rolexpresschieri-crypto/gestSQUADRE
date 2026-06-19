@@ -5,6 +5,7 @@ import {
   resolveSquadCodesFromRouting,
   type AlarmNotifyRoutingRow,
 } from "@/lib/alarm-notify-routing";
+import { loadAlarmNotifyRoutingRows } from "@/lib/load-alarm-notify-routing";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { tocPushTextUpper } from "@/lib/toc-push-text";
 
@@ -74,18 +75,16 @@ export async function forwardVolunteerAlarmToOperators(
   admin: SupabaseClient,
   alarm: SquadAlarmNotifyRow,
 ): Promise<ForwardVolunteerAlarmResult> {
-  const { data: routingRows, error: routingErr } = await admin
-    .from("alarm_notify_routing")
-    .select("alarm_type, recipient_squad_code, admin_code, is_enabled")
-    .eq("is_enabled", true);
+  const { rows: routingRows, error: routingErr } =
+    await loadAlarmNotifyRoutingRows(admin);
 
   if (routingErr) {
-    throw new Error(`Routing allarme: ${routingErr.message}`);
+    throw new Error(`Routing allarme: ${routingErr}`);
   }
 
   const recipientCodes = resolveSquadCodesFromRouting(
     alarm.request_types,
-    (routingRows ?? []) as AlarmNotifyRoutingRow[],
+    routingRows,
   );
 
   const result: ForwardVolunteerAlarmResult = {

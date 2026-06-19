@@ -32,7 +32,8 @@ enum TocPushParser {
     }
 
     static func isTocAlarm(from userInfo: [AnyHashable: Any]) -> Bool {
-        (userInfo["type"] as? String)?.lowercased() == "toc_alarm"
+        let type = (userInfo["type"] as? String)?.lowercased()
+        return type == "toc_alarm" || type == "volunteer_alarm"
     }
 
     static func isPanelClear(from userInfo: [AnyHashable: Any]) -> Bool {
