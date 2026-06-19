@@ -19,6 +19,24 @@ import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.tasks.await
 
+private fun Throwable.rootCause(): Throwable =
+    generateSequence(this) { it.cause }.last()
+
+fun formatFcmRegistrationError(error: Throwable): String {
+    val root = error.rootCause()
+    val msg = (root.message ?: error.message ?: error.toString()).trim()
+    return when {
+        msg.contains("SERVICE_NOT_AVAILABLE", ignoreCase = true) ->
+            "Servizio Google non disponibile: aggiorna «Google Play Services», " +
+                "verifica rete (Wi‑Fi o dati), riavvia il telefono e tocca «Ripara push TOC»."
+        msg.contains("TOO_MANY_REGISTRATIONS", ignoreCase = true) ->
+            "Troppi tentativi push: attendi qualche minuto, poi «Ripara push TOC»."
+        msg.contains("MISSING_INSTANCEID_SERVICE", ignoreCase = true) ->
+            "Google Play Services mancante o disattivato su questo telefono."
+        else -> msg.ifEmpty { "Errore registrazione push." }
+    }
+}
+
 class FcmManager(
     private val context: Context,
 ) {
@@ -59,13 +77,14 @@ class FcmManager(
                 !ensureNotificationPermission()
 
         var lastError: String? = null
-        repeat(3) { attempt ->
+        val maxAttempts = 5
+        repeat(maxAttempts) { attempt ->
             val token =
                 runCatching { FirebaseMessaging.getInstance().token.await() }
                     .fold(
                         onSuccess = { it },
                         onFailure = { error ->
-                            lastError = error.message ?: "Errore token Firebase."
+                            lastError = formatFcmRegistrationError(error)
                             null
                         },
                     )
@@ -89,8 +108,16 @@ class FcmManager(
                 }
             }
 
-            if (attempt < 2) {
-                delay(2_000L)
+            if (attempt < maxAttempts - 1) {
+                val waitMs =
+                    if (lastError?.contains("Google Play Services", ignoreCase = true) == true ||
+                        lastError?.contains("Servizio Google", ignoreCase = true) == true
+                    ) {
+                        4_000L * (attempt + 1)
+                    } else {
+                        2_000L
+                    }
+                delay(waitMs)
             }
         }
 

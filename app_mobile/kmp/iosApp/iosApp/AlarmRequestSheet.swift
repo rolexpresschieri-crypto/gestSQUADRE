@@ -8,6 +8,7 @@ struct AlarmRequestSheet: View {
     @State private var sanitario = false
     @State private var security = false
     @State private var vigiliFuoco = false
+    @State private var strutture = false
     @State private var altro = false
     @State private var otherDetail = ""
     @State private var validationError: String?
@@ -27,7 +28,8 @@ struct AlarmRequestSheet: View {
                         alarmRow("1. Sanitario", $sanitario)
                         alarmRow("2. Security", $security)
                         alarmRow("3. Vigili del Fuoco", $vigiliFuoco)
-                        alarmRow("4. Altro", $altro)
+                        alarmRow("4. Strutture", $strutture)
+                        alarmRow("5. Altro", $altro)
                         if altro {
                             TextField("Descrivi la richiesta", text: $otherDetail)
                                 .textFieldStyle(.roundedBorder)
@@ -70,6 +72,7 @@ struct AlarmRequestSheet: View {
             sanitario: sanitario,
             security: security,
             vigiliFuoco: vigiliFuoco,
+            strutture: strutture,
             altro: altro,
             otherDetail: otherDetail
         ) { errorMessage in

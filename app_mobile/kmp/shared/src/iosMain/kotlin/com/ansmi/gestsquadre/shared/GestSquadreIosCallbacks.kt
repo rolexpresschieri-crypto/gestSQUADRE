@@ -64,6 +64,7 @@ fun GestSquadreFacade.makeSquadAlarmRequest(
     sanitario: Boolean,
     security: Boolean,
     vigiliFuoco: Boolean,
+    strutture: Boolean,
     altro: Boolean,
     otherDetail: String?,
 ): SquadAlarmRequest {
@@ -72,6 +73,7 @@ fun GestSquadreFacade.makeSquadAlarmRequest(
             if (sanitario) add(SquadAlarmRequestType.SANITARIO)
             if (security) add(SquadAlarmRequestType.SECURITY)
             if (vigiliFuoco) add(SquadAlarmRequestType.VIGILI_FUOCO)
+            if (strutture) add(SquadAlarmRequestType.STRUTTURE)
             if (altro) add(SquadAlarmRequestType.ALTRO)
         }
     return SquadAlarmRequest(
@@ -88,6 +90,21 @@ fun GestSquadreFacade.sendAlarmSafe(
     iosScope.launch {
         try {
             sendAlarm(session, request)
+            onComplete(null)
+        } catch (e: Throwable) {
+            onComplete(e.message ?: e.toString())
+        }
+    }
+}
+
+fun GestSquadreFacade.dismissTocNotificationSafe(
+    session: SquadSession,
+    panelMessage: String?,
+    onComplete: (String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            dismissTocNotification(session, panelMessage)
             onComplete(null)
         } catch (e: Throwable) {
             onComplete(e.message ?: e.toString())

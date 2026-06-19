@@ -451,6 +451,7 @@ private fun SquadAlarmRequestDialog(
     var sanitario by remember { mutableStateOf(false) }
     var security by remember { mutableStateOf(false) }
     var vigiliFuoco by remember { mutableStateOf(false) }
+    var strutture by remember { mutableStateOf(false) }
     var altro by remember { mutableStateOf(false) }
     var otherDetail by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
@@ -460,6 +461,7 @@ private fun SquadAlarmRequestDialog(
             if (sanitario) add(SquadAlarmRequestType.SANITARIO)
             if (security) add(SquadAlarmRequestType.SECURITY)
             if (vigiliFuoco) add(SquadAlarmRequestType.VIGILI_FUOCO)
+            if (strutture) add(SquadAlarmRequestType.STRUTTURE)
             if (altro) add(SquadAlarmRequestType.ALTRO)
         }
         return SquadAlarmRequest(
@@ -520,7 +522,15 @@ private fun SquadAlarmRequestDialog(
                     },
                 )
                 AlarmRequestCheckboxRow(
-                    label = "4. Altro",
+                    label = "4. Strutture",
+                    checked = strutture,
+                    onCheckedChange = {
+                        strutture = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "5. Altro",
                     checked = altro,
                     onCheckedChange = {
                         altro = it

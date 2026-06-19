@@ -3,7 +3,6 @@ import { getFirebaseAdminMessaging } from "@/lib/firebase-admin-app";
 import { fcmIosApnsPayload } from "@/lib/fcm-ios-apns";
 import {
   resolveSquadCodesFromRouting,
-  type AlarmNotifyRoutingRow,
 } from "@/lib/alarm-notify-routing";
 import { loadAlarmNotifyRoutingRows } from "@/lib/load-alarm-notify-routing";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
@@ -38,33 +37,51 @@ async function writeAutoNotifyLog(
     sourceSquadCode: string;
     sourceSquadName: string;
     recipientSquadCode: string;
+    recipientSessionId?: string | null;
     fcmToken: string | null;
     status: "sent" | "failed" | "skipped";
     fcmMessageId?: string | null;
     errorMessage?: string | null;
     requestTypes: unknown;
+    pushTitle?: string | null;
+    pushBody?: string | null;
   },
 ) {
-  const payload: Record<string, unknown> = {
+  const fullPayload: Record<string, unknown> = {
     alarm_id: row.alarmId,
     event_id: row.eventId,
     squad_code: row.sourceSquadCode,
     squad_name: row.sourceSquadName,
     recipient_squad_code: row.recipientSquadCode,
+    recipient_session_id: row.recipientSessionId ?? null,
     fcm_token: row.fcmToken,
     status: row.status,
     fcm_message_id: row.fcmMessageId ?? null,
     error_message: row.errorMessage ?? null,
     request_types: row.requestTypes ?? [],
+    push_title: row.pushTitle ?? null,
+    push_body: row.pushBody ?? null,
   };
 
-  let { error } = await admin.from("alarm_auto_notify_logs").insert(payload);
+  let { error } = await admin.from("alarm_auto_notify_logs").insert(fullPayload);
   if (error && /recipient_squad_code|column/i.test(error.message)) {
     ({ error } = await admin.from("alarm_auto_notify_logs").insert({
-      ...payload,
+      ...fullPayload,
       admin_code: row.recipientSquadCode,
       recipient_squad_code: undefined,
+      recipient_session_id: undefined,
+      push_title: undefined,
+      push_body: undefined,
     }));
+  } else if (
+    error &&
+    /recipient_session_id|push_title|push_body|column/i.test(error.message)
+  ) {
+    const { recipient_session_id, push_title, push_body, ...legacy } = fullPayload;
+    void recipient_session_id;
+    void push_title;
+    void push_body;
+    ({ error } = await admin.from("alarm_auto_notify_logs").insert(legacy));
   }
   if (error) {
     console.error("alarm_auto_notify_logs insert failed:", error.message);
@@ -122,6 +139,8 @@ export async function forwardVolunteerAlarmToOperators(
         status: "failed",
         errorMessage: squadErr.message,
         requestTypes: alarm.request_types,
+        pushTitle: title,
+        pushBody: body,
       });
       result.failed += 1;
       continue;
@@ -138,6 +157,8 @@ export async function forwardVolunteerAlarmToOperators(
         status: "skipped",
         errorMessage: "Squadra destinataria non trovata in anagrafica.",
         requestTypes: alarm.request_types,
+        pushTitle: title,
+        pushBody: body,
       });
       result.skipped += 1;
       continue;
@@ -164,6 +185,8 @@ export async function forwardVolunteerAlarmToOperators(
         status: "failed",
         errorMessage: sessionErr.message,
         requestTypes: alarm.request_types,
+        pushTitle: title,
+        pushBody: body,
       });
       result.failed += 1;
       continue;
@@ -181,6 +204,8 @@ export async function forwardVolunteerAlarmToOperators(
         status: "skipped",
         errorMessage: "Squadra non online (nessuna sessione attiva).",
         requestTypes: alarm.request_types,
+        pushTitle: title,
+        pushBody: body,
       });
       result.skipped += 1;
       continue;
@@ -202,102 +227,131 @@ export async function forwardVolunteerAlarmToOperators(
         status: "failed",
         errorMessage: tokenErr.message,
         requestTypes: alarm.request_types,
+        pushTitle: title,
+        pushBody: body,
       });
       result.failed += 1;
       continue;
     }
 
-    const tokens = (tokenRows ?? [])
-      .map((r) => String(r.fcm_token ?? "").trim())
-      .filter(Boolean);
-
-    if (tokens.length === 0) {
-      await writeAutoNotifyLog(admin, {
-        alarmId: alarm.id,
-        eventId: alarm.event_id,
-        sourceSquadCode: alarm.squad_code,
-        sourceSquadName: alarm.squad_name,
-        recipientSquadCode: recipientCode,
-        fcmToken: null,
-        status: "skipped",
-        errorMessage: "Squadra online ma senza token push (rifare login app).",
-        requestTypes: alarm.request_types,
-      });
-      result.skipped += 1;
-      continue;
+    const tokensBySession = new Map<string, string[]>();
+    for (const row of tokenRows ?? []) {
+      const sessionId = String(row.session_id ?? "");
+      const token = String(row.fcm_token ?? "").trim();
+      if (!sessionId || !token) {
+        continue;
+      }
+      tokensBySession.set(sessionId, [...(tokensBySession.get(sessionId) ?? []), token]);
     }
 
     if (!messaging) {
-      for (const token of tokens) {
+      for (const sessionId of sessionIds) {
         await writeAutoNotifyLog(admin, {
           alarmId: alarm.id,
           eventId: alarm.event_id,
           sourceSquadCode: alarm.squad_code,
           sourceSquadName: alarm.squad_name,
           recipientSquadCode: recipientCode,
-          fcmToken: token,
+          recipientSessionId: sessionId,
+          fcmToken: tokensBySession.get(sessionId)?.[0] ?? null,
           status: "failed",
           errorMessage: "Firebase Admin non configurato.",
           requestTypes: alarm.request_types,
+          pushTitle: title,
+          pushBody: body,
         });
         result.failed += 1;
       }
       continue;
     }
 
-    for (const token of tokens) {
-      try {
-        const messageId = await messaging.send({
-          token,
-          data: {
-            type: "volunteer_alarm",
-            title,
-            body,
-            alarm_id: alarm.id,
-            squad_code: alarm.squad_code,
-          },
-          android: { priority: "high" },
-          apns: fcmIosApnsPayload(title, body),
-        });
+    for (const sessionId of sessionIds) {
+      const sessionTokens = tokensBySession.get(sessionId) ?? [];
+      if (sessionTokens.length === 0) {
         await writeAutoNotifyLog(admin, {
           alarmId: alarm.id,
           eventId: alarm.event_id,
           sourceSquadCode: alarm.squad_code,
           sourceSquadName: alarm.squad_name,
           recipientSquadCode: recipientCode,
-          fcmToken: token,
-          status: "sent",
-          fcmMessageId: messageId,
+          recipientSessionId: sessionId,
+          fcmToken: null,
+          status: "skipped",
+          errorMessage: "Squadra online ma senza token push (rifare login app).",
           requestTypes: alarm.request_types,
+          pushTitle: title,
+          pushBody: body,
         });
-        result.sent += 1;
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Errore FCM";
-        if (
-          /registration-token-not-registered|invalid-registration-token|not a valid fcm registration token/i.test(
-            msg,
-          )
-        ) {
-          const badRow = (tokenRows ?? []).find(
-            (r) => String(r.fcm_token ?? "").trim() === token,
-          );
-          if (badRow?.session_id) {
+        result.skipped += 1;
+        continue;
+      }
+
+      let sentForSession = false;
+      let lastMessageId: string | null = null;
+      let lastError: string | null = null;
+
+      for (const token of sessionTokens) {
+        try {
+          const messageId = await messaging.send({
+            token,
+            data: {
+              type: "volunteer_alarm",
+              title,
+              body,
+              alarm_id: alarm.id,
+              squad_code: alarm.squad_code,
+            },
+            android: { priority: "high" },
+            apns: fcmIosApnsPayload(title, body),
+          });
+          sentForSession = true;
+          lastMessageId = messageId;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Errore FCM";
+          lastError = msg;
+          if (
+            /registration-token-not-registered|invalid-registration-token|not a valid fcm registration token/i.test(
+              msg,
+            )
+          ) {
             await admin
               .from("squad_fcm_tokens")
               .delete()
-              .eq("session_id", badRow.session_id as string);
+              .eq("session_id", sessionId);
           }
         }
+      }
+
+      if (sentForSession) {
         await writeAutoNotifyLog(admin, {
           alarmId: alarm.id,
           eventId: alarm.event_id,
           sourceSquadCode: alarm.squad_code,
           sourceSquadName: alarm.squad_name,
           recipientSquadCode: recipientCode,
-          fcmToken: token,
-          status: "failed",
-          errorMessage: msg,
+          recipientSessionId: sessionId,
+          fcmToken: sessionTokens[0] ?? null,
+          status: "sent",
+          fcmMessageId: lastMessageId,
           requestTypes: alarm.request_types,
+          pushTitle: title,
+          pushBody: body,
+        });
+        result.sent += 1;
+      } else {
+        await writeAutoNotifyLog(admin, {
+          alarmId: alarm.id,
+          eventId: alarm.event_id,
+          sourceSquadCode: alarm.squad_code,
+          sourceSquadName: alarm.squad_name,
+          recipientSquadCode: recipientCode,
+          recipientSessionId: sessionId,
+          fcmToken: sessionTokens[0] ?? null,
+          status: "failed",
+          errorMessage: lastError ?? "Errore FCM",
+          requestTypes: alarm.request_types,
+          pushTitle: title,
+          pushBody: body,
         });
         result.failed += 1;
       }

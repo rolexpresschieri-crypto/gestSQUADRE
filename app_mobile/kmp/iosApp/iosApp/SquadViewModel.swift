@@ -94,7 +94,12 @@ final class SquadViewModel: ObservableObject {
     }
 
     func clearLastTocMessage() {
+        let session = self.session
+        let panelMessage = lastTocMessage
         lastTocMessage = nil
+        TocMessageStorage.shared.clear()
+        guard let session, let facade else { return }
+        facade.dismissTocNotificationSafe(session: session, panelMessage: panelMessage) { _ in }
     }
 
     func onLocationPermissionGranted() {
@@ -118,6 +123,7 @@ final class SquadViewModel: ObservableObject {
         sanitario: Bool,
         security: Bool,
         vigiliFuoco: Bool,
+        strutture: Bool,
         altro: Bool,
         otherDetail: String,
         onComplete: @escaping (String?) -> Void
@@ -131,6 +137,7 @@ final class SquadViewModel: ObservableObject {
             sanitario: sanitario,
             security: security,
             vigiliFuoco: vigiliFuoco,
+            strutture: strutture,
             altro: altro,
             otherDetail: otherDetail
         )

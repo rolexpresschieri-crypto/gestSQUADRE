@@ -215,6 +215,16 @@ class GestSquadreRepository(
                 body = MobileDismissedAtPatch(mobileDismissedAt = nowIso()),
             )
         }
+        rest.patch(
+            table = "alarm_auto_notify_logs",
+            filters =
+                listOf(
+                    "recipient_session_id" to session.sessionId,
+                    "status" to "sent",
+                ),
+            isNullColumns = listOf("mobile_dismissed_at"),
+            body = MobileDismissedAtPatch(mobileDismissedAt = nowIso()),
+        )
     }
 
     suspend fun isTocPanelClosedByToc(sessionId: String): Boolean {

@@ -4,6 +4,7 @@ export const ROUTING_ALARM_TYPES = [
   "sanitario",
   "security",
   "vvf",
+  "strutture",
   "altro",
 ] as const;
 

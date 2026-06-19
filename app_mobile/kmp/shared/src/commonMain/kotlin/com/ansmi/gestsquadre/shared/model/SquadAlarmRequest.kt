@@ -7,6 +7,7 @@ enum class SquadAlarmRequestType(
     SANITARIO("sanitario", "Sanitario"),
     SECURITY("security", "Security"),
     VIGILI_FUOCO("vvf", "Vigili del Fuoco"),
+    STRUTTURE("strutture", "Strutture"),
     ALTRO("altro", "Altro"),
     ;
 

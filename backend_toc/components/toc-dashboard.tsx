@@ -16,9 +16,7 @@ import { MAP_SQUAD_POLL_MS } from "@/lib/map-refresh";
 import {
   clearRouteAssignmentForSession,
   fetchActiveRouteAssignmentsForSessions,
-  fetchMapRoutes,
   routeAssignmentsSig,
-  type MapRoute,
   type SquadRouteAssignment,
 } from "@/lib/map-routes";
 import {
@@ -26,6 +24,11 @@ import {
   fetchGolfCourseSquadIds,
   fetchLiveSquads,
 } from "@/lib/golf-course-scope";
+import {
+  fetchActiveAutoNotifyDeliveries,
+  formatAutoNotifyMissionDetail,
+  type ActiveAutoNotifyDelivery,
+} from "@/lib/active-auto-notify";
 import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { openExternalMapWindow } from "@/lib/open-external-map";
 import {
@@ -41,7 +44,7 @@ import {
 } from "@/lib/squad-map-points-feed";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
-import { waypointDisplayName, type SquadWaypoint } from "@/lib/waypoints";
+import { type SquadWaypoint } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
 
 const TOC_PUSH_TITLE = "TOC — ALLARME";
@@ -77,14 +80,14 @@ export default function TocDashboard() {
   const [pushSending, setPushSending] = useState(false);
   const [pushTargetAll, setPushTargetAll] = useState(true);
   const [pushSelected, setPushSelected] = useState<Record<string, boolean>>({});
-  const [mapRoutes, setMapRoutes] = useState<MapRoute[]>([]);
-  const [pushRouteId, setPushRouteId] = useState("");
-  const [pushTargetWaypointId, setPushTargetWaypointId] = useState("");
   const [selectedRouteAssignment, setSelectedRouteAssignment] =
     useState<SquadRouteAssignment | null>(null);
   const [routeAssignmentsBySession, setRouteAssignmentsBySession] = useState<
     Map<string, SquadRouteAssignment>
   >(new Map());
+  const [activeAutoNotifies, setActiveAutoNotifies] = useState<
+    ActiveAutoNotifyDelivery[]
+  >([]);
   const [pushHealth, setPushHealth] = useState<{
     supabaseServiceRole: boolean;
     firebaseAdmin: boolean;
@@ -162,6 +165,8 @@ export default function TocDashboard() {
         ),
     [routeAssignmentsBySession, squads, onlineSessionIds],
   );
+
+  const activeMissionCount = activeTocMissions.length + activeAutoNotifies.length;
 
   const handleSquadRowSelect = useCallback((squad: LiveSquad) => {
     setSelectedSessionId(squad.sessionId);
@@ -274,14 +279,6 @@ export default function TocDashboard() {
     }
   }, [supabase, golfCourseId]);
 
-  const loadMapRoutes = useCallback(async () => {
-    if (!supabase || !golfCourseId) {
-      setMapRoutes([]);
-      return;
-    }
-    setMapRoutes(await fetchMapRoutes(supabase, golfCourseId));
-  }, [supabase, golfCourseId]);
-
   const loadSelectedRouteAssignment = useCallback(async (extraSessionIds: string[] = []) => {
     if (!supabase) {
       setRouteAssignmentsBySession(new Map());
@@ -345,21 +342,46 @@ export default function TocDashboard() {
     });
   }, [supabase, selectedSessionId, pendingAlarmSessionIds]);
 
+  const loadActiveAutoNotifies = useCallback(async () => {
+    if (!supabase || !activeEventId) {
+      setActiveAutoNotifies([]);
+      return;
+    }
+
+    let recipientSquadCodes: string[] | null = null;
+    if (golfCourseId) {
+      const squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
+      if (squadIds.length > 0) {
+        const { data } = await supabase
+          .from("squads")
+          .select("squad_code")
+          .in("id", squadIds);
+        recipientSquadCodes = (data ?? [])
+          .map((row) => String(row.squad_code ?? "").trim().toUpperCase())
+          .filter(Boolean);
+      } else {
+        recipientSquadCodes = [];
+      }
+    }
+
+    const { rows, error } = await fetchActiveAutoNotifyDeliveries(
+      supabase,
+      activeEventId,
+      recipientSquadCodes,
+    );
+    setActiveAutoNotifies(rows);
+    if (error) {
+      setStatusMessage(error);
+    }
+  }, [supabase, activeEventId, golfCourseId]);
+
   useEffect(() => {
-    void loadMapRoutes();
-  }, [loadMapRoutes]);
+    void loadActiveAutoNotifies();
+  }, [loadActiveAutoNotifies]);
 
   useEffect(() => {
     void loadSelectedRouteAssignment();
   }, [loadSelectedRouteAssignment, onlineSessionIdsSig, pendingAlarmSessionIds]);
-
-  const pushSingleTarget = useMemo(() => {
-    if (pushTargetAll) {
-      return null;
-    }
-    const picked = squads.filter((s) => pushSelected[s.sessionId]);
-    return picked.length === 1 ? picked[0]! : null;
-  }, [pushTargetAll, pushSelected, squads]);
 
   const loadPushHealth = useCallback(async () => {
     if (!session) {
@@ -420,9 +442,11 @@ export default function TocDashboard() {
               `ALLARME: ${row.squad_code} — ${formatAlarmRequestDetail(row)}`,
             );
             void loadSelectedRouteAssignment([row.session_id]);
+            void loadActiveAutoNotifies();
           } else {
             void loadAlarms();
             void loadSelectedRouteAssignment();
+            void loadActiveAutoNotifies();
           }
         },
       )
@@ -446,6 +470,15 @@ export default function TocDashboard() {
       )
       .subscribe();
 
+    const autoNotifyChannel = supabase
+      .channel("gest-alarm-auto-notify")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "alarm_auto_notify_logs" },
+        () => void loadActiveAutoNotifies(),
+      )
+      .subscribe();
+
     const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
@@ -454,8 +487,9 @@ export default function TocDashboard() {
       void supabase.removeChannel(alarmChannel);
       void supabase.removeChannel(wpChannel);
       void supabase.removeChannel(routeChannel);
+      void supabase.removeChannel(autoNotifyChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, loadActiveAutoNotifies]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -646,8 +680,6 @@ export default function TocDashboard() {
   function openPushModal() {
     setPushTitle(tocPushTextUpper(readStoredPushTitle(TOC_PUSH_TITLE)));
     setPushBody(tocPushTextUpper(readStoredPushBody(TOC_PUSH_BODY)));
-    setPushRouteId(mapRoutes[0]?.id ?? "");
-    setPushTargetWaypointId(waypoints[0]?.id ?? "");
     setPushAlert(null);
     setPushSending(false);
     setPushOpen(true);
@@ -694,16 +726,6 @@ export default function TocDashboard() {
       }
     }
 
-    const selectedRoute =
-      pushRouteId && pushSingleTarget ? mapRoutes.find((r) => r.id === pushRouteId) : null;
-
-    if (pushSingleTarget && pushRouteId && !pushTargetWaypointId) {
-      setPushAlert(
-        "Per inviare una missione con via TRK seleziona anche il target (waypoint).",
-      );
-      return;
-    }
-
     setPushAlert(null);
     setPushSending(true);
     let ok = 0;
@@ -711,39 +733,6 @@ export default function TocDashboard() {
     const errors: string[] = [];
 
     for (const squad of targets) {
-      const routeForSquad =
-        selectedRoute && pushSingleTarget?.sessionId === squad.sessionId
-          ? selectedRoute
-          : null;
-
-      if (routeForSquad) {
-        const assignRes = await fetch("/api/assign-route", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            session,
-            sessionId: squad.sessionId,
-            routeId: routeForSquad.id,
-            targetWaypointId: pushTargetWaypointId || null,
-          }),
-        });
-        if (!assignRes.ok) {
-          let assignErr = `HTTP ${assignRes.status}`;
-          try {
-            const payload = (await assignRes.json()) as { error?: string };
-            if (payload.error) {
-              assignErr = payload.error;
-            }
-          } catch {
-            /* ignore */
-          }
-          fail += 1;
-          errors.push(`${squad.squadCode}: via — ${assignErr}`);
-          continue;
-        }
-        setSelectedSessionId(squad.sessionId);
-      }
-
       const res = await fetch("/api/send-push", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -753,8 +742,6 @@ export default function TocDashboard() {
           title,
           body,
           alarm: true,
-          routeCode: routeForSquad?.routeCode,
-          targetWaypointId: pushTargetWaypointId || null,
         }),
       });
       let payload: { error?: string; code?: string } = {};
@@ -774,17 +761,10 @@ export default function TocDashboard() {
       }
     }
     setPushSending(false);
-    if (ok > 0) {
-      await loadSelectedRouteAssignment();
-    }
     if (fail === 0) {
       writeStoredPushMessage(title, body);
       setPushOpen(false);
-      const routeHint =
-        selectedRoute && pushSingleTarget
-          ? ` Via ${selectedRoute.routeCode} sulla mappa (squadra ${pushSingleTarget.squadCode} selezionata).`
-          : "";
-      setStatusMessage(`Push inviate con successo: ${ok} squadra/e.${routeHint}`);
+      setStatusMessage(`Push inviate con successo: ${ok} squadra/e.`);
     } else {
       setStatusMessage(
         `Push: ${ok} ok, ${fail} errori. ${errors.slice(0, 2).join(" | ")}`,
@@ -1068,62 +1048,116 @@ export default function TocDashboard() {
 
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>
-            Missioni TOC attive ({activeTocMissions.length})
+            Missioni TOC attive ({activeMissionCount})
           </h2>
           <p className={styles.opsColumnHint}>
-            Push verso una squadra con via TRK e target. La via resta sulla mappa fino a «Fine
-            evento».
+            Via TRK + target assegnati, oppure inoltro automatico allarme verso squadre GT
+            (FIG/Sanitari). Sparisce dalla lista quando il destinatario preme «Reset notifica»
+            sull&apos;app.
           </p>
           <div className={styles.opsColumnBody}>
-            {activeTocMissions.length === 0 ? (
-              <p className={styles.opsEmpty}>Nessuna missione attiva (nessuna via assegnata).</p>
+            {activeMissionCount === 0 ? (
+              <p className={styles.opsEmpty}>
+                Nessuna missione attiva né inoltro automatico in attesa di presa in carico.
+              </p>
             ) : (
-              activeTocMissions.map(({ assignment, squad }) => (
-                <div
-                  key={assignment.id}
-                  className={
-                    selectedSessionId === squad.sessionId
-                      ? `${styles.missionItem} ${styles.opsRowSelected}`
-                      : styles.missionItem
-                  }
-                  onClick={() => handleSquadRowSelect(squad)}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <div className={styles.missionDot} aria-hidden>
-                    →
+              <>
+                {activeTocMissions.map(({ assignment, squad }) => (
+                  <div
+                    key={assignment.id}
+                    className={
+                      selectedSessionId === squad.sessionId
+                        ? `${styles.missionItem} ${styles.opsRowSelected}`
+                        : styles.missionItem
+                    }
+                    onClick={() => handleSquadRowSelect(squad)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <div className={styles.missionDot} aria-hidden>
+                      →
+                    </div>
+                    <div className={styles.alarmBody}>
+                      <p className={styles.alarmTitle}>
+                        {squad.squadCode} — {squad.squadName}
+                      </p>
+                      <p className={styles.alarmMessage}>
+                        Via <strong>{assignment.routeCode}</strong>
+                        {assignment.targetLabel ? (
+                          <>
+                            {" "}
+                            → target <strong>{assignment.targetLabel}</strong>
+                          </>
+                        ) : null}
+                      </p>
+                      <p className={styles.alarmMeta}>
+                        Assegnata {new Date(assignment.assignedAt).toLocaleString("it-IT")}
+                      </p>
+                      <button
+                        className={styles.btnSmall}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSessionId(squad.sessionId);
+                          setSelectedRouteAssignment(assignment);
+                          void endTocMission(assignment, squad);
+                        }}
+                      >
+                        Fine evento
+                      </button>
+                    </div>
                   </div>
-                  <div className={styles.alarmBody}>
-                    <p className={styles.alarmTitle}>
-                      {squad.squadCode} — {squad.squadName}
-                    </p>
-                    <p className={styles.alarmMessage}>
-                      Via <strong>{assignment.routeCode}</strong>
-                      {assignment.targetLabel ? (
-                        <>
-                          {" "}
-                          → target <strong>{assignment.targetLabel}</strong>
-                        </>
-                      ) : null}
-                    </p>
-                    <p className={styles.alarmMeta}>
-                      Assegnata {new Date(assignment.assignedAt).toLocaleString("it-IT")}
-                    </p>
-                    <button
-                      className={styles.btnSmall}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedSessionId(squad.sessionId);
-                        setSelectedRouteAssignment(assignment);
-                        void endTocMission(assignment, squad);
+                ))}
+                {activeAutoNotifies.map((row) => {
+                  const recipientSquad =
+                    squads.find((s) => s.sessionId === row.recipientSessionId) ??
+                    squads.find(
+                      (s) =>
+                        s.squadCode.trim().toUpperCase() ===
+                        row.recipientSquadCode.trim().toUpperCase(),
+                    );
+                  const selected = selectedSessionId === row.recipientSessionId;
+                  return (
+                    <div
+                      key={row.id}
+                      className={
+                        selected
+                          ? `${styles.autoNotifyMissionItem} ${styles.opsRowSelected}`
+                          : styles.autoNotifyMissionItem
+                      }
+                      onClick={() => {
+                        if (recipientSquad) {
+                          handleSquadRowSelect(recipientSquad);
+                        }
                       }}
+                      role="button"
+                      tabIndex={0}
                     >
-                      Fine evento
-                    </button>
-                  </div>
-                </div>
-              ))
+                      <div className={styles.autoNotifyMissionDot} aria-hidden>
+                        GT
+                      </div>
+                      <div className={styles.alarmBody}>
+                        <p className={styles.alarmTitle}>
+                          {row.recipientSquadCode}
+                          {recipientSquad ? ` — ${recipientSquad.squadName}` : ""}
+                        </p>
+                        <p className={styles.alarmMessage}>
+                          Allarme da <strong>{row.sourceSquadCode}</strong>
+                          {" · "}
+                          {formatAutoNotifyMissionDetail(row)}
+                        </p>
+                        <p className={styles.alarmMeta}>
+                          Inviato {new Date(row.createdAt).toLocaleString("it-IT")}
+                          {!recipientSquad ? " · destinatario non online" : ""}
+                        </p>
+                        <p className={styles.autoNotifyHint}>
+                          In attesa presa in carico (reset sul telefono destinatario)
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         </section>
@@ -1282,60 +1316,6 @@ export default function TocDashboard() {
                   );
                 })
               : null}
-            {pushSingleTarget ? (
-              <>
-                <p className={styles.pushHint}>
-                  Missione TOC → <strong>{pushSingleTarget.squadCode}</strong>: scegli{" "}
-                  <strong>via TRK</strong> e <strong>target</strong> (obbligatori se assegni una
-                  via). Non scrivere la via nel messaggio.
-                </p>
-                {mapRoutes.length > 0 ? (
-                  <>
-                    <label className={styles.pushField}>
-                      Via da percorrere
-                      <select
-                        className={styles.pushInput}
-                        value={pushRouteId}
-                        onChange={(e) => setPushRouteId(e.target.value)}
-                      >
-                        <option value="">— Nessuna via —</option>
-                        {mapRoutes.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.routeCode}
-                            {r.routeName !== r.routeCode ? ` — ${r.routeName}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className={styles.pushField}>
-                      Target (waypoint)
-                      <select
-                        className={styles.pushInput}
-                        value={pushTargetWaypointId}
-                        onChange={(e) => setPushTargetWaypointId(e.target.value)}
-                      >
-                        <option value="">— Nessun target —</option>
-                        {waypoints.map((wp) => (
-                          <option key={wp.id} value={wp.id}>
-                            {waypointDisplayName(wp)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </>
-                ) : (
-                  <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
-                    Nessuna via in database: su Supabase esegui{" "}
-                    <code>sql/map_routes.sql</code> e{" "}
-                    <code>sql/import_routes_golf_torino_seed.sql</code>, poi ricarica la pagina.
-                  </p>
-                )}
-              </>
-            ) : !pushTargetAll ? (
-              <p className={styles.pushHint}>
-                Per assegnare una via, seleziona <strong>una sola</strong> squadra (non tutte).
-              </p>
-            ) : null}
             <label className={styles.pushField}>
               Titolo notifica
               <input

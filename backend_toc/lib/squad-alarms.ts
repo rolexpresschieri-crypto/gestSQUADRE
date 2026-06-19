@@ -2,6 +2,7 @@ export const SQUAD_ALARM_REQUEST_LABELS: Record<string, string> = {
   sanitario: "Sanitario",
   security: "Security",
   vvf: "Vigili del Fuoco",
+  strutture: "Strutture",
   altro: "Altro",
   // legacy (allarmi già inviati prima del cambio tipologie)
   ambulanza: "Ambulanza",
@@ -15,6 +16,7 @@ export const SQUAD_ALARM_REQUEST_ORDER = [
   "sanitario",
   "security",
   "vvf",
+  "strutture",
   "altro",
 ] as const;
 

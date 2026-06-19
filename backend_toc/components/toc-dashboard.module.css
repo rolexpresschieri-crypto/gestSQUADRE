@@ -352,6 +352,40 @@
   color: #111;
 }
 
+.autoNotifyMissionItem {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  background: rgba(255, 193, 7, 0.16);
+  border: 2px solid #ffc107;
+  cursor: pointer;
+}
+
+.autoNotifyMissionDot {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ffc107;
+  border: 2px solid #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  font-size: 11px;
+  color: #111;
+}
+
+.autoNotifyHint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #ffe082;
+  font-style: italic;
+}
+
 .alarmBody {
   flex: 1;
   min-width: 0;
