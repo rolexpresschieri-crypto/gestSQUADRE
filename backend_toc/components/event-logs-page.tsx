@@ -13,10 +13,14 @@ import { restoreAdminSessionFromStorage } from "@/lib/campo-login";
 import { fetchGolfCourseSquadIds } from "@/lib/golf-course-scope";
 import {
   downloadTextFile,
+  EVENT_LOG_ALARM_FILTER_OPTIONS,
+  eventLogAlarmFilterLabel,
   eventLogsToCsv,
+  filterUnifiedEventLogsByAlarmTypes,
   mergeEventLogs,
   printEventLogsAsPdf,
   type AlarmAutoNotifyLogRow,
+  type EventLogAlarmFilterCode,
   type SquadAlarmLogRow,
   type SquadMobileDismissLogRow,
   type SquadSessionAuthLogRow,
@@ -43,8 +47,31 @@ export default function EventLogsPage() {
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
+  const [exportAllLogs, setExportAllLogs] = useState(true);
+  const [exportAlarmTypes, setExportAlarmTypes] = useState<
+    Record<EventLogAlarmFilterCode, boolean>
+  >({
+    sanitario: false,
+    security: false,
+    vvf: false,
+    strutture: false,
+  });
 
   const isAdmin = session ? canManageEventLogs(session.role) : false;
+
+  const selectedAlarmFilterCodes = useMemo((): EventLogAlarmFilterCode[] | null => {
+    if (exportAllLogs) {
+      return null;
+    }
+    return EVENT_LOG_ALARM_FILTER_OPTIONS.filter((o) => exportAlarmTypes[o.code]).map(
+      (o) => o.code,
+    );
+  }, [exportAllLogs, exportAlarmTypes]);
+
+  const filterLabel = useMemo(
+    () => eventLogAlarmFilterLabel(selectedAlarmFilterCodes),
+    [selectedAlarmFilterCodes],
+  );
 
   useEffect(() => {
     setSupabase(getSupabaseBrowserClient());
@@ -296,18 +323,57 @@ export default function EventLogsPage() {
     [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies, forceDismisses],
   );
 
+  const filteredUnified = useMemo(
+    () => filterUnifiedEventLogsByAlarmTypes(unified, selectedAlarmFilterCodes),
+    [unified, selectedAlarmFilterCodes],
+  );
+
+  function toggleExportAll(checked: boolean) {
+    setExportAllLogs(checked);
+    if (checked) {
+      setExportAlarmTypes({
+        sanitario: false,
+        security: false,
+        vvf: false,
+        strutture: false,
+      });
+    }
+  }
+
+  function toggleExportAlarmType(code: EventLogAlarmFilterCode, checked: boolean) {
+    setExportAllLogs(false);
+    setExportAlarmTypes((prev) => ({ ...prev, [code]: checked }));
+  }
+
   function exportCsv() {
-    const csv = eventLogsToCsv(unified, eventTitle);
+    if (!exportAllLogs && selectedAlarmFilterCodes?.length === 0) {
+      setStatus("Seleziona almeno una tipologia allarme oppure «Tutti i log».");
+      return;
+    }
+    const csv = eventLogsToCsv(
+      filteredUnified,
+      eventTitle,
+      exportAllLogs ? undefined : filterLabel,
+    );
     const stamp = new Date().toISOString().slice(0, 10);
-    downloadTextFile(`gestSQUADRE-log-${stamp}.csv`, csv, "text/csv;charset=utf-8");
+    const suffix = exportAllLogs ? "" : "-filtrato";
+    downloadTextFile(`gestSQUADRE-log-${stamp}${suffix}.csv`, csv, "text/csv;charset=utf-8");
   }
 
   function exportPdf() {
-    if (unified.length === 0) {
-      setStatus("Nessun log da esportare.");
+    if (!exportAllLogs && selectedAlarmFilterCodes?.length === 0) {
+      setStatus("Seleziona almeno una tipologia allarme oppure «Tutti i log».");
       return;
     }
-    const ok = printEventLogsAsPdf(unified, eventTitle);
+    if (filteredUnified.length === 0) {
+      setStatus("Nessun log da esportare con il filtro selezionato.");
+      return;
+    }
+    const ok = printEventLogsAsPdf(
+      filteredUnified,
+      eventTitle,
+      exportAllLogs ? undefined : filterLabel,
+    );
     if (!ok) {
       setStatus("Impossibile avviare la stampa PDF. Riprova con un altro browser.");
       return;
@@ -397,6 +463,37 @@ export default function EventLogsPage() {
         </p>
         {status ? <p className={styles.status}>{status}</p> : null}
 
+        <div className={styles.filterBox}>
+          <p className={styles.filterTitle}>Esportazione log (CSV / PDF)</p>
+          <label className={styles.filterAll}>
+            <input
+              type="checkbox"
+              checked={exportAllLogs}
+              onChange={(e) => toggleExportAll(e.target.checked)}
+            />
+            Tutti i log evento (login, push, missioni, allarmi…)
+          </label>
+          <p className={styles.filterHint}>Oppure solo righe legate a tipologia allarme:</p>
+          <div className={styles.filterGrid} role="group" aria-label="Tipologia allarme">
+            {EVENT_LOG_ALARM_FILTER_OPTIONS.map((opt) => (
+              <label key={opt.code} className={styles.filterOption}>
+                <input
+                  type="checkbox"
+                  checked={!exportAllLogs && exportAlarmTypes[opt.code]}
+                  disabled={exportAllLogs}
+                  onChange={(e) => toggleExportAlarmType(opt.code, e.target.checked)}
+                />
+                {opt.label}
+              </label>
+            ))}
+          </div>
+          {!exportAllLogs ? (
+            <p className={styles.filterActive}>
+              Filtro attivo: <strong>{filterLabel}</strong> · {filteredUnified.length} righe
+            </p>
+          ) : null}
+        </div>
+
         <div className={styles.actions}>
           <button type="button" className={styles.btnPrimary} onClick={exportCsv} disabled={loading}>
             Esporta CSV
@@ -421,8 +518,12 @@ export default function EventLogsPage() {
 
         {loading ? (
           <p>Caricamento log…</p>
-        ) : unified.length === 0 ? (
-          <p>Nessun log registrato per questo evento.</p>
+        ) : filteredUnified.length === 0 ? (
+          <p>
+            {unified.length === 0
+              ? "Nessun log registrato per questo evento."
+              : "Nessun log corrisponde al filtro tipologia selezionato."}
+          </p>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
@@ -437,7 +538,7 @@ export default function EventLogsPage() {
                 </tr>
               </thead>
               <tbody>
-                {unified.map((r) => (
+                {filteredUnified.map((r) => (
                   <tr key={`${r.kind}-${r.id}`}>
                     <td>{new Date(r.createdAt).toLocaleString("it-IT")}</td>
                     <td>{r.summary}</td>

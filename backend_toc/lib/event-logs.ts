@@ -1,4 +1,4 @@
-import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
+import { formatAlarmRequestDetail, parseAlarmRequestTypes } from "@/lib/squad-alarms";
 
 export type SquadAlarmLogRow = {
   id: string;
@@ -132,6 +132,18 @@ export type TocMissionForceDismissLogRow = {
   created_at: string;
 };
 
+export type EventLogAlarmFilterCode = "sanitario" | "security" | "vvf" | "strutture";
+
+export const EVENT_LOG_ALARM_FILTER_OPTIONS: {
+  code: EventLogAlarmFilterCode;
+  label: string;
+}[] = [
+  { code: "sanitario", label: "Sanitario" },
+  { code: "security", label: "Security" },
+  { code: "vvf", label: "Vigili del Fuoco" },
+  { code: "strutture", label: "Strutture" },
+];
+
 export type UnifiedEventLog = {
   id: string;
   kind:
@@ -152,6 +164,8 @@ export type UnifiedEventLog = {
   detail: string;
   status: string;
   actor: string;
+  /** Tipologie allarme (solo righe legate a squad_alarms / inoltri GT). */
+  alarmTypeCodes?: string[];
 };
 
 export function mergeEventLogs(
@@ -165,6 +179,7 @@ export function mergeEventLogs(
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
+    const typeCodes = parseAlarmRequestTypes(a.request_types);
     alarmRows.push({
       id: a.id,
       kind: "squad_alarm",
@@ -175,6 +190,7 @@ export function mergeEventLogs(
       detail: formatAlarmRequestDetail(a),
       status: a.acknowledged_at ? "chiuso" : "inviato",
       actor: "—",
+      alarmTypeCodes: typeCodes,
     });
     if (a.acknowledged_at) {
       alarmRows.push({
@@ -187,6 +203,7 @@ export function mergeEventLogs(
         detail: formatAlarmRequestDetail(a),
         status: "chiuso",
         actor: a.acknowledged_by?.trim() || "—",
+        alarmTypeCodes: typeCodes,
       });
     }
   }
@@ -250,6 +267,7 @@ export function mergeEventLogs(
     const failed = n.status === "failed";
     const skipped = n.status === "skipped";
     const recipient = autoNotifyRecipientCode(n);
+    const typeCodes = parseAlarmRequestTypes(n.request_types);
     return {
       id: n.id,
       kind: "alarm_auto_notify" as const,
@@ -264,6 +282,7 @@ export function mergeEventLogs(
           : `Squadra ${recipient}`,
       status: skipped ? "saltato" : failed ? "fallito" : "inviato",
       actor: recipient,
+      alarmTypeCodes: typeCodes,
     };
   });
 
@@ -330,12 +349,52 @@ export function mergeEventLogs(
   );
 }
 
+/** Filtra log per tipologia allarme (multipla). `null` = tutti i tipi di log. */
+export function filterUnifiedEventLogsByAlarmTypes(
+  rows: UnifiedEventLog[],
+  selectedTypes: EventLogAlarmFilterCode[] | null,
+): UnifiedEventLog[] {
+  if (selectedTypes === null) {
+    return rows;
+  }
+  if (selectedTypes.length === 0) {
+    return [];
+  }
+  const wanted = new Set(selectedTypes);
+  return rows.filter((row) => {
+    const codes = row.alarmTypeCodes;
+    if (!codes?.length) {
+      return false;
+    }
+    return codes.some((code) => wanted.has(code as EventLogAlarmFilterCode));
+  });
+}
+
+export function eventLogAlarmFilterLabel(
+  selectedTypes: EventLogAlarmFilterCode[] | null,
+): string {
+  if (selectedTypes === null) {
+    return "Tutti i log";
+  }
+  if (selectedTypes.length === 0) {
+    return "Nessuna tipologia selezionata";
+  }
+  const labels = EVENT_LOG_ALARM_FILTER_OPTIONS.filter((o) =>
+    selectedTypes.includes(o.code),
+  ).map((o) => o.label);
+  return labels.length > 0 ? labels.join(", ") : "Tutti i log";
+}
+
 function csvEscape(value: string): string {
   const v = value.replace(/"/g, '""');
   return `"${v}"`;
 }
 
-export function eventLogsToCsv(rows: UnifiedEventLog[], eventTitle: string): string {
+export function eventLogsToCsv(
+  rows: UnifiedEventLog[],
+  eventTitle: string,
+  filterLabel?: string,
+): string {
   const header = [
     "Data/ora",
     "Tipo",
@@ -360,7 +419,8 @@ export function eventLogsToCsv(rows: UnifiedEventLog[], eventTitle: string): str
       .join(";"),
   );
 
-  return `\uFEFFEvento: ${eventTitle}\n${header}\n${lines.join("\n")}\n`;
+  const filterLine = filterLabel ? `\nFiltro tipologia: ${filterLabel}` : "";
+  return `\uFEFFEvento: ${eventTitle}${filterLine}\n${header}\n${lines.join("\n")}\n`;
 }
 
 export function downloadTextFile(filename: string, content: string, mime: string) {
@@ -381,8 +441,15 @@ function escapeHtml(text: string): string {
     .replace(/"/g, "&quot;");
 }
 
-export function eventLogsPrintHtml(rows: UnifiedEventLog[], eventTitle: string): string {
+export function eventLogsPrintHtml(
+  rows: UnifiedEventLog[],
+  eventTitle: string,
+  filterLabel?: string,
+): string {
   const exportedAt = new Date().toLocaleString("it-IT");
+  const filterMeta = filterLabel
+    ? `<p class="meta">Filtro tipologia allarme: ${escapeHtml(filterLabel)}</p>`
+    : "";
   const bodyRows = rows
     .map(
       (r) => `<tr>
@@ -416,6 +483,7 @@ export function eventLogsPrintHtml(rows: UnifiedEventLog[], eventTitle: string):
 <body>
   <h1>Log evento: ${escapeHtml(eventTitle)}</h1>
   <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Login/logout · allarmi · missioni · push</p>
+  ${filterMeta}
   <table>
     <thead>
       <tr>
@@ -438,6 +506,7 @@ export function eventLogsPrintHtml(rows: UnifiedEventLog[], eventTitle: string):
 export function printEventLogsAsPdf(
   rows: UnifiedEventLog[],
   eventTitle: string,
+  filterLabel?: string,
 ): boolean {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("title", "Export log gestSQUADRE");
@@ -457,7 +526,7 @@ export function printEventLogsAsPdf(
   }
 
   doc.open();
-  doc.write(eventLogsPrintHtml(rows, eventTitle));
+  doc.write(eventLogsPrintHtml(rows, eventTitle, filterLabel));
   doc.close();
 
   const triggerPrint = () => {
