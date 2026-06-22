@@ -44,6 +44,13 @@ export const SQUAD_ICON_OPTIONS: SquadIconOption[] = [
 
 export const DEFAULT_SQUAD_ICON_KEY: SquadIconKey = "squadre_a_piedi";
 
+/** Valori legacy o alias salvati in DB prima del catalogo ufficiale. */
+const SQUAD_ICON_ALIASES: Record<string, SquadIconKey> = {
+  nv_ansmi: "logo_ansmi",
+  ansmi: "logo_ansmi",
+  logo_nv_ansmi: "logo_ansmi",
+};
+
 const URL_BY_KEY = Object.fromEntries(
   SQUAD_ICON_OPTIONS.map((o) => [o.key, o.mapUrl]),
 ) as Record<SquadIconKey, string>;
@@ -52,6 +59,9 @@ export function normalizeSquadIconKey(raw: string | null | undefined): SquadIcon
   const k = (raw ?? "").trim();
   if (k in URL_BY_KEY) {
     return k as SquadIconKey;
+  }
+  if (k in SQUAD_ICON_ALIASES) {
+    return SQUAD_ICON_ALIASES[k]!;
   }
   return DEFAULT_SQUAD_ICON_KEY;
 }
