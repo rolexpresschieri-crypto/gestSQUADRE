@@ -13,6 +13,8 @@ object SquadIcons {
             "forze_ordine" -> R.drawable.squad_forze_ordine
             "medico" -> R.drawable.squad_medico
             "fig" -> R.drawable.squad_fig
+            "waypoint_toc", "toc" -> R.drawable.squad_waypoint_toc
+            "logo_rolexpress" -> R.drawable.squad_logo_rolexpress
             "squadre_a_piedi", "" -> R.drawable.squad_squadre_a_piedi
             else -> R.drawable.squad_squadre_a_piedi
         }

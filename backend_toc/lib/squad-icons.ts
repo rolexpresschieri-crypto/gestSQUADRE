@@ -5,7 +5,9 @@ export type SquadIconKey =
   | "vigili_fuoco"
   | "forze_ordine"
   | "medico"
-  | "fig";
+  | "fig"
+  | "waypoint_toc"
+  | "logo_rolexpress";
 
 export type SquadIconOption = {
   key: SquadIconKey;
@@ -13,7 +15,7 @@ export type SquadIconOption = {
   mapUrl: string;
 };
 
-/** Icone squadra (fig. 1): TOC resta solo tra i waypoint. */
+/** Icone squadra su mappa TOC e picker campo squadre. */
 export const SQUAD_ICON_OPTIONS: SquadIconOption[] = [
   { key: "ambulanza", label: "Ambulanza", mapUrl: "/map/squad/ambulanza.png" },
   { key: "squadre_a_piedi", label: "Squadre a piedi", mapUrl: "/map/squad/squadre_a_piedi.png" },
@@ -26,6 +28,12 @@ export const SQUAD_ICON_OPTIONS: SquadIconOption[] = [
   { key: "forze_ordine", label: "Forze dell'ordine", mapUrl: "/map/squad/forze_ordine.png" },
   { key: "medico", label: "Medico", mapUrl: "/map/squad/medico.png" },
   { key: "fig", label: "FIG", mapUrl: "/map/squad/fig.png" },
+  { key: "waypoint_toc", label: "T.O.C.", mapUrl: "/map/squad/waypoint_toc.png" },
+  {
+    key: "logo_rolexpress",
+    label: "Rolexpress",
+    mapUrl: "/map/squad/logo_rolexpress.png",
+  },
 ];
 
 export const DEFAULT_SQUAD_ICON_KEY: SquadIconKey = "squadre_a_piedi";

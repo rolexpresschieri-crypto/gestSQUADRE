@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getFirebaseAdminMessaging } from "@/lib/firebase-admin-app";
 import { fcmIosApnsPayload } from "@/lib/fcm-ios-apns";
 import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
-import { tocPushTextUpper } from "@/lib/toc-push-text";
+import { tocPushBodyWithTarget, tocPushTextUpper } from "@/lib/toc-push-text";
 
 /** Firebase Admin richiede runtime Node (compatibile Vercel serverless). */
 export const runtime = "nodejs";
@@ -54,6 +54,7 @@ export async function POST(request: Request) {
     alarm?: boolean;
     routeCode?: string;
     targetWaypointId?: string | null;
+    targetWaypointLabel?: string | null;
   };
 
   const adminSessionRaw = payload.session;
@@ -94,6 +95,10 @@ export async function POST(request: Request) {
     typeof payload.targetWaypointId === "string" && payload.targetWaypointId.trim()
       ? payload.targetWaypointId.trim()
       : "";
+  const targetWaypointLabelFromClient =
+    typeof payload.targetWaypointLabel === "string"
+      ? payload.targetWaypointLabel.trim()
+      : "";
   let bodyText = tocPushTextUpper(bodyRaw);
   if (routeCode) {
     bodyText = tocPushTextUpper(
@@ -127,20 +132,19 @@ export async function POST(request: Request) {
   const squadInfo = Array.isArray(squadJoin) ? squadJoin[0] : squadJoin;
   const eventId = session.event_id as string;
 
-  let targetWaypointLabel: string | null = null;
-  if (targetWaypointId) {
+  let targetWaypointLabel: string | null = targetWaypointLabelFromClient || null;
+  if (!targetWaypointLabel && targetWaypointId) {
     const { data: waypointRow } = await admin
       .from("squad_map_points")
       .select("label")
       .eq("id", targetWaypointId)
       .maybeSingle();
-    targetWaypointLabel = (waypointRow?.label as string | null)?.trim() || null;
+    const fromDb = (waypointRow?.label as string | null)?.trim() || "";
+    targetWaypointLabel = fromDb || null;
   }
 
-  let logBody = bodyText;
-  if (targetWaypointLabel && !logBody.includes(targetWaypointLabel)) {
-    logBody = tocPushTextUpper(`${logBody} — TARGET ${targetWaypointLabel}`);
-  }
+  const bodyForDelivery = tocPushBodyWithTarget(bodyText, targetWaypointLabel);
+  const logBody = bodyForDelivery;
 
   async function writePushLog(status: "sent" | "failed", extra: {
     fcmMessageId?: string;
@@ -211,14 +215,17 @@ export async function POST(request: Request) {
       data: {
         type: useAlarm ? "toc_alarm" : "toc_message",
         title,
-        body: bodyText,
+        body: bodyForDelivery,
         ...(routeCode ? { route_code: routeCode } : {}),
         ...(targetWaypointId ? { target_waypoint_id: targetWaypointId } : {}),
+        ...(targetWaypointLabel
+          ? { target_waypoint_label: tocPushTextUpper(targetWaypointLabel) }
+          : {}),
       },
       android: {
         priority: "high",
       },
-      apns: fcmIosApnsPayload(title, bodyText),
+      apns: fcmIosApnsPayload(title, bodyForDelivery),
     });
     await writePushLog("sent", { fcmMessageId: messageId });
     return NextResponse.json({ ok: true, messageId, alarm: useAlarm });

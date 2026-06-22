@@ -14,7 +14,7 @@ class GestSquadreMessagingService : FirebaseMessagingService() {
 
         if (message.isVolunteerAlarm()) {
             val title = message.tocTitle()
-            val body = message.tocBody()
+            val body = message.tocBodyForDisplay()
             TocPushDelivery.deliver(
                 context = applicationContext,
                 title = title,
@@ -29,7 +29,7 @@ class GestSquadreMessagingService : FirebaseMessagingService() {
         }
 
         val title = message.tocTitle()
-        val body = message.tocBody()
+        val body = message.tocBodyForDisplay()
         val isAlarm = message.isTocAlarm()
 
         TocPushDelivery.deliver(

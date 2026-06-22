@@ -904,6 +904,11 @@ export default function TocDashboard() {
     let fail = 0;
     const errors: string[] = [];
 
+    const pushWaypoint =
+      !pushTargetAll && pushTargetWaypointId
+        ? (waypoints.find((w) => w.id === pushTargetWaypointId) ?? null)
+        : null;
+
     for (const squad of targets) {
       const res = await fetch("/api/send-push", {
         method: "POST",
@@ -914,10 +919,8 @@ export default function TocDashboard() {
           title,
           body,
           alarm: true,
-          targetWaypointId:
-            pushSingleTarget?.sessionId === squad.sessionId && pushTargetWaypointId
-              ? pushTargetWaypointId
-              : null,
+          targetWaypointId: pushWaypoint?.id ?? null,
+          targetWaypointLabel: pushWaypoint ? waypointDisplayName(pushWaypoint) : null,
         }),
       });
       let payload: { error?: string; code?: string } = {};

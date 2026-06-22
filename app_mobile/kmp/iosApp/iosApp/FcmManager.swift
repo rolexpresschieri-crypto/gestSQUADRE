@@ -31,6 +31,15 @@ enum TocPushParser {
         (userInfo["body"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
+    static func tocBodyForDisplay(from userInfo: [AnyHashable: Any]) -> String {
+        let base = tocBody(from: userInfo)
+        let target = (userInfo["target_waypoint_label"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !target.isEmpty else { return base }
+        if base.localizedCaseInsensitiveContains(target) { return base }
+        return "\(base) — TARGET \(target.uppercased(with: Locale(identifier: "it_IT")))"
+    }
+
     static func isTocAlarm(from userInfo: [AnyHashable: Any]) -> Bool {
         let type = (userInfo["type"] as? String)?.lowercased()
         return type == "toc_alarm" || type == "volunteer_alarm"
@@ -124,7 +133,7 @@ final class FcmManager {
         }
 
         let title = TocPushParser.tocTitle(from: userInfo)
-        let body = TocPushParser.tocBody(from: userInfo)
+        let body = TocPushParser.tocBodyForDisplay(from: userInfo)
         let message = TocMessageStorage.formatDisplayMessage(title: title, body: body)
         TocMessageStorage.shared.save(message: message)
         FcmPushBus.emit(title: title, body: body)
