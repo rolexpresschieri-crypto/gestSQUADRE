@@ -7,7 +7,8 @@ export type SquadIconKey =
   | "medico"
   | "fig"
   | "waypoint_toc"
-  | "logo_rolexpress";
+  | "logo_rolexpress"
+  | "logo_ansmi";
 
 export type SquadIconOption = {
   key: SquadIconKey;
@@ -33,6 +34,11 @@ export const SQUAD_ICON_OPTIONS: SquadIconOption[] = [
     key: "logo_rolexpress",
     label: "Rolexpress",
     mapUrl: "/map/squad/logo_rolexpress.png",
+  },
+  {
+    key: "logo_ansmi",
+    label: "NV ANSMI",
+    mapUrl: "/map/squad/logo_ansmi.png",
   },
 ];
 

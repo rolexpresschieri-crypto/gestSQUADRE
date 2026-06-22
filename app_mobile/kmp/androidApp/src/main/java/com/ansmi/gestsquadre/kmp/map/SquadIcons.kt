@@ -15,6 +15,7 @@ object SquadIcons {
             "fig" -> R.drawable.squad_fig
             "waypoint_toc", "toc" -> R.drawable.squad_waypoint_toc
             "logo_rolexpress" -> R.drawable.squad_logo_rolexpress
+            "logo_ansmi", "nv_ansmi", "ansmi" -> R.drawable.squad_logo_ansmi
             "squadre_a_piedi", "" -> R.drawable.squad_squadre_a_piedi
             else -> R.drawable.squad_squadre_a_piedi
         }
