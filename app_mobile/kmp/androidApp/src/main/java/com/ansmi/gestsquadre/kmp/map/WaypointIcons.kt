@@ -15,6 +15,7 @@ object WaypointIcons {
             "welcome" -> R.drawable.waypoint_welcome
             "media_center" -> R.drawable.waypoint_media_center
             "toc" -> R.drawable.waypoint_toc
+            "pma" -> R.drawable.waypoint_pma
             "buche", "buca_golf", "" -> R.drawable.waypoint_buche
             else -> R.drawable.waypoint_buche
         }
