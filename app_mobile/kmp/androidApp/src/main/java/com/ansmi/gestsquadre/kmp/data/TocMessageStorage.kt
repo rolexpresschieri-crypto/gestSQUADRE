@@ -1,6 +1,7 @@
 package com.ansmi.gestsquadre.kmp.data
 
 import android.content.Context
+import com.ansmi.gestsquadre.shared.model.formatTocPanelMessage
 
 /**
  * Ultimo messaggio TOC da mostrare nel pannello blu (sopravvive a chiusura app / processo kill).
@@ -35,10 +36,6 @@ class TocMessageStorage(
         fun formatDisplayMessage(
             title: String,
             body: String,
-        ): String {
-            val t = title.trim()
-            val b = body.trim()
-            return if (b.isEmpty()) t else "$t: $b"
-        }
+        ): String = formatTocPanelMessage(title, body).orEmpty()
     }
 }

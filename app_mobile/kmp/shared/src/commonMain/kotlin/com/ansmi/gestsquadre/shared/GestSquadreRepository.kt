@@ -4,7 +4,9 @@ import com.ansmi.gestsquadre.shared.model.EventInfo
 import com.ansmi.gestsquadre.shared.model.GpsPosition
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
+import com.ansmi.gestsquadre.shared.model.formatTocPanelMessage
 import com.ansmi.gestsquadre.shared.network.AlarmInsertBody
+import com.ansmi.gestsquadre.shared.network.AutoNotifyPanelRow
 import com.ansmi.gestsquadre.shared.network.EventRow
 import com.ansmi.gestsquadre.shared.network.FcmTokenUpsertBody
 import com.ansmi.gestsquadre.shared.network.LogoutPatchBody
@@ -13,6 +15,7 @@ import com.ansmi.gestsquadre.shared.network.MobileDismissedAtPatch
 import com.ansmi.gestsquadre.shared.network.PositionPatchBody
 import com.ansmi.gestsquadre.shared.network.TocPushClosedRow
 import com.ansmi.gestsquadre.shared.network.TocPushIdRow
+import com.ansmi.gestsquadre.shared.network.TocPushPanelRow
 import com.ansmi.gestsquadre.shared.network.SessionAuthLogInsertBody
 import com.ansmi.gestsquadre.shared.network.SessionInsertBody
 import com.ansmi.gestsquadre.shared.network.SessionInsertRow
@@ -249,6 +252,73 @@ class GestSquadreRepository(
                 limit = 1,
             ).firstOrNull() ?: return false
         return !row.closedAt.isNullOrBlank()
+    }
+
+    /**
+     * Messaggio attivo per il pannello blu: push TOC diretta o inoltro automatico allarme volontario
+     * non ancora chiuso / preso in carico sul telefono.
+     */
+    suspend fun fetchActivePanelMessage(session: SquadSession): String? {
+        val candidates = mutableListOf<Pair<String, String>>()
+
+        runCatching {
+            rest.getList<TocPushPanelRow>(
+                table = "toc_push_logs",
+                select = "title,body,created_at",
+                eqFilters =
+                    listOf(
+                        "session_id" to session.sessionId,
+                        "status" to "sent",
+                    ),
+                isNullColumns = listOf("mobile_dismissed_at", "closed_at"),
+                order = "created_at.desc",
+                limit = 1,
+            ).firstOrNull()
+        }.getOrNull()?.let { row ->
+            formatTocPanelMessage(row.title, row.body)?.let { msg ->
+                candidates += row.createdAt to msg
+            }
+        }
+
+        runCatching {
+            rest.getList<AutoNotifyPanelRow>(
+                table = "alarm_auto_notify_logs",
+                select = "push_title,push_body,created_at",
+                eqFilters =
+                    listOf(
+                        "recipient_session_id" to session.sessionId,
+                        "status" to "sent",
+                    ),
+                isNullColumns = listOf("mobile_dismissed_at"),
+                order = "created_at.desc",
+                limit = 1,
+            ).firstOrNull()
+        }.getOrNull()?.let { row ->
+            formatTocPanelMessage(row.pushTitle, row.pushBody)?.let { msg ->
+                candidates += row.createdAt to msg
+            }
+        }
+
+        runCatching {
+            rest.getList<AutoNotifyPanelRow>(
+                table = "alarm_auto_notify_logs",
+                select = "push_title,push_body,created_at",
+                eqFilters =
+                    listOf(
+                        "recipient_squad_code" to session.squadCode,
+                        "status" to "sent",
+                    ),
+                isNullColumns = listOf("mobile_dismissed_at"),
+                order = "created_at.desc",
+                limit = 1,
+            ).firstOrNull()
+        }.getOrNull()?.let { row ->
+            formatTocPanelMessage(row.pushTitle, row.pushBody)?.let { msg ->
+                candidates += row.createdAt to msg
+            }
+        }
+
+        return candidates.maxByOrNull { it.first }?.second
     }
 
     suspend fun sendAlarm(

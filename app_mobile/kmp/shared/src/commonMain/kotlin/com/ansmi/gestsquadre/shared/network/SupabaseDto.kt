@@ -99,6 +99,20 @@ internal data class TocPushClosedRow(
 )
 
 @Serializable
+internal data class TocPushPanelRow(
+    val title: String? = null,
+    val body: String? = null,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
+internal data class AutoNotifyPanelRow(
+    @SerialName("push_title") val pushTitle: String? = null,
+    @SerialName("push_body") val pushBody: String? = null,
+    @SerialName("created_at") val createdAt: String,
+)
+
+@Serializable
 internal data class MobileDismissedAtPatch(
     @SerialName("mobile_dismissed_at") val mobileDismissedAt: String,
 )

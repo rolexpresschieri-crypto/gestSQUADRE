@@ -66,6 +66,9 @@ class GestSquadreFacade(
     suspend fun isTocPanelClosedByToc(sessionId: String): Boolean =
         repository.isTocPanelClosedByToc(sessionId)
 
+    suspend fun fetchActivePanelMessage(session: SquadSession): String? =
+        repository.fetchActivePanelMessage(session)
+
     suspend fun loadMapSquads(): List<LiveSquadPin> = mapRepository.loadLiveSquads()
 
     suspend fun loadMapWaypoints(): List<MapWaypointPin> = mapRepository.loadWaypoints()

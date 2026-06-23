@@ -3,6 +3,7 @@ package com.ansmi.gestsquadre.kmp.push
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -140,11 +141,21 @@ class FcmManager(
         }
 
         val channelId = if (isAlarm) CHANNEL_ALARM else CHANNEL_INFO
+        val launchIntent = TocPushIntentHandler.buildLaunchIntent(context, title, body)
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        val contentIntent =
+            PendingIntent.getActivity(
+                context,
+                (title.hashCode() xor body.hashCode()),
+                launchIntent,
+                pendingFlags,
+            )
         val notification =
             NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_notification)
                 .setContentTitle(title)
                 .setContentText(body)
+                .setContentIntent(contentIntent)
                 .setPriority(
                     if (isAlarm) NotificationCompat.PRIORITY_MAX else NotificationCompat.PRIORITY_HIGH,
                 )

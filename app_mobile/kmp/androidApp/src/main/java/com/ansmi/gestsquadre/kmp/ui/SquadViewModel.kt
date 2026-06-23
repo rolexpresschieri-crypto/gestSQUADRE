@@ -18,6 +18,7 @@ import com.ansmi.gestsquadre.shared.location.LocationTracker
 import com.ansmi.gestsquadre.shared.model.GpsPosition
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
+import com.ansmi.gestsquadre.shared.model.formatTocPanelMessage
 import com.ansmi.gestsquadre.shared.model.loginTimeLabel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -77,10 +78,10 @@ class SquadViewModel(
         }
         viewModelScope.launch {
             FcmPushBus.messages.collect { push ->
-                val body = push.body.trim()
-                val title = push.title.trim()
-                val message = if (body.isEmpty()) title else "$title: $body"
-                // Notifica visiva solo in GestSquadreMessagingService (come Flutter fcm_service).
+                val message =
+                    formatTocPanelMessage(push.title, push.body)
+                        ?: return@collect
+                tocMessageStorage.save(message)
                 _uiState.update { it.copy(lastTocMessage = message) }
             }
         }
@@ -302,13 +303,19 @@ class SquadViewModel(
     private suspend fun onSessionReady(session: SquadSession) {
         sessionStorage.save(session)
         bindFcmSession(session)
-        val pendingToc = tocMessageStorage.load()
+        val localPanel = tocMessageStorage.load()
+        val serverPanel =
+            runCatching { facade.fetchActivePanelMessage(session) }.getOrNull()
+        val panelMessage = serverPanel ?: localPanel
+        if (panelMessage != null) {
+            tocMessageStorage.save(panelMessage)
+        }
         _uiState.update {
             it.copy(
                 session = session,
                 isBusy = false,
                 bannerMessage = null,
-                lastTocMessage = pendingToc,
+                lastTocMessage = panelMessage,
                 lastGpsAccuracyM = null,
                 gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
             )
@@ -409,18 +416,27 @@ class SquadViewModel(
                         handleRemoteLogout()
                         continue
                     }
-                    if (_uiState.value.lastTocMessage != null) {
-                        val closedByToc =
-                            runCatching { facade.isTocPanelClosedByToc(session.sessionId) }
-                                .getOrDefault(false)
-                        if (closedByToc) {
-                            tocMessageStorage.clear()
-                            _uiState.update { it.copy(lastTocMessage = null) }
-                            RouteRefreshBus.emitCleared(session.sessionId)
-                        }
-                    }
+                    syncActivePanelMessage(session)
                 }
             }
+    }
+
+    private suspend fun syncActivePanelMessage(session: SquadSession) {
+        val serverMessage =
+            runCatching { facade.fetchActivePanelMessage(session) }.getOrNull()
+        when {
+            serverMessage != null -> {
+                if (_uiState.value.lastTocMessage != serverMessage) {
+                    tocMessageStorage.save(serverMessage)
+                    _uiState.update { it.copy(lastTocMessage = serverMessage) }
+                }
+            }
+            _uiState.value.lastTocMessage != null -> {
+                tocMessageStorage.clear()
+                _uiState.update { it.copy(lastTocMessage = null) }
+                RouteRefreshBus.emitCleared(session.sessionId)
+            }
+        }
     }
 
     private suspend fun handleRemoteLogout() {
