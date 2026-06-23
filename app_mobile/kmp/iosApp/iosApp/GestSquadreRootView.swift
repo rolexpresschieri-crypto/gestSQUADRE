@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import shared
 
 private enum AppScreen {
@@ -10,7 +11,6 @@ private enum AppScreen {
 
 struct GestSquadreRootView: View {
     @EnvironmentObject private var viewModel: SquadViewModel
-    @Environment(\.scenePhase) private var scenePhase
 
     @State private var screen: AppScreen = .splash
     @State private var toastMessage: String?
@@ -30,7 +30,7 @@ struct GestSquadreRootView: View {
                     onNavigateLogin: { screen = .login },
                     onNavigateMap: {
                         if let facade = viewModel.facade {
-                            mapViewModelHolder.ensure(facade: facade)
+                            mapViewModelHolder.ensure(facade: facade, focusSessionId: viewModel.isLoggedIn ? viewModel.sessionId : nil)
                             screen = .map
                         }
                     },
@@ -44,7 +44,7 @@ struct GestSquadreRootView: View {
                     onShowMessage: showToast
                 )
             case .map:
-                if let mapVM = mapViewModelHolder.model {
+                if let mapVM = mapViewModelHolder.model(for: viewModel) {
                     TocMapView(
                         mapViewModel: mapVM,
                         focusSessionId: viewModel.isLoggedIn ? viewModel.sessionId : nil,
@@ -73,14 +73,12 @@ struct GestSquadreRootView: View {
                 screen = .home
             }
         }
-        .onChange(of: scenePhase) { phase in
-            if phase == .active {
-                if viewModel.isLoggedIn, viewModel.needsLocationPermission {
-                    viewModel.onLocationPermissionGranted()
-                }
-                if viewModel.isLoggedIn, viewModel.needsNotificationPermission {
-                    viewModel.onNotificationPermissionGranted()
-                }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            if viewModel.isLoggedIn, viewModel.needsLocationPermission {
+                viewModel.onLocationPermissionGranted()
+            }
+            if viewModel.isLoggedIn, viewModel.needsNotificationPermission {
+                viewModel.onNotificationPermissionGranted()
             }
         }
     }
@@ -96,11 +94,23 @@ struct GestSquadreRootView: View {
 }
 
 private final class MapViewModelHolder: ObservableObject {
-    @Published var model: TocMapViewModel?
+    @Published private(set) var model: TocMapViewModel?
+    private var focusSessionId: String?
 
-    func ensure(facade: GestSquadreFacade) {
-        if model == nil {
-            model = TocMapViewModel(facade: facade)
+    func ensure(facade: GestSquadreFacade, focusSessionId: String?) {
+        if model == nil || self.focusSessionId != focusSessionId {
+            self.focusSessionId = focusSessionId
+            model = TocMapViewModel(facade: facade, focusSessionId: focusSessionId)
         }
+    }
+
+    func model(for viewModel: SquadViewModel) -> TocMapViewModel? {
+        if let facade = viewModel.facade {
+            ensure(
+                facade: facade,
+                focusSessionId: viewModel.isLoggedIn ? viewModel.sessionId : nil
+            )
+        }
+        return model
     }
 }

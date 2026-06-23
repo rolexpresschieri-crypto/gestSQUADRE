@@ -1,5 +1,19 @@
 import SwiftUI
 
+private struct ContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct ViewportHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct HomeView: View {
     @ObservedObject var viewModel: SquadViewModel
     let onNavigateLogin: () -> Void
@@ -7,6 +21,9 @@ struct HomeView: View {
     let onShowMessage: (String) -> Void
 
     @State private var showAlarmSheet = false
+    @State private var showScrollHint = false
+    @State private var measuredContentHeight: CGFloat = 0
+    @State private var measuredViewportHeight: CGFloat = 0
 
     var body: some View {
         ScrollView {
@@ -88,16 +105,53 @@ struct HomeView: View {
                             }
                         )
                         .padding(.top, 18)
+
+                        #if DEBUG
+                        Text(AppBuildInfo.label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(TacticalColors.muted)
+                            .padding(.top, 10)
+                        #endif
                     }
                 }
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: ContentHeightKey.self, value: proxy.size.height)
+                    }
+                )
             }
             .padding(.bottom, 12)
+
+            if showScrollHint {
+                Text("▼")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
+            }
+        }
+        .background(
+            GeometryReader { proxy in
+                Color.clear.preference(key: ViewportHeightKey.self, value: proxy.size.height)
+            }
+        )
+        .onPreferenceChange(ContentHeightKey.self) { contentHeight in
+            updateScrollHint(contentHeight: contentHeight, viewportHeight: nil)
+        }
+        .onPreferenceChange(ViewportHeightKey.self) { viewportHeight in
+            updateScrollHint(contentHeight: nil, viewportHeight: viewportHeight)
         }
         .sheet(isPresented: $showAlarmSheet) {
             AlarmRequestSheet(viewModel: viewModel) { message in
                 onShowMessage(message)
             }
         }
+    }
+
+    private func updateScrollHint(contentHeight: CGFloat?, viewportHeight: CGFloat?) {
+        if let contentHeight { measuredContentHeight = contentHeight }
+        if let viewportHeight { measuredViewportHeight = viewportHeight }
+        showScrollHint = measuredContentHeight > measuredViewportHeight + 20
     }
 
     private var squadBox: some View {
@@ -144,6 +198,7 @@ struct HomeView: View {
                 .padding(.bottom, 8)
             }
             if !viewModel.pushStatusOk, viewModel.isLoggedIn {
+                #if !targetEnvironment(simulator)
                 MainButton(
                     label: "Ripara push TOC",
                     backgroundColor: TacticalColors.navy,
@@ -152,6 +207,7 @@ struct HomeView: View {
                     action: { viewModel.retryPushRegistration() }
                 )
                 .padding(.bottom, 8)
+                #endif
             }
             TacticalBodyText(text: SquadAlarmCopy.hint, fontSize: 13)
                 .padding(.bottom, 8)

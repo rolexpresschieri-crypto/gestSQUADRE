@@ -1,5 +1,6 @@
 package com.ansmi.gestsquadre.shared
 
+import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
 import com.ansmi.gestsquadre.shared.model.GpsPosition
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
@@ -10,8 +11,28 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
 
 private val iosScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+object SessionCache {
+    fun parse(raw: String): SquadSession? {
+        val parts = raw.split("|")
+        if (parts.size < 6) {
+            return null
+        }
+        return runCatching {
+            SquadSession(
+                sessionId = parts[0],
+                eventId = parts[1],
+                squadId = parts[2],
+                squadCode = parts[3],
+                squadName = parts[4],
+                loginAt = Instant.parse(parts[5]),
+            )
+        }.getOrNull()
+    }
+}
 
 /**
  * Wrapper per Swift: evita il crash in ObjCExportCoroutines quando una suspend fallisce.
@@ -133,7 +154,21 @@ fun GestSquadreFacade.isSessionOnlineSafe(
         try {
             onComplete(isSessionOnline(sessionId), null)
         } catch (e: Throwable) {
-            onComplete(false, e.message ?: e.toString())
+            // Come Android: errore di rete ≠ logout remoto (evita disconnessione locale spuria).
+            onComplete(true, e.message ?: e.toString())
+        }
+    }
+}
+
+fun GestSquadreFacade.loadActiveRouteAssignmentSafe(
+    sessionId: String,
+    onComplete: (ActiveRouteAssignment?, String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            onComplete(loadActiveRouteAssignment(sessionId), null)
+        } catch (e: Throwable) {
+            onComplete(null, e.message ?: e.toString())
         }
     }
 }
@@ -147,14 +182,21 @@ fun GestSquadreFacade.refreshTocMapSafe(
     ) -> Unit,
 ) {
     iosScope.launch {
-        try {
-            val squads = loadMapSquads()
-            val waypoints = loadMapWaypoints()
-            val alarming = loadAlarmingSessionIds().toList()
-            onComplete(squads, waypoints, alarming, null)
-        } catch (e: Throwable) {
-            onComplete(emptyList(), emptyList(), emptyList(), e.message ?: e.toString())
-        }
+        val squadsResult = runCatching { loadMapSquads() }
+        val waypointsResult = runCatching { loadMapWaypoints() }
+        val alarmingResult = runCatching { loadAlarmingSessionIds() }
+        val firstError =
+            listOf(
+                squadsResult.exceptionOrNull(),
+                waypointsResult.exceptionOrNull(),
+                alarmingResult.exceptionOrNull(),
+            ).firstOrNull()
+        onComplete(
+            squadsResult.getOrElse { emptyList() },
+            waypointsResult.getOrElse { emptyList() },
+            alarmingResult.getOrElse { emptySet() }.toList(),
+            firstError?.message?.let { msg -> "Errore mappa: $msg" },
+        )
     }
 }
 

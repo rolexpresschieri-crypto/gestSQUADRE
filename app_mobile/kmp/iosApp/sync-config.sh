@@ -36,8 +36,8 @@ content = f"""// Generato da sync-config.sh — non modificare a mano
 SUPABASE_URL = {xc_quote(url)}
 SUPABASE_ANON_KEY = {xc_quote(key)}
 PRODUCT_BUNDLE_IDENTIFIER = com.ansmi.gestsquadre
-MARKETING_VERSION = 1.0.2
-CURRENT_PROJECT_VERSION = 1
+MARKETING_VERSION = 1.0.3
+CURRENT_PROJECT_VERSION = 6
 
 #include? "Signing.xcconfig"
 """
@@ -84,3 +84,25 @@ if ios_id:
 else:
     print("    AVVISO: FIREBASE_IOS_APP_ID vuoto — push iOS disabilitata fino a configurazione Firebase.")
 PY
+
+ICON_SRC="$ROOT/../gest_squadre/assets/app_icon.png"
+ICON_DEST="$ROOT/iosApp/iosApp/Assets.xcassets/AppIcon.appiconset"
+if [[ -f "$ICON_SRC" && -d "$ICON_DEST" ]]; then
+  gen_icon() { sips -z "$2" "$2" "$ICON_SRC" --out "$ICON_DEST/$1" >/dev/null; }
+  gen_icon "Icon-App-20x20@1x.png" 20
+  gen_icon "Icon-App-20x20@2x.png" 40
+  gen_icon "Icon-App-20x20@3x.png" 60
+  gen_icon "Icon-App-29x29@1x.png" 29
+  gen_icon "Icon-App-29x29@2x.png" 58
+  gen_icon "Icon-App-29x29@3x.png" 87
+  gen_icon "Icon-App-40x40@1x.png" 40
+  gen_icon "Icon-App-40x40@2x.png" 80
+  gen_icon "Icon-App-40x40@3x.png" 120
+  gen_icon "Icon-App-60x60@2x.png" 120
+  gen_icon "Icon-App-60x60@3x.png" 180
+  gen_icon "Icon-App-76x76@1x.png" 76
+  gen_icon "Icon-App-76x76@2x.png" 152
+  gen_icon "Icon-App-83.5x83.5@2x.png" 167
+  gen_icon "Icon-App-1024x1024@1x.png" 1024
+  echo "OK: icone iOS da app_icon.png"
+fi

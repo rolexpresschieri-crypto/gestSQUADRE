@@ -29,6 +29,34 @@
 		E1F2A3B41F60718293A4B606 /* firebase-config.json in Resources */ = {isa = PBXBuildFile; fileRef = E1F2A3B41F60718293A4B616 /* firebase-config.json */; };
 		E1F2A3B41F60718293A4B607 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = E1F2A3B41F60718293A4B621 /* FirebaseCore */; };
 		E1F2A3B41F60718293A4B608 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = E1F2A3B41F60718293A4B622 /* FirebaseMessaging */; };
+		F1A2B3C41F60718293A4B701 /* MapViewStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B711 /* MapViewStorage.swift */; };
+		F1A2B3C41F60718293A4B702 /* WaypointIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B712 /* WaypointIcons.swift */; };
+		F1A2B3C41F60718293A4B703 /* MapMarkerFactory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B713 /* MapMarkerFactory.swift */; };
+		F1A2B3C41F60718293A4B704 /* RouteRefreshBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B714 /* RouteRefreshBus.swift */; };
+		F1A2B3C41F60718293A4B70E /* SimulatorTocPushRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71E /* SimulatorTocPushRelay.swift */; };
+		F1A2B3C41F60718293A4B70F /* AppBuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71F /* AppBuildInfo.swift */; };
+		F1A2B3C41F60718293A4B705 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B715 /* Assets.xcassets */; };
+		F1A2B3C41F60718293A4B706 /* waypoint_buche.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B716 /* waypoint_buche.png */; };
+		F1A2B3C41F60718293A4B707 /* waypoint_cancello_in.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B717 /* waypoint_cancello_in.png */; };
+		F1A2B3C41F60718293A4B708 /* waypoint_club_house.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B718 /* waypoint_club_house.png */; };
+		F1A2B3C41F60718293A4B709 /* waypoint_croce_rossa.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B719 /* waypoint_croce_rossa.png */; };
+		F1A2B3C41F60718293A4B70A /* waypoint_driving_range.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71A /* waypoint_driving_range.png */; };
+		F1A2B3C41F60718293A4B70B /* waypoint_media_center.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71B /* waypoint_media_center.png */; };
+		F1A2B3C41F60718293A4B70C /* waypoint_villaggio_comm.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71C /* waypoint_villaggio_comm.png */; };
+		F1A2B3C41F60718293A4B70D /* waypoint_welcome.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71D /* waypoint_welcome.png */; };
+		F1A2B3C41F60718293A4B721 /* SquadIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B731 /* SquadIcons.swift */; };
+		F1A2B3C41F60718293A4B722 /* squad_ambulanza.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B732 /* squad_ambulanza.png */; };
+		F1A2B3C41F60718293A4B723 /* squad_coordinatore_cri.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B733 /* squad_coordinatore_cri.png */; };
+		F1A2B3C41F60718293A4B724 /* squad_fig.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B734 /* squad_fig.png */; };
+		F1A2B3C41F60718293A4B725 /* squad_forze_ordine.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B735 /* squad_forze_ordine.png */; };
+		F1A2B3C41F60718293A4B726 /* squad_logo_ansmi.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B736 /* squad_logo_ansmi.png */; };
+		F1A2B3C41F60718293A4B727 /* squad_logo_rolexpress.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B737 /* squad_logo_rolexpress.png */; };
+		F1A2B3C41F60718293A4B728 /* squad_medico.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B738 /* squad_medico.png */; };
+		F1A2B3C41F60718293A4B729 /* squad_squadre_a_piedi.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B739 /* squad_squadre_a_piedi.png */; };
+		F1A2B3C41F60718293A4B72A /* squad_vigili_fuoco.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73A /* squad_vigili_fuoco.png */; };
+		F1A2B3C41F60718293A4B72B /* squad_waypoint_toc.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73B /* squad_waypoint_toc.png */; };
+		F1A2B3C41F60718293A4B72C /* waypoint_pma.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73C /* waypoint_pma.png */; };
+		F1A2B3C41F60718293A4B72D /* waypoint_toc.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73D /* waypoint_toc.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -56,6 +84,34 @@
 		E1F2A3B41F60718293A4B614 /* FcmPushBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FcmPushBus.swift; sourceTree = "<group>"; };
 		E1F2A3B41F60718293A4B615 /* FcmSessionRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FcmSessionRegistry.swift; sourceTree = "<group>"; };
 		E1F2A3B41F60718293A4B616 /* firebase-config.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "firebase-config.json"; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B711 /* MapViewStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapViewStorage.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B712 /* WaypointIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WaypointIcons.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B713 /* MapMarkerFactory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapMarkerFactory.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B714 /* RouteRefreshBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRefreshBus.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B71E /* SimulatorTocPushRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulatorTocPushRelay.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B71F /* AppBuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBuildInfo.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B715 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B716 /* waypoint_buche.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_buche.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B717 /* waypoint_cancello_in.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_cancello_in.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B718 /* waypoint_club_house.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_club_house.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B719 /* waypoint_croce_rossa.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_croce_rossa.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B71A /* waypoint_driving_range.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_driving_range.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B71B /* waypoint_media_center.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_media_center.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B71C /* waypoint_villaggio_comm.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_villaggio_comm.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B71D /* waypoint_welcome.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_welcome.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B731 /* SquadIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadIcons.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B732 /* squad_ambulanza.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_ambulanza.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B733 /* squad_coordinatore_cri.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_coordinatore_cri.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B734 /* squad_fig.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_fig.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B735 /* squad_forze_ordine.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_forze_ordine.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B736 /* squad_logo_ansmi.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_logo_ansmi.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B737 /* squad_logo_rolexpress.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_logo_rolexpress.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B738 /* squad_medico.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_medico.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B739 /* squad_squadre_a_piedi.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_squadre_a_piedi.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B73A /* squad_vigili_fuoco.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_vigili_fuoco.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B73B /* squad_waypoint_toc.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_waypoint_toc.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B73C /* waypoint_pma.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_pma.png; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B73D /* waypoint_toc.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_toc.png; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +157,13 @@
 				D1E2F3A41F60718293A4B5F6 /* AlarmRequestSheet.swift */,
 				D1E2F3A41F60718293A4B5F8 /* TocMapView.swift */,
 				D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */,
+				F1A2B3C41F60718293A4B711 /* MapViewStorage.swift */,
+				F1A2B3C41F60718293A4B712 /* WaypointIcons.swift */,
+				F1A2B3C41F60718293A4B731 /* SquadIcons.swift */,
+				F1A2B3C41F60718293A4B713 /* MapMarkerFactory.swift */,
+				F1A2B3C41F60718293A4B714 /* RouteRefreshBus.swift */,
+				F1A2B3C41F60718293A4B71E /* SimulatorTocPushRelay.swift */,
+				F1A2B3C41F60718293A4B71F /* AppBuildInfo.swift */,
 				D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */,
 				D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */,
 				D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */,
@@ -113,6 +176,27 @@
 				C2D3E4F51F60718293A4B5DA /* supabase-config.json */,
 				E1F2A3B41F60718293A4B616 /* firebase-config.json */,
 				D1E2F3A41F60718293A4B5F0 /* logo_open_golf_2026.png */,
+				F1A2B3C41F60718293A4B715 /* Assets.xcassets */,
+				F1A2B3C41F60718293A4B716 /* waypoint_buche.png */,
+				F1A2B3C41F60718293A4B717 /* waypoint_cancello_in.png */,
+				F1A2B3C41F60718293A4B718 /* waypoint_club_house.png */,
+				F1A2B3C41F60718293A4B719 /* waypoint_croce_rossa.png */,
+				F1A2B3C41F60718293A4B71A /* waypoint_driving_range.png */,
+				F1A2B3C41F60718293A4B71B /* waypoint_media_center.png */,
+				F1A2B3C41F60718293A4B71C /* waypoint_villaggio_comm.png */,
+				F1A2B3C41F60718293A4B71D /* waypoint_welcome.png */,
+				F1A2B3C41F60718293A4B73C /* waypoint_pma.png */,
+				F1A2B3C41F60718293A4B73D /* waypoint_toc.png */,
+				F1A2B3C41F60718293A4B732 /* squad_ambulanza.png */,
+				F1A2B3C41F60718293A4B733 /* squad_coordinatore_cri.png */,
+				F1A2B3C41F60718293A4B734 /* squad_fig.png */,
+				F1A2B3C41F60718293A4B735 /* squad_forze_ordine.png */,
+				F1A2B3C41F60718293A4B736 /* squad_logo_ansmi.png */,
+				F1A2B3C41F60718293A4B737 /* squad_logo_rolexpress.png */,
+				F1A2B3C41F60718293A4B738 /* squad_medico.png */,
+				F1A2B3C41F60718293A4B739 /* squad_squadre_a_piedi.png */,
+				F1A2B3C41F60718293A4B73A /* squad_vigili_fuoco.png */,
+				F1A2B3C41F60718293A4B73B /* squad_waypoint_toc.png */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
@@ -194,6 +278,27 @@
 				C2D3E4F51F60718293A4B5DB /* supabase-config.json in Resources */,
 				E1F2A3B41F60718293A4B606 /* firebase-config.json in Resources */,
 				D1E2F3A41F60718293A4B5EB /* logo_open_golf_2026.png in Resources */,
+				F1A2B3C41F60718293A4B705 /* Assets.xcassets in Resources */,
+				F1A2B3C41F60718293A4B706 /* waypoint_buche.png in Resources */,
+				F1A2B3C41F60718293A4B707 /* waypoint_cancello_in.png in Resources */,
+				F1A2B3C41F60718293A4B708 /* waypoint_club_house.png in Resources */,
+				F1A2B3C41F60718293A4B709 /* waypoint_croce_rossa.png in Resources */,
+				F1A2B3C41F60718293A4B70A /* waypoint_driving_range.png in Resources */,
+				F1A2B3C41F60718293A4B70B /* waypoint_media_center.png in Resources */,
+				F1A2B3C41F60718293A4B70C /* waypoint_villaggio_comm.png in Resources */,
+				F1A2B3C41F60718293A4B70D /* waypoint_welcome.png in Resources */,
+				F1A2B3C41F60718293A4B72C /* waypoint_pma.png in Resources */,
+				F1A2B3C41F60718293A4B72D /* waypoint_toc.png in Resources */,
+				F1A2B3C41F60718293A4B722 /* squad_ambulanza.png in Resources */,
+				F1A2B3C41F60718293A4B723 /* squad_coordinatore_cri.png in Resources */,
+				F1A2B3C41F60718293A4B724 /* squad_fig.png in Resources */,
+				F1A2B3C41F60718293A4B725 /* squad_forze_ordine.png in Resources */,
+				F1A2B3C41F60718293A4B726 /* squad_logo_ansmi.png in Resources */,
+				F1A2B3C41F60718293A4B727 /* squad_logo_rolexpress.png in Resources */,
+				F1A2B3C41F60718293A4B728 /* squad_medico.png in Resources */,
+				F1A2B3C41F60718293A4B729 /* squad_squadre_a_piedi.png in Resources */,
+				F1A2B3C41F60718293A4B72A /* squad_vigili_fuoco.png in Resources */,
+				F1A2B3C41F60718293A4B72B /* squad_waypoint_toc.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -256,6 +361,13 @@
 				D1E2F3A41F60718293A4B5E6 /* AlarmRequestSheet.swift in Sources */,
 				D1E2F3A41F60718293A4B5E8 /* TocMapView.swift in Sources */,
 				D1E2F3A41F60718293A4B5E9 /* TocMapViewModel.swift in Sources */,
+				F1A2B3C41F60718293A4B701 /* MapViewStorage.swift in Sources */,
+				F1A2B3C41F60718293A4B702 /* WaypointIcons.swift in Sources */,
+				F1A2B3C41F60718293A4B721 /* SquadIcons.swift in Sources */,
+				F1A2B3C41F60718293A4B703 /* MapMarkerFactory.swift in Sources */,
+				F1A2B3C41F60718293A4B704 /* RouteRefreshBus.swift in Sources */,
+				F1A2B3C41F60718293A4B70E /* SimulatorTocPushRelay.swift in Sources */,
+				F1A2B3C41F60718293A4B70F /* AppBuildInfo.swift in Sources */,
 				D1E2F3A41F60718293A4B5E1 /* TacticalTheme.swift in Sources */,
 				D1E2F3A41F60718293A4B5E2 /* TacticalComponents.swift in Sources */,
 				D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */,
@@ -318,6 +430,7 @@
 		7555FFA6242A565B00829871 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 9GZ3AN39J2;
@@ -337,6 +450,7 @@
 				);
 				PRODUCT_NAME = gestSQUADRE;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -345,6 +459,7 @@
 		7555FFA7242A565B00829871 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp-Release.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 9GZ3AN39J2;
@@ -364,6 +479,7 @@
 				);
 				PRODUCT_NAME = gestSQUADRE;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_ENABLE_EXPLICIT_MODULES = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};

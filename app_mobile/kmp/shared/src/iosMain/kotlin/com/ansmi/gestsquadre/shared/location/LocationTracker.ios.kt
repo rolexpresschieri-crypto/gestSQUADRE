@@ -17,7 +17,9 @@ import platform.CoreLocation.CLLocationManager
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
 import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
+import platform.CoreLocation.kCLAuthorizationStatusDenied
 import platform.CoreLocation.kCLAuthorizationStatusNotDetermined
+import platform.CoreLocation.kCLAuthorizationStatusRestricted
 import platform.CoreLocation.kCLLocationAccuracyBest
 import platform.Foundation.NSError
 import platform.darwin.NSObject
@@ -46,6 +48,11 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
 
     actual fun hasLocationPermission(): Boolean =
         isAuthorized(CLLocationManager.authorizationStatus())
+
+    fun isLocationPermissionDenied(): Boolean {
+        val status = CLLocationManager.authorizationStatus()
+        return status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted
+    }
 
     /** Richiesta permesso When-In-Use (da Swift se [hasLocationPermission] è false). */
     fun requestLocationAuthorization() {

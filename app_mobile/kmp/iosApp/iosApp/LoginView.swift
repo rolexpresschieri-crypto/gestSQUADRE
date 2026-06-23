@@ -26,7 +26,7 @@ struct LoginView: View {
 
                     loginField("Codice squadra", text: $squadCode, secure: false)
                         .padding(.bottom, 12)
-                    loginField("Password", text: $password, secure: !passwordVisible)
+                    passwordField
                         .padding(.bottom, 24)
 
                     MainButton(
@@ -43,6 +43,43 @@ struct LoginView: View {
                         .padding(.top, 12)
                         .frame(maxWidth: .infinity)
                 }
+            }
+        }
+    }
+
+    private var passwordField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Password")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.85))
+            HStack(spacing: 0) {
+                Group {
+                    if passwordVisible {
+                        TextField("", text: $password)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                    } else {
+                        SecureField("", text: $password)
+                    }
+                }
+                .padding(12)
+                Button {
+                    passwordVisible.toggle()
+                } label: {
+                    Image(systemName: passwordVisible ? "eye.slash.fill" : "eye.fill")
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(width: 44, height: 44)
+                }
+            }
+            .background(Color.black.opacity(0.25))
+            .overlay {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.55), lineWidth: 1)
+            }
+            .foregroundStyle(.white)
+            .onChange(of: password) { newValue in
+                password = newValue.uppercased()
+                blockingAlert = nil
             }
         }
     }

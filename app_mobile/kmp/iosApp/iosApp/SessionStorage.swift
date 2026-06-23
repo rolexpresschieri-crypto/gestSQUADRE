@@ -18,7 +18,7 @@ final class SessionStorage {
             session.squadId,
             session.squadCode,
             session.squadName,
-            String(describing: session.loginAt),
+            session.loginAt.description(),
         ].joined(separator: "|")
         defaults.set(raw, forKey: key)
     }
@@ -29,6 +29,11 @@ final class SessionStorage {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard let sessionId, !sessionId.isEmpty else { return nil }
         return sessionId
+    }
+
+    func loadCached() -> SquadSession? {
+        guard let raw = defaults.string(forKey: key) else { return nil }
+        return SessionCache.shared.parse(raw: raw)
     }
 
     func clear() {

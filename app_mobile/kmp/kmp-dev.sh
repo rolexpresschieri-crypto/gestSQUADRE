@@ -42,6 +42,9 @@ case "$MODE" in
   ios-ipa-adhoc)
     bash "$ROOT/build-ios-ipa.sh" ad-hoc
     ;;
+  ios-simulator)
+    bash "$ROOT/iosApp/ios-simulator-build.sh"
+    ;;
   *)
     cat <<'EOF'
 gestSQUADRE KMP — Mac
@@ -49,6 +52,7 @@ gestSQUADRE KMP — Mac
   ./kmp-dev.sh ios-sync      → Supabase da dart-defines.json → Config.xcconfig
   ./kmp-dev.sh ios-framework → compila modulo Kotlin shared per iOS
   ./kmp-dev.sh ios-open      → sync config + apre Xcode
+  ./kmp-dev.sh ios-simulator  → build pulito + install simulatore (senza Xcode Run)
   ./kmp-dev.sh ios-ipa       → IPA per iPhone fisico → gestSQUADRE_iOS_1.0.x.ipa
   ./kmp-dev.sh android       → APK debug Android
 
