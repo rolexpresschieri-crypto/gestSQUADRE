@@ -186,3 +186,16 @@ fun GestSquadreFacade.isTocPanelClosedByTocSafe(
         }
     }
 }
+
+fun GestSquadreFacade.fetchActivePanelMessageSafe(
+    session: SquadSession,
+    onComplete: (String?, String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            onComplete(fetchActivePanelMessage(session), null)
+        } catch (e: Throwable) {
+            onComplete(null, e.message ?: e.toString())
+        }
+    }
+}

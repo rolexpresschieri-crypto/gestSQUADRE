@@ -218,10 +218,30 @@ final class SquadViewModel: ObservableObject {
         bannerMessage = nil
         gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
         lastGpsAccuracyM = nil
-        lastTocMessage = TocMessageStorage.shared.load()
+        let localPanel = TocMessageStorage.shared.load()
+        lastTocMessage = localPanel
         startGpsTracking()
         startSessionWatchdog()
+        syncActivePanelMessage(session: session)
         setupPushForSession(session)
+    }
+
+    private func syncActivePanelMessage(session: SquadSession) {
+        guard let facade else { return }
+        facade.fetchActivePanelMessageSafe(session: session) { [weak self] serverPanel, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let serverPanel {
+                    if self.lastTocMessage != serverPanel {
+                        TocMessageStorage.shared.save(message: serverPanel)
+                        self.lastTocMessage = serverPanel
+                    }
+                } else if self.lastTocMessage != nil {
+                    TocMessageStorage.shared.clear()
+                    self.lastTocMessage = nil
+                }
+            }
+        }
     }
 
     private func setupPushForSession(_ session: SquadSession) {
@@ -293,13 +313,16 @@ final class SquadViewModel: ObservableObject {
             guard let self else { return }
             let title = notification.userInfo?["title"] as? String ?? ""
             let body = notification.userInfo?["body"] as? String ?? ""
-            self.lastTocMessage = TocMessageStorage.formatDisplayMessage(title: title, body: body)
+            let message = TocMessageStorage.formatDisplayMessage(title: title, body: body)
+            TocMessageStorage.shared.save(message: message)
+            self.lastTocMessage = message
         }
         NotificationCenter.default.addObserver(
             forName: FcmPushBus.panelCleared,
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            TocMessageStorage.shared.clear()
             self?.lastTocMessage = nil
         }
     }
@@ -318,6 +341,7 @@ final class SquadViewModel: ObservableObject {
         needsNotificationPermission = false
         pushStatusLabel = nil
         pushStatusOk = false
+        TocMessageStorage.shared.clear()
         lastTocMessage = nil
         statusMessage = "Log-out completato."
     }
@@ -332,15 +356,8 @@ final class SquadViewModel: ObservableObject {
                         self.handleRemoteLogout()
                         return
                     }
-                    if self.lastTocMessage != nil {
-                        facade.isTocPanelClosedByTocSafe(sessionId: self.sessionId) { closed, _ in
-                            DispatchQueue.main.async {
-                                if closed.boolValue {
-                                    TocMessageStorage.shared.clear()
-                                    self.lastTocMessage = nil
-                                }
-                            }
-                        }
+                    if let session = self.session {
+                        self.syncActivePanelMessage(session: session)
                     }
                 }
             }
@@ -366,6 +383,7 @@ final class SquadViewModel: ObservableObject {
         lastGpsAccuracyM = nil
         pushStatusLabel = nil
         pushStatusOk = false
+        TocMessageStorage.shared.clear()
         lastTocMessage = nil
         bannerMessage = "Sessione chiusa: login su un altro telefono o logout dal TOC."
     }
