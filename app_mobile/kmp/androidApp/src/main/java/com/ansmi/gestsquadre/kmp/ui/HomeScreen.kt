@@ -1,11 +1,14 @@
 package com.ansmi.gestsquadre.kmp.ui
 
 import android.Manifest
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
@@ -46,13 +49,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.ansmi.gestsquadre.kmp.ui.components.AppTitleBlock
 import com.ansmi.gestsquadre.kmp.ui.components.MainButton
@@ -71,7 +73,10 @@ import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequestType
 import com.ansmi.gestsquadre.shared.model.loginTimeLabel
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
 
 private const val SquadAlarmHint =
     "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
@@ -189,6 +194,7 @@ fun GestSquadreApp(
                 AppScreen.Splash -> LaunchSplashScreen()
                 AppScreen.Home ->
                     HomeScreen(
+                        modifier = Modifier.fillMaxSize(),
                         viewModel = viewModel,
                         onNavigateLogin = { screen = AppScreen.Login },
                         onNavigateMap = { screen = AppScreen.Map },
@@ -221,6 +227,7 @@ fun GestSquadreApp(
 
 @Composable
 fun HomeScreen(
+    modifier: Modifier = Modifier,
     viewModel: SquadViewModel,
     onNavigateLogin: () -> Unit,
     onNavigateMap: () -> Unit,
@@ -232,31 +239,20 @@ fun HomeScreen(
     val isLogged = session != null
     var showAlarmDialog by remember { mutableStateOf(false) }
 
-    if (showAlarmDialog) {
-        SquadAlarmRequestDialog(
-            onDismiss = { showAlarmDialog = false },
-            onConfirm = { request ->
-                showAlarmDialog = false
-                viewModel.sendAlarm(request) { err ->
-                    onShowMessage(err ?: SquadAlarmSentOk)
-                }
-            },
-        )
-    }
-
     val scrollState = rememberScrollState()
     val showScrollHint by remember {
         derivedStateOf { scrollState.canScrollForward }
     }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState)
-                .padding(bottom = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+                    .padding(bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
         TacticalShell {
             Column(
                 modifier = Modifier.fillMaxWidth(),
@@ -445,11 +441,24 @@ fun HomeScreen(
                 textAlign = TextAlign.Center,
             )
         }
+        }
+
+        if (showAlarmDialog) {
+            SquadAlarmRequestOverlay(
+                onDismiss = { showAlarmDialog = false },
+                onConfirm = { request ->
+                    showAlarmDialog = false
+                    viewModel.sendAlarm(request) { err ->
+                        onShowMessage(err ?: SquadAlarmSentOk)
+                    }
+                },
+            )
+        }
     }
 }
 
 @Composable
-private fun SquadAlarmRequestDialog(
+private fun SquadAlarmRequestOverlay(
     onDismiss: () -> Unit,
     onConfirm: (SquadAlarmRequest) -> Unit,
 ) {
@@ -476,26 +485,65 @@ private fun SquadAlarmRequestDialog(
     }
 
     val scrollState = rememberScrollState()
-    LaunchedEffect(altro, otherDetail.length) {
+    val configuration = LocalConfiguration.current
+    val maxPanelHeight = (configuration.screenHeightDp * 0.9f).dp
+    val scrimInteraction = remember { MutableInteractionSource() }
+
+    suspend fun scrollToBottom() {
+        snapshotFlow { scrollState.maxValue }
+            .filter { it > 0 }
+            .first()
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
+
+    LaunchedEffect(altro) {
         if (altro) {
-            scrollState.animateScrollTo(scrollState.maxValue)
+            scrollToBottom()
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+    LaunchedEffect(validationError) {
+        if (validationError != null) {
+            scrollToBottom()
+        }
+    }
+
+    BackHandler(onBack = onDismiss)
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .imePadding(),
+        contentAlignment = Alignment.Center,
     ) {
+        Box(
+            modifier =
+                Modifier
+                    .matchParentSize()
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .clickable(
+                        interactionSource = scrimInteraction,
+                        indication = null,
+                        onClick = onDismiss,
+                    ),
+        )
         Surface(
             modifier =
                 Modifier
-                    .fillMaxWidth(0.92f)
-                    .imePadding()
-                    .padding(vertical = 16.dp),
+                    .fillMaxWidth(0.94f)
+                    .heightIn(max = maxPanelHeight)
+                    .padding(vertical = 12.dp),
             shape = RoundedCornerShape(12.dp),
             color = Color(0xFF1A2E1A),
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(scrollState)
+                        .padding(20.dp),
+            ) {
                 Text(
                     text = SquadAlarmDialogTitle,
                     color = Color.White,
@@ -503,101 +551,96 @@ private fun SquadAlarmRequestDialog(
                     fontSize = 20.sp,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 360.dp)
-                            .verticalScroll(scrollState),
-                ) {
-                    Text(
-                        text = SquadAlarmDialogBody,
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
+                Text(
+                    text = SquadAlarmDialogBody,
+                    color = Color.White,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Cosa richiedi? (scelta multipla)",
+                    color = TacticalYellow,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                AlarmRequestCheckboxRow(
+                    label = "1. Sanitario",
+                    checked = sanitario,
+                    onCheckedChange = {
+                        sanitario = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "2. Security",
+                    checked = security,
+                    onCheckedChange = {
+                        security = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "3. Vigili del Fuoco",
+                    checked = vigiliFuoco,
+                    onCheckedChange = {
+                        vigiliFuoco = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "4. Strutture",
+                    checked = strutture,
+                    onCheckedChange = {
+                        strutture = it
+                        validationError = null
+                    },
+                )
+                AlarmRequestCheckboxRow(
+                    label = "5. Altro",
+                    checked = altro,
+                    onCheckedChange = {
+                        altro = it
+                        validationError = null
+                    },
+                )
+                if (altro) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = otherDetail,
+                        onValueChange = {
+                            otherDetail = it
+                            validationError = null
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 72.dp, max = 96.dp),
+                        label = { Text("Descrizione breve") },
+                        singleLine = false,
+                        minLines = 2,
+                        maxLines = 3,
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                focusedBorderColor = TacticalYellow,
+                                unfocusedBorderColor = TacticalMuted,
+                                focusedLabelColor = TacticalYellow,
+                                unfocusedLabelColor = TacticalMuted,
+                                cursorColor = TacticalYellow,
+                            ),
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Cosa richiedi? (scelta multipla)",
-                        color = TacticalYellow,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                    )
+                }
+                validationError?.let { err ->
                     Spacer(modifier = Modifier.height(8.dp))
-                    AlarmRequestCheckboxRow(
-                        label = "1. Sanitario",
-                        checked = sanitario,
-                        onCheckedChange = {
-                            sanitario = it
-                            validationError = null
-                        },
+                    Text(
+                        text = err,
+                        color = TacticalRed,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
-                    AlarmRequestCheckboxRow(
-                        label = "2. Security",
-                        checked = security,
-                        onCheckedChange = {
-                            security = it
-                            validationError = null
-                        },
-                    )
-                    AlarmRequestCheckboxRow(
-                        label = "3. Vigili del Fuoco",
-                        checked = vigiliFuoco,
-                        onCheckedChange = {
-                            vigiliFuoco = it
-                            validationError = null
-                        },
-                    )
-                    AlarmRequestCheckboxRow(
-                        label = "4. Strutture",
-                        checked = strutture,
-                        onCheckedChange = {
-                            strutture = it
-                            validationError = null
-                        },
-                    )
-                    AlarmRequestCheckboxRow(
-                        label = "5. Altro",
-                        checked = altro,
-                        onCheckedChange = {
-                            altro = it
-                            validationError = null
-                        },
-                    )
-                    if (altro) {
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = otherDetail,
-                            onValueChange = {
-                                otherDetail = it
-                                validationError = null
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Descrizione breve") },
-                            singleLine = false,
-                            minLines = 2,
-                            maxLines = 5,
-                            colors =
-                                OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    focusedBorderColor = TacticalYellow,
-                                    unfocusedBorderColor = TacticalMuted,
-                                    focusedLabelColor = TacticalYellow,
-                                    unfocusedLabelColor = TacticalMuted,
-                                    cursorColor = TacticalYellow,
-                                ),
-                        )
-                    }
-                    validationError?.let { err ->
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = err,
-                            color = TacticalRed,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
@@ -625,6 +668,7 @@ private fun SquadAlarmRequestDialog(
                         )
                     }
                 }
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }

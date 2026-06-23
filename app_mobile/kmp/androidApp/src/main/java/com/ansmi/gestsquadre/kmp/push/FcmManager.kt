@@ -14,6 +14,7 @@ import com.ansmi.gestsquadre.kmp.BuildConfig
 import com.ansmi.gestsquadre.kmp.R
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.GestSquadreException
+import com.ansmi.gestsquadre.shared.NetworkErrorMessages
 import com.ansmi.gestsquadre.shared.model.SquadSession
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.FirebaseMessaging
@@ -34,7 +35,10 @@ fun formatFcmRegistrationError(error: Throwable): String {
             "Troppi tentativi push: attendi qualche minuto, poi «Ripara push TOC»."
         msg.contains("MISSING_INSTANCEID_SERVICE", ignoreCase = true) ->
             "Google Play Services mancante o disattivato su questo telefono."
-        else -> msg.ifEmpty { "Errore registrazione push." }
+        msg.contains("Unable to resolve host", ignoreCase = true) ||
+            msg.contains("No address associated with hostname", ignoreCase = true) ->
+            NetworkErrorMessages.format(msg)
+        else -> NetworkErrorMessages.format(msg.ifEmpty { "Errore registrazione push." })
     }
 }
 
@@ -103,9 +107,9 @@ class FcmManager(
                         null
                     }
                 } catch (e: GestSquadreException) {
-                    e.message ?: "Errore salvataggio token push su Supabase."
+                    NetworkErrorMessages.format(e.message ?: "Errore salvataggio token push su Supabase.")
                 } catch (e: Exception) {
-                    e.message ?: "Errore salvataggio token push su Supabase."
+                    NetworkErrorMessages.format(e)
                 }
             }
 

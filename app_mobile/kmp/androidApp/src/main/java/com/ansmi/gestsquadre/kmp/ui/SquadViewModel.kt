@@ -13,6 +13,7 @@ import com.ansmi.gestsquadre.kmp.push.FcmPushBus
 import com.ansmi.gestsquadre.kmp.push.FcmSessionRegistry
 import com.ansmi.gestsquadre.shared.GestSquadreException
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
+import com.ansmi.gestsquadre.shared.NetworkErrorMessages
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
 import com.ansmi.gestsquadre.shared.location.LocationTracker
 import com.ansmi.gestsquadre.shared.model.GpsPosition
@@ -123,7 +124,7 @@ class SquadViewModel(
                 onResult(e.message)
             } catch (e: Exception) {
                 _uiState.update { it.copy(isBusy = false) }
-                onResult(e.message ?: "Login fallito.")
+                onResult(NetworkErrorMessages.format(e))
             }
         }
     }
@@ -163,7 +164,7 @@ class SquadViewModel(
                 onResult(e.message)
             } catch (e: Exception) {
                 _uiState.update { it.copy(isBusy = false) }
-                onResult(e.message ?: "Invio allarme fallito.")
+                onResult(NetworkErrorMessages.format(e))
             }
         }
     }
