@@ -7,6 +7,7 @@ private enum AppScreen {
     case home
     case login
     case map
+    case tocOperator
 }
 
 struct GestSquadreRootView: View {
@@ -34,6 +35,7 @@ struct GestSquadreRootView: View {
                             screen = .map
                         }
                     },
+                    onNavigateTocOperator: { screen = .tocOperator },
                     onShowMessage: showToast
                 )
             case .login:
@@ -51,6 +53,12 @@ struct GestSquadreRootView: View {
                         onClose: { screen = .home }
                     )
                 }
+            case .tocOperator:
+                TocOperatorNotifyView(
+                    viewModel: viewModel,
+                    onBack: { screen = .home },
+                    onShowMessage: showToast
+                )
             }
         }
         .overlay(alignment: .bottom) {

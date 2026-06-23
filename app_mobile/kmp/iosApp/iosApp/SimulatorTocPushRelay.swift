@@ -2,7 +2,7 @@ import Foundation
 
 #if targetEnvironment(simulator)
 
-// Sul simulatore FCM/APNs non sono affidabili: legge toc_push_logs da Supabase.
+// Sul simulatore FCM/APNs non sono affidabili: legge toc_push_logs e alarm_auto_notify_logs da Supabase.
 final class SimulatorTocPushRelay {
     static let shared = SimulatorTocPushRelay()
 
@@ -36,16 +36,23 @@ final class SimulatorTocPushRelay {
         deliveredIds.removeAll()
     }
 
-    private struct PushLogRow: Decodable {
+    private struct TocPushLogRow: Decodable {
         let id: String
         let title: String
         let body: String
         let status: String
+    }
+
+    private struct AutoNotifyLogRow: Decodable {
+        let id: String
+        let pushTitle: String?
+        let pushBody: String?
+        let status: String
 
         enum CodingKeys: String, CodingKey {
             case id
-            case title
-            case body
+            case pushTitle = "push_title"
+            case pushBody = "push_body"
             case status
         }
     }
@@ -53,46 +60,110 @@ final class SimulatorTocPushRelay {
     private func pollOnce() {
         guard !sessionId.isEmpty,
               !supabaseUrl.isEmpty,
-              !anonKey.isEmpty,
-              let url = buildRequestUrl() else { return }
+              !anonKey.isEmpty else { return }
 
+        let group = DispatchGroup()
+        var tocRows: [TocPushLogRow] = []
+        var autoRows: [AutoNotifyLogRow] = []
+
+        group.enter()
+        fetchTocPushLogs { rows in
+            tocRows = rows
+            group.leave()
+        }
+
+        group.enter()
+        fetchAutoNotifyLogs { rows in
+            autoRows = rows
+            group.leave()
+        }
+
+        group.notify(queue: .main) { [weak self] in
+            self?.processRows(tocRows: tocRows, autoRows: autoRows)
+        }
+    }
+
+    private func processRows(tocRows: [TocPushLogRow], autoRows: [AutoNotifyLogRow]) {
+        var pending: [(id: String, title: String, body: String)] = []
+
+        for row in tocRows where row.status == "sent" || row.status == "failed" {
+            pending.append((id: "toc:\(row.id)", title: row.title, body: row.body))
+        }
+
+        for row in autoRows where row.status == "sent" {
+            let title = row.pushTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let body = row.pushBody?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !title.isEmpty || !body.isEmpty else { continue }
+            pending.append((id: "auto:\(row.id)", title: title, body: body))
+        }
+
+        if !baselineDone {
+            for item in pending {
+                deliveredIds.insert(item.id)
+            }
+            baselineDone = true
+            return
+        }
+
+        for item in pending where !deliveredIds.contains(item.id) {
+            deliveredIds.insert(item.id)
+            deliver(title: item.title, body: item.body)
+        }
+    }
+
+    private func fetchTocPushLogs(completion: @escaping ([TocPushLogRow]) -> Void) {
+        guard let url = buildTocPushLogsUrl() else {
+            completion([])
+            return
+        }
+        fetch(url: url, completion: completion)
+    }
+
+    private func fetchAutoNotifyLogs(completion: @escaping ([AutoNotifyLogRow]) -> Void) {
+        guard let url = buildAutoNotifyLogsUrl() else {
+            completion([])
+            return
+        }
+        fetch(url: url, completion: completion)
+    }
+
+    private func fetch<T: Decodable>(url: URL, completion: @escaping ([T]) -> Void) {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue(anonKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(anonKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, _ in
-            guard let self,
-                  let data,
+        URLSession.shared.dataTask(with: request) { data, response, _ in
+            guard let data,
                   let http = response as? HTTPURLResponse,
                   (200 ..< 300).contains(http.statusCode),
-                  let rows = try? JSONDecoder().decode([PushLogRow].self, from: data) else {
+                  let rows = try? JSONDecoder().decode([T].self, from: data) else {
+                completion([])
                 return
             }
-
-            let relevant = rows.filter { $0.status == "sent" || $0.status == "failed" }
-
-            if !self.baselineDone {
-                for row in relevant {
-                    self.deliveredIds.insert(row.id)
-                }
-                self.baselineDone = true
-                return
-            }
-
-            for row in relevant where !self.deliveredIds.contains(row.id) {
-                self.deliveredIds.insert(row.id)
-                self.deliver(title: row.title, body: row.body)
-            }
+            completion(rows)
         }.resume()
     }
 
-    private func buildRequestUrl() -> URL? {
+    private func buildTocPushLogsUrl() -> URL? {
         var components = URLComponents(string: "\(supabaseUrl)/rest/v1/toc_push_logs")
         components?.queryItems = [
             URLQueryItem(name: "select", value: "id,title,body,status"),
             URLQueryItem(name: "session_id", value: "eq.\(sessionId)"),
+            URLQueryItem(name: "order", value: "created_at.desc"),
+            URLQueryItem(name: "limit", value: "8"),
+        ]
+        return components?.url
+    }
+
+    private func buildAutoNotifyLogsUrl() -> URL? {
+        var components = URLComponents(string: "\(supabaseUrl)/rest/v1/alarm_auto_notify_logs")
+        components?.queryItems = [
+            URLQueryItem(name: "select", value: "id,push_title,push_body,status"),
+            URLQueryItem(name: "recipient_session_id", value: "eq.\(sessionId)"),
+            URLQueryItem(name: "status", value: "eq.sent"),
+            URLQueryItem(name: "mobile_dismissed_at", value: "is.null"),
             URLQueryItem(name: "order", value: "created_at.desc"),
             URLQueryItem(name: "limit", value: "8"),
         ]

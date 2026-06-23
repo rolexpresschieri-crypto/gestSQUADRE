@@ -120,6 +120,43 @@ final class FcmManager {
         }
     }
 
+    func fetchFcmToken(completion: @escaping (String?, String?) -> Void) {
+        guard isConfigured else {
+            completion(nil, "Push disabilitata: configura FIREBASE_IOS_* in dart-defines.json.")
+            return
+        }
+        hasNotificationPermission { granted in
+            if !granted {
+                completion(nil, "Abilita le notifiche in Impostazioni → gestSQUADRE.")
+                return
+            }
+            UIApplication.shared.registerForRemoteNotifications()
+            self.fetchTokenOnly(attempt: 0, completion: completion)
+        }
+    }
+
+    private func fetchTokenOnly(attempt: Int, completion: @escaping (String?, String?) -> Void) {
+        if Messaging.messaging().apnsToken == nil {
+            if attempt < 10 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                    self?.fetchTokenOnly(attempt: attempt + 1, completion: completion)
+                }
+                return
+            }
+            completion(nil, "Token push non ottenuto. Verifica Firebase e notifiche.")
+            return
+        }
+        Messaging.messaging().token { token, _ in
+            DispatchQueue.main.async {
+                if let token, !token.isEmpty {
+                    completion(token, nil)
+                } else {
+                    completion(nil, "Token push non ottenuto. Verifica Firebase e notifiche.")
+                }
+            }
+        }
+    }
+
     func onNewToken(_ token: String?) {
         guard let token, !token.isEmpty else { return }
         FcmSessionRegistry.shared.deliverNewToken(token)

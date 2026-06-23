@@ -18,6 +18,7 @@ struct HomeView: View {
     @ObservedObject var viewModel: SquadViewModel
     let onNavigateLogin: () -> Void
     let onNavigateMap: () -> Void
+    let onNavigateTocOperator: () -> Void
     let onShowMessage: (String) -> Void
 
     @State private var showAlarmSheet = false
@@ -105,6 +106,29 @@ struct HomeView: View {
                             }
                         )
                         .padding(.top, 18)
+
+                        TacticalBodyText(
+                            text: "Squadre FIG/Sanitari (GT_*): login squadra = mappa, allarmi e push automatici",
+                            fontSize: 12,
+                            color: Color.white.opacity(0.78)
+                        )
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 14)
+                        .padding(.horizontal, 8)
+
+                        Button {
+                            if !viewModel.isBusy {
+                                onNavigateTocOperator()
+                            }
+                        } label: {
+                            Text("TOC da campo (senza squadra): registra notifiche")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(TacticalColors.yellow)
+                                .multilineTextAlignment(.center)
+                                .padding(.vertical, 4)
+                        }
+                        .disabled(viewModel.isBusy)
+                        .padding(.top, 8)
 
                         #if DEBUG
                         Text(AppBuildInfo.label)

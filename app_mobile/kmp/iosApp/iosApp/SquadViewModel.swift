@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import shared
 
 final class SquadViewModel: ObservableObject {
@@ -19,6 +20,7 @@ final class SquadViewModel: ObservableObject {
     @Published var needsNotificationPermission = false
     @Published var pushStatusLabel: String?
     @Published var pushStatusOk = false
+    @Published var tocOperatorAdminCode: String?
     @Published var showAlarmSheet = false
     @Published var isAlarmBusy = false
 
@@ -26,6 +28,7 @@ final class SquadViewModel: ObservableObject {
     private var session: SquadSession?
     private let locationTracker = LocationTracker(platformContext: NSObject())
     private let sessionStorage = SessionStorage()
+    private let tocOperatorStorage = TocOperatorStorage()
     private var stopLocationUpdates: (() -> Void)?
     private var lastPublished: GpsPosition?
     private var lastPublishedAtMs: Int64?
@@ -40,6 +43,7 @@ final class SquadViewModel: ObservableObject {
         }
         let config = GestSquadreConfig(supabaseUrl: url, supabaseAnonKey: key)
         facade = GestSquadreFacade(config: config)
+        tocOperatorAdminCode = tocOperatorStorage.registeredAdminCode()
         observePushBus()
         restoreSessionOnStart()
     }
@@ -96,10 +100,63 @@ final class SquadViewModel: ObservableObject {
     func clearLastTocMessage() {
         let session = self.session
         let panelMessage = lastTocMessage
-        lastTocMessage = nil
         TocMessageStorage.shared.clear()
+        lastTocMessage = nil
         guard let session, let facade else { return }
         facade.dismissTocNotificationSafe(session: session, panelMessage: panelMessage) { _ in }
+    }
+
+    func registerTocOperatorNotify(
+        adminCode: String,
+        password: String,
+        onComplete: @escaping (String?) -> Void
+    ) {
+        let code = adminCode.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        let pwd = password.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !code.isEmpty, !pwd.isEmpty else {
+            onComplete("Inserisci codice operatore e password TOC.")
+            return
+        }
+        guard FcmManager.shared.isConfigured else {
+            onComplete("Push disabilitata: configura FIREBASE_* in dart-defines.json.")
+            return
+        }
+
+        isBusy = true
+        FcmManager.shared.configureIfNeeded()
+        FcmManager.shared.hasNotificationPermission { [weak self] granted in
+            guard let self else { return }
+            if !granted {
+                self.needsNotificationPermission = true
+                FcmManager.shared.requestNotificationPermission { _ in }
+            }
+            FcmManager.shared.fetchFcmToken { token, errorMessage in
+                DispatchQueue.main.async {
+                    guard let token, errorMessage == nil else {
+                        self.isBusy = false
+                        onComplete(errorMessage ?? "Token push non ottenuto. Verifica Firebase e notifiche.")
+                        return
+                    }
+                    TocOperatorNotifyClient.registerOperatorFcm(
+                        adminCode: code,
+                        password: pwd,
+                        fcmToken: token,
+                        deviceLabel: UIDevice.current.model
+                    ) { err in
+                        DispatchQueue.main.async {
+                            self.isBusy = false
+                            if let err {
+                                onComplete(err)
+                                return
+                            }
+                            self.tocOperatorStorage.saveRegisteredAdminCode(code)
+                            self.tocOperatorAdminCode = code
+                            onComplete(nil)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     func onLocationPermissionGranted() {
@@ -224,6 +281,7 @@ final class SquadViewModel: ObservableObject {
         startSessionWatchdog()
         syncActivePanelMessage(session: session)
         setupPushForSession(session)
+        startSimulatorPushRelayIfNeeded(session: session)
     }
 
     private func syncActivePanelMessage(session: SquadSession) {
@@ -322,12 +380,17 @@ final class SquadViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            guard let self else { return }
             TocMessageStorage.shared.clear()
-            self?.lastTocMessage = nil
+            self.lastTocMessage = nil
+            if !self.sessionId.isEmpty {
+                RouteRefreshBus.emitCleared(sessionId: self.sessionId)
+            }
         }
     }
 
     private func clearLocalSession() {
+        stopSimulatorPushRelay()
         stopPushWatchdog()
         FcmSessionRegistry.shared.clear()
         session = nil
@@ -359,6 +422,17 @@ final class SquadViewModel: ObservableObject {
                     if let session = self.session {
                         self.syncActivePanelMessage(session: session)
                     }
+                    if self.lastTocMessage != nil {
+                        facade.isTocPanelClosedByTocSafe(sessionId: self.sessionId) { closed, _ in
+                            DispatchQueue.main.async {
+                                if closed.boolValue {
+                                    TocMessageStorage.shared.clear()
+                                    self.lastTocMessage = nil
+                                    RouteRefreshBus.emitCleared(sessionId: self.sessionId)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -372,6 +446,7 @@ final class SquadViewModel: ObservableObject {
     private func handleRemoteLogout() {
         stopGpsTracking()
         stopSessionWatchdog()
+        stopSimulatorPushRelay()
         stopPushWatchdog()
         FcmSessionRegistry.shared.clear()
         sessionStorage.clear()
@@ -459,6 +534,23 @@ final class SquadViewModel: ObservableObject {
                 )
             }
         }
+    }
+
+    private func startSimulatorPushRelayIfNeeded(session: SquadSession) {
+        #if targetEnvironment(simulator)
+        guard let url = supabaseUrl, let key = supabaseAnonKey else { return }
+        SimulatorTocPushRelay.shared.start(
+            sessionId: session.sessionId,
+            supabaseUrl: url,
+            anonKey: key
+        )
+        #endif
+    }
+
+    private func stopSimulatorPushRelay() {
+        #if targetEnvironment(simulator)
+        SimulatorTocPushRelay.shared.stop()
+        #endif
     }
 
     private struct SupabaseBundleConfig: Decodable {

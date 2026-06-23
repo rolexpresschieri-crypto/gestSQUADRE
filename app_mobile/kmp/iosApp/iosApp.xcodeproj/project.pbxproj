@@ -35,6 +35,9 @@
 		F1A2B3C41F60718293A4B704 /* RouteRefreshBus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B714 /* RouteRefreshBus.swift */; };
 		F1A2B3C41F60718293A4B70E /* SimulatorTocPushRelay.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71E /* SimulatorTocPushRelay.swift */; };
 		F1A2B3C41F60718293A4B70F /* AppBuildInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71F /* AppBuildInfo.swift */; };
+		A1B2C3D41F60718293A4B801 /* TocOperatorStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41F60718293A4B811 /* TocOperatorStorage.swift */; };
+		A1B2C3D41F60718293A4B802 /* TocOperatorNotifyClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41F60718293A4B812 /* TocOperatorNotifyClient.swift */; };
+		A1B2C3D41F60718293A4B803 /* TocOperatorNotifyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D41F60718293A4B813 /* TocOperatorNotifyView.swift */; };
 		F1A2B3C41F60718293A4B705 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B715 /* Assets.xcassets */; };
 		F1A2B3C41F60718293A4B706 /* waypoint_buche.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B716 /* waypoint_buche.png */; };
 		F1A2B3C41F60718293A4B707 /* waypoint_cancello_in.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B717 /* waypoint_cancello_in.png */; };
@@ -90,6 +93,9 @@
 		F1A2B3C41F60718293A4B714 /* RouteRefreshBus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteRefreshBus.swift; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B71E /* SimulatorTocPushRelay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulatorTocPushRelay.swift; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B71F /* AppBuildInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppBuildInfo.swift; sourceTree = "<group>"; };
+		A1B2C3D41F60718293A4B811 /* TocOperatorStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocOperatorStorage.swift; sourceTree = "<group>"; };
+		A1B2C3D41F60718293A4B812 /* TocOperatorNotifyClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocOperatorNotifyClient.swift; sourceTree = "<group>"; };
+		A1B2C3D41F60718293A4B813 /* TocOperatorNotifyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocOperatorNotifyView.swift; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B715 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B716 /* waypoint_buche.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_buche.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B717 /* waypoint_cancello_in.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_cancello_in.png; sourceTree = "<group>"; };
@@ -164,6 +170,9 @@
 				F1A2B3C41F60718293A4B714 /* RouteRefreshBus.swift */,
 				F1A2B3C41F60718293A4B71E /* SimulatorTocPushRelay.swift */,
 				F1A2B3C41F60718293A4B71F /* AppBuildInfo.swift */,
+				A1B2C3D41F60718293A4B811 /* TocOperatorStorage.swift */,
+				A1B2C3D41F60718293A4B812 /* TocOperatorNotifyClient.swift */,
+				A1B2C3D41F60718293A4B813 /* TocOperatorNotifyView.swift */,
 				D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */,
 				D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */,
 				D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */,
@@ -368,6 +377,9 @@
 				F1A2B3C41F60718293A4B704 /* RouteRefreshBus.swift in Sources */,
 				F1A2B3C41F60718293A4B70E /* SimulatorTocPushRelay.swift in Sources */,
 				F1A2B3C41F60718293A4B70F /* AppBuildInfo.swift in Sources */,
+				A1B2C3D41F60718293A4B801 /* TocOperatorStorage.swift in Sources */,
+				A1B2C3D41F60718293A4B802 /* TocOperatorNotifyClient.swift in Sources */,
+				A1B2C3D41F60718293A4B803 /* TocOperatorNotifyView.swift in Sources */,
 				D1E2F3A41F60718293A4B5E1 /* TacticalTheme.swift in Sources */,
 				D1E2F3A41F60718293A4B5E2 /* TacticalComponents.swift in Sources */,
 				D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */,

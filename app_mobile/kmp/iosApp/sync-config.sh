@@ -25,6 +25,7 @@ with open(defines_path, encoding="utf-8-sig") as f:
 
 url = data.get("SUPABASE_URL", "").strip()
 key = data.get("SUPABASE_ANON_KEY", "").strip()
+toc_backend = data.get("TOC_BACKEND_URL", "https://gest-squadre.vercel.app").strip()
 if not url or not key:
     raise SystemExit("SUPABASE_URL e SUPABASE_ANON_KEY obbligatori in dart-defines.json")
 
@@ -36,8 +37,8 @@ content = f"""// Generato da sync-config.sh — non modificare a mano
 SUPABASE_URL = {xc_quote(url)}
 SUPABASE_ANON_KEY = {xc_quote(key)}
 PRODUCT_BUNDLE_IDENTIFIER = com.ansmi.gestsquadre
-MARKETING_VERSION = 1.0.3
-CURRENT_PROJECT_VERSION = 6
+MARKETING_VERSION = 1.0.4
+CURRENT_PROJECT_VERSION = 7
 
 #include? "Signing.xcconfig"
 """
@@ -46,7 +47,11 @@ with open(out_path, "w", encoding="utf-8") as f:
 
 with open(json_out_path, "w", encoding="utf-8") as f:
     json.dump(
-        {"SUPABASE_URL": url, "SUPABASE_ANON_KEY": key},
+        {
+            "SUPABASE_URL": url,
+            "SUPABASE_ANON_KEY": key,
+            "TOC_BACKEND_URL": toc_backend,
+        },
         f,
         indent=2,
         ensure_ascii=False,
