@@ -191,7 +191,7 @@ export default function CampoSquadsPage() {
       squadCode: row.squad_code.toUpperCase(),
       squadName: row.squad_name,
       isEnabled: row.is_enabled,
-      mapColor: row.map_color,
+      mapIconKey: row.map_icon_key,
     }));
     const ok = printSquadsAsPdf(rows, courseLabel, courseCode);
     if (!ok) {
