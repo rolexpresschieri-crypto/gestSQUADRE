@@ -10,6 +10,7 @@ import com.ansmi.gestsquadre.kmp.map.MapViewStorage
 import com.ansmi.gestsquadre.kmp.map.RouteRefreshBus
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
+import com.ansmi.gestsquadre.shared.map.TocMapSnapshotSignature
 import com.ansmi.gestsquadre.shared.model.ActiveRouteAssignment
 import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
@@ -90,15 +91,45 @@ class TocMapViewModel(
                     waypointsResult.exceptionOrNull(),
                     alarmingResult.exceptionOrNull(),
                 ).firstOrNull()
-            _uiState.update {
-                it.copy(
-                    loading = false,
-                    error = firstError?.message?.let { msg -> "Errore mappa: $msg" },
-                    squads = squadsResult.getOrElse { emptyList() },
-                    waypoints = waypointsResult.getOrElse { emptyList() },
-                    activeRoute = activeRoute,
-                    alarmingSessionIds = alarmingResult.getOrElse { emptySet() },
-                )
+            val newSquads = squadsResult.getOrElse { emptyList() }
+            val newWaypoints = waypointsResult.getOrElse { emptyList() }
+            val newAlarming = alarmingResult.getOrElse { emptySet() }
+            _uiState.update { current ->
+                val mapDataUnchanged =
+                    silent &&
+                        TocMapSnapshotSignature.squadsPositionSig(current.squads) ==
+                        TocMapSnapshotSignature.squadsPositionSig(newSquads) &&
+                        TocMapSnapshotSignature.squadsVisualSig(
+                            current.squads,
+                            current.alarmingSessionIds,
+                            focusSessionId,
+                        ) ==
+                        TocMapSnapshotSignature.squadsVisualSig(
+                            newSquads,
+                            newAlarming,
+                            focusSessionId,
+                        ) &&
+                        TocMapSnapshotSignature.waypointsSig(current.waypoints) ==
+                        TocMapSnapshotSignature.waypointsSig(newWaypoints) &&
+                        TocMapSnapshotSignature.alarmingSig(current.alarmingSessionIds) ==
+                        TocMapSnapshotSignature.alarmingSig(newAlarming) &&
+                        TocMapSnapshotSignature.routeSig(current.activeRoute) ==
+                        TocMapSnapshotSignature.routeSig(activeRoute)
+                if (mapDataUnchanged) {
+                    current.copy(
+                        loading = false,
+                        error = firstError?.message?.let { msg -> "Errore mappa: $msg" },
+                    )
+                } else {
+                    current.copy(
+                        loading = false,
+                        error = firstError?.message?.let { msg -> "Errore mappa: $msg" },
+                        squads = newSquads,
+                        waypoints = newWaypoints,
+                        activeRoute = activeRoute,
+                        alarmingSessionIds = newAlarming,
+                    )
+                }
             }
         }
     }
@@ -123,16 +154,6 @@ class TocMapViewModel(
         storage: MapViewStorage,
     ) {
         storage.saveView(latitude, longitude, zoom)
-        _uiState.update { state ->
-            state.copy(
-                viewState =
-                    state.viewState.copy(
-                        latitude = latitude,
-                        longitude = longitude,
-                        zoom = zoom,
-                    ),
-            )
-        }
     }
 
     override fun onCleared() {

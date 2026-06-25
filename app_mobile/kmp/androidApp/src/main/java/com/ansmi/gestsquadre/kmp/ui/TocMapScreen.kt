@@ -29,7 +29,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -38,7 +37,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ansmi.gestsquadre.kmp.map.MapLayerMode
-import com.ansmi.gestsquadre.kmp.map.MapMarkerFactory
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.ansmi.gestsquadre.kmp.map.TocMapOverlaySync
 import com.ansmi.gestsquadre.kmp.map.MapViewStorage
 import com.ansmi.gestsquadre.kmp.ui.theme.BrandBase
 import com.ansmi.gestsquadre.kmp.ui.theme.TacticalYellow
@@ -53,9 +55,7 @@ import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.util.MapTileIndex
 import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.Marker
-import org.osmdroid.views.overlay.Polygon
-import org.osmdroid.views.overlay.Polyline
+import org.osmdroid.views.overlay.ScaleBarOverlay
 
 private val EsriWorldImagery =
     object : OnlineTileSourceBase(
@@ -96,6 +96,8 @@ fun TocMapScreen(
             ),
         )
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val overlaySync = remember { TocMapOverlaySync(context) }
+    var appliedLayerMode by remember { mutableStateOf(uiState.layerMode) }
     LaunchedEffect(Unit) {
         Configuration.getInstance().load(
             appContext,
@@ -120,6 +122,12 @@ fun TocMapScreen(
                     factory = { ctx ->
                         MapView(ctx).apply {
                             setMultiTouchControls(true)
+                            setHorizontalMapRepetitionEnabled(false)
+                            setVerticalMapRepetitionEnabled(false)
+                            isTilesScaledToDpi = true
+                            setFlingEnabled(true)
+                            minZoomLevel = 5.0
+                            maxZoomLevel = 19.0
                             setTileSource(
                                 if (uiState.layerMode == MapLayerMode.ORTHOPHOTO) {
                                     EsriWorldImagery
@@ -131,6 +139,12 @@ fun TocMapScreen(
                             controller.setCenter(
                                 GeoPoint(uiState.viewState.latitude, uiState.viewState.longitude),
                             )
+                            val scaleBar = ScaleBarOverlay(this)
+                            scaleBar.setAlignBottom(true)
+                            scaleBar.setMaxLength(1.4f)
+                            scaleBar.setTextSize(28f)
+                            scaleBar.setScaleBarOffset(24, 20)
+                            overlays.add(scaleBar)
                             addMapListener(
                                 object : MapListener {
                                     override fun onScroll(event: ScrollEvent?): Boolean {
@@ -157,68 +171,32 @@ fun TocMapScreen(
                         }
                     },
                     update = { map ->
-                        map.setTileSource(
-                            if (uiState.layerMode == MapLayerMode.ORTHOPHOTO) {
-                                EsriWorldImagery
-                            } else {
-                                TileSourceFactory.MAPNIK
-                            },
-                        )
-                        val overlays = map.overlays
-                        overlays.removeAll(
-                            overlays.filter { it is Marker || it is Polygon || it is Polyline },
-                        )
-                        val selfId = currentSession?.sessionId
-                        for (wp in uiState.waypoints) {
-                            val marker = Marker(map)
-                            marker.position = GeoPoint(wp.latitude, wp.longitude)
-                            MapMarkerFactory.applyMarkerIcon(
-                                context,
-                                marker,
-                                MapMarkerFactory.waypointMarker(context, wp),
+                        if (appliedLayerMode != uiState.layerMode) {
+                            map.setTileSource(
+                                if (uiState.layerMode == MapLayerMode.ORTHOPHOTO) {
+                                    EsriWorldImagery
+                                } else {
+                                    TileSourceFactory.MAPNIK
+                                },
                             )
-                            overlays.add(marker)
+                            appliedLayerMode = uiState.layerMode
                         }
-                        for (squad in uiState.squads) {
-                            val alarming = uiState.alarmingSessionIds.contains(squad.sessionId)
-                            val isSelf = selfId != null && squad.sessionId == selfId
-                            val marker = Marker(map)
-                            marker.position = GeoPoint(squad.latitude, squad.longitude)
-                            MapMarkerFactory.applyMarkerIcon(
-                                context,
-                                marker,
-                                MapMarkerFactory.squadMarker(context, squad, alarming, isSelf),
-                            )
-                            overlays.add(marker)
-                            val acc = squad.accuracyM
-                            if (acc != null && acc > 0 && acc <= 120) {
-                                val circle = Polygon(map)
-                                circle.points =
-                                    Polygon.pointsAsCircle(
-                                        GeoPoint(squad.latitude, squad.longitude),
-                                        acc,
-                                    )
-                                val base = Color(squad.mapColorArgb)
-                                circle.fillPaint.color = base.copy(alpha = 0.12f).toArgb()
-                                circle.outlinePaint.color = base.copy(alpha = 0.55f).toArgb()
-                                circle.outlinePaint.strokeWidth = 1f
-                                overlays.add(circle)
-                            }
-                        }
-                        uiState.activeRoute?.let { route ->
-                            if (route.points.size >= 2) {
-                                val polyline = Polyline(map)
-                                polyline.setPoints(
-                                    route.points.map { (lat, lng) -> GeoPoint(lat, lng) },
-                                )
-                                polyline.outlinePaint.color = route.colorArgb.toInt()
-                                polyline.outlinePaint.strokeWidth = 9f
-                                polyline.outlinePaint.isAntiAlias = true
-                                overlays.add(polyline)
-                            }
-                        }
-                        map.invalidate()
+                        overlaySync.sync(
+                            map = map,
+                            squads = uiState.squads,
+                            waypoints = uiState.waypoints,
+                            alarmingSessionIds = uiState.alarmingSessionIds,
+                            focusSessionId = currentSession?.sessionId,
+                            activeRoute = uiState.activeRoute,
+                        )
+                        map.postInvalidate()
                     },
+                )
+                TocMapNorthArrow(
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 112.dp, end = 10.dp),
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -303,7 +281,7 @@ fun TocMapScreen(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(8.dp)
+                        .padding(start = 8.dp, end = 8.dp, bottom = 44.dp)
                         .background(Color.Black.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                 color = if (uiState.error != null) Color(0xFFFF8A80) else Color.White.copy(alpha = 0.7f),
@@ -322,5 +300,29 @@ fun TocMapScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun TocMapNorthArrow(modifier: Modifier = Modifier) {
+    Column(
+        modifier =
+            modifier
+                .background(Color(0xD9111812), RoundedCornerShape(8.dp))
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = "▲",
+            color = Color.White,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.ExtraBold,
+        )
+        Text(
+            text = "N",
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.ExtraBold,
+        )
     }
 }

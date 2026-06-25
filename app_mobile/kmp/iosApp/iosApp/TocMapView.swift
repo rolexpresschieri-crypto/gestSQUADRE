@@ -7,6 +7,9 @@ struct TocMapView: View {
     let focusSessionId: String?
     let onClose: () -> Void
 
+    @State private var mapScaleLabel = ""
+    @State private var persistViewWorkItem: DispatchWorkItem?
+
     var body: some View {
         ZStack(alignment: .top) {
             if mapViewModel.viewReady {
@@ -19,7 +22,13 @@ struct TocMapView: View {
                     mapType: mapViewModel.mapType,
                     viewState: mapViewModel.viewState,
                     onViewChanged: { lat, lng, zoom in
-                        mapViewModel.saveView(latitude: lat, longitude: lng, zoom: zoom)
+                        mapScaleLabel = formatMapScaleLabel(latitude: lat, zoom: zoom)
+                        persistViewWorkItem?.cancel()
+                        let work = DispatchWorkItem {
+                            mapViewModel.saveView(latitude: lat, longitude: lng, zoom: zoom)
+                        }
+                        persistViewWorkItem = work
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
                     }
                 )
                 .ignoresSafeArea()
@@ -68,6 +77,12 @@ struct TocMapView: View {
                 mapLayerPicker
                     .padding(.horizontal, 8)
 
+                HStack {
+                    Spacer()
+                    TocMapNorthArrow()
+                        .padding(.trailing, 10)
+                }
+
                 if mapViewModel.loading {
                     ProgressView()
                         .tint(TacticalColors.yellow)
@@ -87,9 +102,30 @@ struct TocMapView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
                 .padding(.horizontal, 8)
                 .padding(.bottom, 8)
+
+                if !mapScaleLabel.isEmpty {
+                    HStack(spacing: 0) {
+                        Rectangle()
+                            .fill(Color.white)
+                            .frame(width: 72, height: 2)
+                        Text(mapScaleLabel)
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .padding(.leading, 6)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+                }
             }
         }
         .background(TacticalColors.brandBase)
+        .onAppear {
+            mapScaleLabel = formatMapScaleLabel(
+                latitude: mapViewModel.viewState.latitude,
+                zoom: mapViewModel.viewState.zoom
+            )
+        }
     }
 
     private var mapLayerPicker: some View {
@@ -105,6 +141,23 @@ struct TocMapView: View {
         .padding(.vertical, 8)
         .background(Color.black.opacity(0.72))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+private struct TocMapNorthArrow: View {
+    var body: some View {
+        VStack(spacing: 1) {
+            Text("▲")
+                .font(.system(size: 14, weight: .heavy))
+                .foregroundStyle(.white)
+            Text("N")
+                .font(.system(size: 9, weight: .heavy))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.black.opacity(0.84))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -129,6 +182,7 @@ private struct TocMapRepresentable: UIViewRepresentable {
         map.showsUserLocation = true
         map.isRotateEnabled = false
         map.isPitchEnabled = false
+        map.showsCompass = false
         let meters = mapZoomToMeters(zoom: viewState.zoom)
         let center = CLLocationCoordinate2D(latitude: viewState.latitude, longitude: viewState.longitude)
         map.setRegion(
@@ -192,17 +246,11 @@ private struct TocMapRepresentable: UIViewRepresentable {
             for waypoint in waypoints {
                 let fingerprint = waypointFingerprint(waypoint)
                 if let existing = waypointAnnotations[waypoint.id] {
-                    if existing.waypoint.latitude != waypoint.latitude || existing.waypoint.longitude != waypoint.longitude {
-                        mapView.removeAnnotation(existing)
-                        let replacement = WaypointAnnotation(waypoint: waypoint)
-                        waypointAnnotations[waypoint.id] = replacement
-                        mapView.addAnnotation(replacement)
-                    } else {
-                        existing.waypoint = waypoint
-                        if waypointFingerprints[waypoint.id] != fingerprint,
-                           let view = mapView.view(for: existing) {
-                            applyWaypointView(view, waypoint: waypoint)
-                        }
+                    existing.waypoint = waypoint
+                    existing.setCoordinate(latitude: waypoint.latitude, longitude: waypoint.longitude)
+                    if waypointFingerprints[waypoint.id] != fingerprint,
+                       let view = mapView.view(for: existing) {
+                        applyWaypointView(view, waypoint: waypoint)
                     }
                 } else {
                     let annotation = WaypointAnnotation(waypoint: waypoint)
@@ -229,15 +277,12 @@ private struct TocMapRepresentable: UIViewRepresentable {
                 let fingerprint = squadFingerprint(squad: squad, alarming: alarming, isSelf: isSelf)
 
                 if let existing = squadAnnotations[squad.sessionId] {
-                    let moved = existing.squad.latitude != squad.latitude || existing.squad.longitude != squad.longitude
                     existing.squad = squad
                     existing.isAlarming = alarming
                     existing.isSelf = isSelf
-                    if moved {
-                        mapView.removeAnnotation(existing)
-                        mapView.addAnnotation(existing)
-                    } else if squadFingerprints[squad.sessionId] != fingerprint,
-                              let view = mapView.view(for: existing) {
+                    existing.setCoordinate(latitude: squad.latitude, longitude: squad.longitude)
+                    if squadFingerprints[squad.sessionId] != fingerprint,
+                       let view = mapView.view(for: existing) {
                         applySquadView(view, annotation: existing)
                     }
                 } else {
@@ -427,13 +472,21 @@ private struct TocMapRepresentable: UIViewRepresentable {
 
 private final class WaypointAnnotation: NSObject, MKAnnotation {
     var waypoint: MapWaypointPin
+    private var _coordinate: CLLocationCoordinate2D
 
     init(waypoint: MapWaypointPin) {
         self.waypoint = waypoint
+        _coordinate = CLLocationCoordinate2D(latitude: waypoint.latitude, longitude: waypoint.longitude)
     }
 
-    var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: waypoint.latitude, longitude: waypoint.longitude)
+    var coordinate: CLLocationCoordinate2D { _coordinate }
+
+    func setCoordinate(latitude: Double, longitude: Double) {
+        let next = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        guard next.latitude != _coordinate.latitude || next.longitude != _coordinate.longitude else { return }
+        willChangeValue(forKey: "coordinate")
+        _coordinate = next
+        didChangeValue(forKey: "coordinate")
     }
 
     var title: String? { waypoint.displayName }
@@ -443,15 +496,23 @@ private final class SquadAnnotation: NSObject, MKAnnotation {
     var squad: LiveSquadPin
     var isAlarming: Bool
     var isSelf: Bool
+    private var _coordinate: CLLocationCoordinate2D
 
     init(squad: LiveSquadPin, isAlarming: Bool, isSelf: Bool) {
         self.squad = squad
         self.isAlarming = isAlarming
         self.isSelf = isSelf
+        _coordinate = CLLocationCoordinate2D(latitude: squad.latitude, longitude: squad.longitude)
     }
 
-    var coordinate: CLLocationCoordinate2D {
-        CLLocationCoordinate2D(latitude: squad.latitude, longitude: squad.longitude)
+    var coordinate: CLLocationCoordinate2D { _coordinate }
+
+    func setCoordinate(latitude: Double, longitude: Double) {
+        let next = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+        guard next.latitude != _coordinate.latitude || next.longitude != _coordinate.longitude else { return }
+        willChangeValue(forKey: "coordinate")
+        _coordinate = next
+        didChangeValue(forKey: "coordinate")
     }
 
     var title: String? { squad.squadCode }

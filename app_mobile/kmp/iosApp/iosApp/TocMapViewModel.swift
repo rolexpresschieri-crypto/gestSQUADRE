@@ -54,9 +54,19 @@ final class TocMapViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.loading = false
                     self.errorMessage = error
+                    let alarmingSet = Set(alarmingIds)
+                    let mapDataUnchanged =
+                        silent &&
+                        TocMapSignature.squadsPositionSig(self.squads) == TocMapSignature.squadsPositionSig(squads) &&
+                        TocMapSignature.squadsVisualSig(self.squads, alarmingSessionIds: self.alarmingSessionIds, focusSessionId: self.focusSessionId) ==
+                            TocMapSignature.squadsVisualSig(squads, alarmingSessionIds: alarmingSet, focusSessionId: self.focusSessionId) &&
+                        TocMapSignature.waypointsSig(self.waypoints) == TocMapSignature.waypointsSig(waypoints) &&
+                        TocMapSignature.alarmingSig(self.alarmingSessionIds) == TocMapSignature.alarmingSig(alarmingSet) &&
+                        TocMapSignature.routeSig(self.activeRoute) == TocMapSignature.routeSig(route)
+                    guard !mapDataUnchanged else { return }
                     self.squads = squads
                     self.waypoints = waypoints
-                    self.alarmingSessionIds = Set(alarmingIds)
+                    self.alarmingSessionIds = alarmingSet
                     self.activeRoute = route
                 }
             }
@@ -81,12 +91,6 @@ final class TocMapViewModel: ObservableObject {
 
     func saveView(latitude: Double, longitude: Double, zoom: Double) {
         storage.saveView(latitude: latitude, longitude: longitude, zoom: zoom)
-        viewState = MapViewState(
-            latitude: latitude,
-            longitude: longitude,
-            zoom: zoom,
-            layerMode: layerMode
-        )
     }
 
     private func loadRouteIfNeeded(completion: @escaping (ActiveRouteAssignment?) -> Void) {

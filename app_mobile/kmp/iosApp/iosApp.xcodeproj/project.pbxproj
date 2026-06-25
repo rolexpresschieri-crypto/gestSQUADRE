@@ -47,6 +47,7 @@
 		F1A2B3C41F60718293A4B70B /* waypoint_media_center.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71B /* waypoint_media_center.png */; };
 		F1A2B3C41F60718293A4B70C /* waypoint_villaggio_comm.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71C /* waypoint_villaggio_comm.png */; };
 		F1A2B3C41F60718293A4B70D /* waypoint_welcome.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B71D /* waypoint_welcome.png */; };
+		F1A2B3C41F60718293A4B740 /* TocMapSignature.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B741 /* TocMapSignature.swift */; };
 		F1A2B3C41F60718293A4B721 /* SquadIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B731 /* SquadIcons.swift */; };
 		F1A2B3C41F60718293A4B722 /* squad_ambulanza.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B732 /* squad_ambulanza.png */; };
 		F1A2B3C41F60718293A4B723 /* squad_coordinatore_cri.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B733 /* squad_coordinatore_cri.png */; };
@@ -106,6 +107,7 @@
 		F1A2B3C41F60718293A4B71C /* waypoint_villaggio_comm.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_villaggio_comm.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B71D /* waypoint_welcome.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_welcome.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B731 /* SquadIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SquadIcons.swift; sourceTree = "<group>"; };
+		F1A2B3C41F60718293A4B741 /* TocMapSignature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TocMapSignature.swift; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B732 /* squad_ambulanza.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_ambulanza.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B733 /* squad_coordinatore_cri.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_coordinatore_cri.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B734 /* squad_fig.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_fig.png; sourceTree = "<group>"; };
@@ -163,6 +165,7 @@
 				D1E2F3A41F60718293A4B5F6 /* AlarmRequestSheet.swift */,
 				D1E2F3A41F60718293A4B5F8 /* TocMapView.swift */,
 				D1E2F3A41F60718293A4B5F9 /* TocMapViewModel.swift */,
+				F1A2B3C41F60718293A4B741 /* TocMapSignature.swift */,
 				F1A2B3C41F60718293A4B711 /* MapViewStorage.swift */,
 				F1A2B3C41F60718293A4B712 /* WaypointIcons.swift */,
 				F1A2B3C41F60718293A4B731 /* SquadIcons.swift */,
@@ -370,6 +373,7 @@
 				D1E2F3A41F60718293A4B5E6 /* AlarmRequestSheet.swift in Sources */,
 				D1E2F3A41F60718293A4B5E8 /* TocMapView.swift in Sources */,
 				D1E2F3A41F60718293A4B5E9 /* TocMapViewModel.swift in Sources */,
+				F1A2B3C41F60718293A4B740 /* TocMapSignature.swift in Sources */,
 				F1A2B3C41F60718293A4B701 /* MapViewStorage.swift in Sources */,
 				F1A2B3C41F60718293A4B702 /* WaypointIcons.swift in Sources */,
 				F1A2B3C41F60718293A4B721 /* SquadIcons.swift in Sources */,
