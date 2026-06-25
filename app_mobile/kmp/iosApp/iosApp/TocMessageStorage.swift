@@ -27,9 +27,10 @@ final class TocMessageStorage {
         defaults.removeObject(forKey: key)
     }
 
-    static func formatDisplayMessage(title: String, body: String) -> String {
+    static func formatDisplayMessage(title: String, body: String) -> String? {
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let b = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.isEmpty && b.isEmpty { return nil }
         return b.isEmpty ? t : "\(t): \(b)"
     }
 }

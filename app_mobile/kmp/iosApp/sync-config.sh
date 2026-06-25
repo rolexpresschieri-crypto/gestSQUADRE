@@ -37,8 +37,8 @@ content = f"""// Generato da sync-config.sh — non modificare a mano
 SUPABASE_URL = {xc_quote(url)}
 SUPABASE_ANON_KEY = {xc_quote(key)}
 PRODUCT_BUNDLE_IDENTIFIER = com.ansmi.gestsquadre
-MARKETING_VERSION = 1.0.4
-CURRENT_PROJECT_VERSION = 7
+MARKETING_VERSION = 1.0.5
+CURRENT_PROJECT_VERSION = 8
 
 #include? "Signing.xcconfig"
 """

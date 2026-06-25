@@ -175,7 +175,9 @@ final class SimulatorTocPushRelay {
         let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
         let fallbackTitle = "TOC - ALLARME"
         DispatchQueue.main.async {
-            let message = TocMessageStorage.formatDisplayMessage(title: trimmedTitle, body: trimmedBody)
+            guard let message = TocMessageStorage.formatDisplayMessage(title: trimmedTitle, body: trimmedBody) else {
+                return
+            }
             TocMessageStorage.shared.save(message: message)
             FcmPushBus.emit(title: trimmedTitle, body: trimmedBody)
             FcmManager.shared.showLocalNotification(
