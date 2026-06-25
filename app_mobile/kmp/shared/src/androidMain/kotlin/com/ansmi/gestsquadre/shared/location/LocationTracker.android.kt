@@ -56,7 +56,9 @@ actual class LocationTracker actual constructor(platformContext: Any) {
         val request =
             LocationRequest
                 .Builder(Priority.PRIORITY_HIGH_ACCURACY, 2_000L)
-                .setMinUpdateDistanceMeters(2f)
+                .setMinUpdateIntervalMillis(2_000L)
+                .setMinUpdateDistanceMeters(0f)
+                .setMaxUpdateDelayMillis(4_000L)
                 .build()
         val callback =
             object : LocationCallback() {

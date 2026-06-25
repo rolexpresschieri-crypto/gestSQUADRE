@@ -122,7 +122,7 @@ fun GestSquadreApp(
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    viewModel.retryPushRegistration()
+                    viewModel.onAppResumed()
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)

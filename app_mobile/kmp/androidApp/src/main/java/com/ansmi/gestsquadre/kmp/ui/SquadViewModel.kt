@@ -69,6 +69,7 @@ class SquadViewModel(
     private var lastPublished: GpsPosition? = null
     private var lastPublishedAtMs: Long? = null
     private var gpsJob: Job? = null
+    private var gpsHeartbeatJob: Job? = null
     private var sessionWatchJob: Job? = null
     private var pushWatchJob: Job? = null
 
@@ -257,6 +258,21 @@ class SquadViewModel(
             }
             registerFcmForSession(session)
         }
+    }
+
+    /** App tornata in primo piano: ripristina stream GPS (alcuni device lo sospendono). */
+    fun onAppResumed() {
+        if (_uiState.value.session == null) {
+            return
+        }
+        startGpsTracking()
+        viewModelScope.launch {
+            val fix = locationTracker.getCurrentFix()
+            if (fix != null) {
+                maybePublishPosition(fix)
+            }
+        }
+        retryPushRegistration()
     }
 
     fun onNotificationPermissionResult(granted: Boolean) {
@@ -480,6 +496,9 @@ class SquadViewModel(
         if (_uiState.value.session == null) {
             return
         }
+        stopLocationUpdates?.invoke()
+        stopLocationUpdates = null
+        gpsHeartbeatJob?.cancel()
         gpsJob?.cancel()
         gpsJob =
             viewModelScope.launch {
@@ -496,8 +515,6 @@ class SquadViewModel(
                     _uiState.update { it.copy(requestLocationPermission = true) }
                     return@launch
                 }
-                stopLocationUpdates?.invoke()
-                stopLocationUpdates = null
                 val initial = locationTracker.getCurrentFix()
                 if (initial != null) {
                     maybePublishPosition(initial)
@@ -508,6 +525,25 @@ class SquadViewModel(
                             maybePublishPosition(fix)
                         }
                     }
+            }
+        gpsHeartbeatJob =
+            viewModelScope.launch {
+                while (isActive) {
+                    delay(GpsPublishPolicy.MAP_REFRESH_INTERVAL_MS)
+                    if (_uiState.value.session == null) {
+                        continue
+                    }
+                    if (!locationTracker.hasLocationPermission()) {
+                        continue
+                    }
+                    val now = System.currentTimeMillis()
+                    val lastAt = lastPublishedAtMs
+                    if (lastAt != null && now - lastAt < GpsPublishPolicy.MAP_REFRESH_INTERVAL_MS) {
+                        continue
+                    }
+                    val fix = locationTracker.getCurrentFix() ?: continue
+                    maybePublishPosition(fix)
+                }
             }
     }
 
@@ -543,6 +579,8 @@ class SquadViewModel(
     private fun stopGpsTracking() {
         gpsJob?.cancel()
         gpsJob = null
+        gpsHeartbeatJob?.cancel()
+        gpsHeartbeatJob = null
         stopLocationUpdates?.invoke()
         stopLocationUpdates = null
         lastPublished = null

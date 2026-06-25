@@ -16,20 +16,20 @@ LocationSettings buildGpsLocationSettings() {
   if (Platform.isAndroid) {
     return AndroidSettings(
       accuracy: LocationAccuracy.best,
-      distanceFilter: 2,
+      distanceFilter: 0,
       intervalDuration: const Duration(seconds: 2),
     );
   }
   if (Platform.isIOS) {
     return AppleSettings(
       accuracy: LocationAccuracy.best,
-      distanceFilter: 2,
+      distanceFilter: 0,
       pauseLocationUpdatesAutomatically: false,
     );
   }
   return const LocationSettings(
     accuracy: LocationAccuracy.best,
-    distanceFilter: 2,
+    distanceFilter: 0,
   );
 }
 

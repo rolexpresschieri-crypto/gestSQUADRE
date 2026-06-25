@@ -27,7 +27,8 @@ import platform.darwin.dispatch_async
 import platform.darwin.dispatch_get_main_queue
 
 private const val INITIAL_FIX_TIMEOUT_MS = 25_000L
-private const val DISTANCE_FILTER_METERS = 2.0
+/** 0 = aggiorna anche da fermo (mappa TOC); evita freeze fino a uscita/rientro app. */
+private const val DISTANCE_FILTER_METERS = 0.0
 
 private val locationScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
