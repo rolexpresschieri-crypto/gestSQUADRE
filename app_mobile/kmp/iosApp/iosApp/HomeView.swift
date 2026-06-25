@@ -213,6 +213,32 @@ struct HomeView: View {
                 )
                 .padding(.bottom, 8)
             }
+            if viewModel.needsBackgroundLocationPermission {
+                TacticalBodyText(
+                    text: "Per il tracking con telefono in tasca scegli «Sempre» nelle impostazioni posizione.",
+                    fontSize: 13,
+                    color: TacticalColors.orange
+                )
+                .padding(.bottom, 8)
+                #if !targetEnvironment(simulator)
+                MainButton(
+                    label: "Consenti posizione Sempre",
+                    backgroundColor: TacticalColors.navy,
+                    foregroundColor: .white,
+                    enabled: !viewModel.isBusy,
+                    action: { viewModel.requestBackgroundLocationPermission() }
+                )
+                .padding(.bottom, 8)
+                MainButton(
+                    label: "Apri Impostazioni",
+                    backgroundColor: TacticalColors.navy,
+                    foregroundColor: .white,
+                    enabled: !viewModel.isBusy,
+                    action: { viewModel.openAppSettings() }
+                )
+                .padding(.bottom, 8)
+                #endif
+            }
             if let pushLabel = viewModel.pushStatusLabel {
                 TacticalBodyText(
                     text: pushLabel,

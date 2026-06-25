@@ -19,6 +19,7 @@ class SquadViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SquadViewModel::class.java)) {
             return SquadViewModel(
+                appContext = appContext.applicationContext,
                 facade = facade,
                 locationTracker = LocationTracker(appContext),
                 sessionStorage = SessionStorage(appContext),

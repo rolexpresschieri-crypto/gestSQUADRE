@@ -173,8 +173,27 @@ class FcmManager(
     companion object {
         const val CHANNEL_INFO = "gest_squadre_alerts"
         const val CHANNEL_ALARM = "gest_squadre_toc_alarm_v2"
+        const val CHANNEL_GPS_TRACKING = "gest_squadre_gps_tracking"
+
+        fun createGpsTrackingChannel(context: Context) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                return
+            }
+            val nm = context.getSystemService(NotificationManager::class.java) ?: return
+            val gps =
+                NotificationChannel(
+                    CHANNEL_GPS_TRACKING,
+                    "Tracking GPS squadra",
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply {
+                    description = "Posizione inviata al TOC durante il servizio"
+                    setShowBadge(false)
+                }
+            nm.createNotificationChannel(gps)
+        }
 
         fun createNotificationChannels(context: Context) {
+            createGpsTrackingChannel(context)
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
                 return
             }

@@ -43,7 +43,7 @@ object GpsPublishPolicy {
         return false
     }
 
-    fun accuracyLabel(accuracyM: Double?): String? {
+    fun accuracyLabel(accuracyM: Double?): String {
         if (accuracyM == null || accuracyM <= 0) {
             return "GPS: in attesa di fix…"
         }

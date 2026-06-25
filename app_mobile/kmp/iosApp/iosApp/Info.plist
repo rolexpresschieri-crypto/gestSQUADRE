@@ -24,9 +24,14 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>La posizione GPS viene inviata al TOC durante il servizio di squadra.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Con «Sempre» la posizione viene inviata al TOC anche con telefono in tasca e schermo spento.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Posizione in background per il tracking squadra verso il TOC.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
+		<string>location</string>
 	</array>
 	<key>SUPABASE_URL</key>
 	<string>$(SUPABASE_URL)</string>

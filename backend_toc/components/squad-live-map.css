@@ -1,3 +1,52 @@
+.gs-map-shell {
+  position: relative;
+}
+
+.gs-map-north {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 6px 3px;
+  border-radius: 8px;
+  background: rgba(17, 24, 18, 0.84);
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.gs-map-north-icon {
+  display: block;
+}
+
+.gs-map-north-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  letter-spacing: 0.05em;
+}
+
+.gs-map-shell .leaflet-control-scale {
+  margin: 0 0 10px 10px;
+}
+
+.gs-map-shell .leaflet-control-scale-line {
+  border-color: #fff;
+  border-width: 2px;
+  color: #fff;
+  background: rgba(17, 24, 18, 0.84);
+  padding: 2px 6px 1px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+
 .gs-squad-divicon,
 .gs-wp-divicon {
   background: transparent;

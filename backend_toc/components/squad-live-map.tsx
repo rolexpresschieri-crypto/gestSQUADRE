@@ -1,5 +1,6 @@
 "use client";
 
+import "@/components/squad-live-map.css";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import {
@@ -110,6 +111,42 @@ function MapUserInteractionTracker() {
   }, [map, api]);
 
   return null;
+}
+
+function MapChrome() {
+  const map = useMap();
+
+  useEffect(() => {
+    const scale = L.control.scale({
+      position: "bottomleft",
+      imperial: false,
+      metric: true,
+      maxWidth: 140,
+    });
+    scale.addTo(map);
+    return () => {
+      scale.remove();
+    };
+  }, [map]);
+
+  return null;
+}
+
+function MapNorthArrow() {
+  return (
+    <div className="gs-map-north" aria-hidden title="Nord">
+      <svg className="gs-map-north-icon" viewBox="0 0 24 28" width="18" height="21" role="img">
+        <path
+          d="M12 2 L21 24 L12 19 L3 24 Z"
+          fill="#f5f5f5"
+          stroke="#1a1a1a"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <span className="gs-map-north-label">N</span>
+    </div>
+  );
 }
 
 function escapeHtml(text: string): string {
@@ -616,7 +653,7 @@ const StableMapShell = memo(function StableMapShell({
   const tile = getMapTileConfig(layerMode);
 
   return (
-    <div style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
+    <div className="gs-map-shell" style={{ height, width: "100%", borderRadius: 12, overflow: "hidden" }}>
       <MapContainer
         center={defaultCenter}
         zoom={13}
@@ -633,12 +670,14 @@ const StableMapShell = memo(function StableMapShell({
           maxNativeZoom={19}
           maxZoom={20}
         />
+        <MapChrome />
         <MapUserNavProvider>
           <MapUserInteractionTracker />
           <MapBoundsController dataRef={dataRef} recenterNonce={recenterNonce} />
           <MapImperativeLayers dataRef={dataRef} />
         </MapUserNavProvider>
       </MapContainer>
+      <MapNorthArrow />
     </div>
   );
 });

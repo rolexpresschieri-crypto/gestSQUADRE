@@ -121,8 +121,10 @@ fun GestSquadreApp(
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer =
             LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    viewModel.onAppResumed()
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> viewModel.onAppResumed()
+                    Lifecycle.Event.ON_PAUSE -> viewModel.onAppPaused()
+                    else -> Unit
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -153,6 +155,13 @@ fun GestSquadreApp(
             viewModel.onNotificationPermissionResult(granted)
         }
 
+    val backgroundLocationLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) { granted ->
+            viewModel.onBackgroundLocationPermissionResult(granted)
+        }
+
     LaunchedEffect(uiState.requestLocationPermission) {
         if (uiState.requestLocationPermission) {
             permissionLauncher.launch(
@@ -162,6 +171,16 @@ fun GestSquadreApp(
                 ),
             )
             viewModel.clearLocationPermissionRequest()
+        }
+    }
+
+    LaunchedEffect(uiState.requestBackgroundLocationPermission) {
+        if (uiState.requestBackgroundLocationPermission) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                backgroundLocationLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            } else {
+                viewModel.clearBackgroundLocationPermissionRequest()
+            }
         }
     }
 

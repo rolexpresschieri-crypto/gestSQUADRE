@@ -82,6 +82,10 @@ struct GestSquadreRootView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            if viewModel.isLoggedIn {
+                viewModel.onAppResumed()
+                viewModel.syncBackgroundPermissionFromSettings()
+            }
             if viewModel.isLoggedIn, viewModel.needsLocationPermission {
                 viewModel.onLocationPermissionGranted()
             }

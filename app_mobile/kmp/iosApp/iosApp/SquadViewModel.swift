@@ -17,6 +17,7 @@ final class SquadViewModel: ObservableObject {
     @Published var gpsStatusLabel: String?
     @Published var lastGpsAccuracyM: Double?
     @Published var needsLocationPermission = false
+    @Published var needsBackgroundLocationPermission = false
     @Published var needsNotificationPermission = false
     @Published var pushStatusLabel: String?
     @Published var pushStatusOk = false
@@ -30,6 +31,7 @@ final class SquadViewModel: ObservableObject {
     private let sessionStorage = SessionStorage()
     private let tocOperatorStorage = TocOperatorStorage()
     private var stopLocationUpdates: (() -> Void)?
+    private var gpsHeartbeatTimer: Timer?
     private var lastPublished: GpsPosition?
     private var lastPublishedAtMs: Int64?
     private var sessionWatchTimer: Timer?
@@ -162,7 +164,33 @@ final class SquadViewModel: ObservableObject {
     func onLocationPermissionGranted() {
         guard locationTracker.hasLocationPermission() else { return }
         needsLocationPermission = false
+        if locationTracker.shouldPromptBackgroundLocation() {
+            needsBackgroundLocationPermission = true
+            locationTracker.requestBackgroundLocationAuthorization()
+        }
         startGpsTracking()
+    }
+
+    func onBackgroundLocationPermissionGranted() {
+        needsBackgroundLocationPermission = false
+        startGpsTracking()
+    }
+
+    func requestBackgroundLocationPermission() {
+        guard isLoggedIn, locationTracker.hasLocationPermission() else { return }
+        needsBackgroundLocationPermission = true
+        locationTracker.requestBackgroundLocationAuthorization()
+    }
+
+    func openAppSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    func syncBackgroundPermissionFromSettings() {
+        if needsBackgroundLocationPermission, locationTracker.hasBackgroundLocationPermission() {
+            onBackgroundLocationPermissionGranted()
+        }
     }
 
     func onNotificationPermissionGranted() {
@@ -174,6 +202,13 @@ final class SquadViewModel: ObservableObject {
     func retryPushRegistration() {
         guard let facade, let session else { return }
         registerFcmForSession(session, facade: facade)
+    }
+
+    /// App tornata in primo piano: ripristina stream GPS (come Android onAppResumed).
+    func onAppResumed() {
+        guard isLoggedIn else { return }
+        startGpsTracking()
+        retryPushRegistration()
     }
 
     func sendAlarm(
@@ -480,6 +515,11 @@ final class SquadViewModel: ObservableObject {
         }
 
         needsLocationPermission = false
+        if locationTracker.shouldPromptBackgroundLocation() {
+            needsBackgroundLocationPermission = true
+            locationTracker.requestBackgroundLocationAuthorization()
+        }
+
         stopLocationUpdates?()
         stopLocationUpdates = nil
 
@@ -496,9 +536,34 @@ final class SquadViewModel: ObservableObject {
             }
         }
         stopLocationUpdates = { _ = kotlinStop() }
+        startGpsHeartbeat()
+    }
+
+    private func startGpsHeartbeat() {
+        stopGpsHeartbeat()
+        let intervalSec = Double(GpsPublishPolicy.shared.MAP_REFRESH_INTERVAL_MS) / 1000.0
+        gpsHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: intervalSec, repeats: true) { [weak self] _ in
+            guard let self, self.isLoggedIn, self.locationTracker.hasLocationPermission() else { return }
+            let now = Int64(Date().timeIntervalSince1970 * 1000)
+            if let lastAt = self.lastPublishedAtMs, now - lastAt < GpsPublishPolicy.shared.MAP_REFRESH_INTERVAL_MS {
+                return
+            }
+            self.locationTracker.getCurrentFixSafe { fix in
+                DispatchQueue.main.async {
+                    guard let fix else { return }
+                    self.maybePublish(position: fix)
+                }
+            }
+        }
+    }
+
+    private func stopGpsHeartbeat() {
+        gpsHeartbeatTimer?.invalidate()
+        gpsHeartbeatTimer = nil
     }
 
     private func stopGpsTracking() {
+        stopGpsHeartbeat()
         stopLocationUpdates?()
         stopLocationUpdates = nil
         lastPublished = nil

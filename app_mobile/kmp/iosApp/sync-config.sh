@@ -15,11 +15,18 @@ fi
 
 mkdir -p "$(dirname "$OUT")" "$(dirname "$JSON_OUT")" "$(dirname "$FIREBASE_OUT")"
 
-python3 - "$DEFINES" "$OUT" "$JSON_OUT" "$FIREBASE_OUT" <<'PY'
+GRADLE="$ROOT/androidApp/build.gradle.kts"
+if [[ ! -f "$GRADLE" ]]; then
+  echo "ERRORE: manca $GRADLE (versione iOS allineata ad Android)"
+  exit 1
+fi
+
+python3 - "$DEFINES" "$OUT" "$JSON_OUT" "$FIREBASE_OUT" "$GRADLE" <<'PY'
 import json
+import re
 import sys
 
-defines_path, out_path, json_out_path, firebase_out_path = sys.argv[1:5]
+defines_path, out_path, json_out_path, firebase_out_path, gradle_path = sys.argv[1:6]
 with open(defines_path, encoding="utf-8-sig") as f:
     data = json.load(f)
 
@@ -29,6 +36,15 @@ toc_backend = data.get("TOC_BACKEND_URL", "https://gest-squadre.vercel.app").str
 if not url or not key:
     raise SystemExit("SUPABASE_URL e SUPABASE_ANON_KEY obbligatori in dart-defines.json")
 
+with open(gradle_path, encoding="utf-8") as f:
+    gradle = f.read()
+marketing_match = re.search(r'versionName\s*=\s*"([^"]+)"', gradle)
+build_match = re.search(r'versionCode\s*=\s*(\d+)', gradle)
+if not marketing_match or not build_match:
+    raise SystemExit(f"versionName/versionCode non trovati in {gradle_path}")
+marketing_version = marketing_match.group(1)
+current_project_version = build_match.group(1)
+
 def xc_quote(value: str) -> str:
     escaped = value.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
@@ -37,8 +53,8 @@ content = f"""// Generato da sync-config.sh — non modificare a mano
 SUPABASE_URL = {xc_quote(url)}
 SUPABASE_ANON_KEY = {xc_quote(key)}
 PRODUCT_BUNDLE_IDENTIFIER = com.ansmi.gestsquadre
-MARKETING_VERSION = 1.0.4
-CURRENT_PROJECT_VERSION = 7
+MARKETING_VERSION = {marketing_version}
+CURRENT_PROJECT_VERSION = {current_project_version}
 
 #include? "Signing.xcconfig"
 """
@@ -83,6 +99,7 @@ print(f"OK: {out_path}")
 print(f"OK: {json_out_path}")
 print(f"OK: {firebase_out_path}")
 print(f"    SUPABASE_URL = {url}")
+print(f"    MARKETING_VERSION = {marketing_version} ({current_project_version})")
 ios_id = firebase_payload["FIREBASE_IOS_APP_ID"]
 if ios_id:
     print(f"    FIREBASE_IOS_APP_ID = {ios_id}")

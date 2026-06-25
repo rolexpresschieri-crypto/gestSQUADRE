@@ -1,11 +1,15 @@
 package com.ansmi.gestsquadre.kmp.ui
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ansmi.gestsquadre.kmp.BuildConfig
 import com.ansmi.gestsquadre.kmp.data.SessionStorage
 import com.ansmi.gestsquadre.kmp.data.TocMessageStorage
 import com.ansmi.gestsquadre.kmp.data.TocOperatorStorage
+import com.ansmi.gestsquadre.kmp.location.GpsLocationPermissions
+import com.ansmi.gestsquadre.kmp.location.GpsTrackingController
+import com.ansmi.gestsquadre.kmp.location.GpsTrackingRuntime
 import com.ansmi.gestsquadre.kmp.network.TocOperatorNotifyClient
 import com.ansmi.gestsquadre.kmp.push.FcmManager
 import com.ansmi.gestsquadre.kmp.map.RouteRefreshBus
@@ -16,7 +20,6 @@ import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.NetworkErrorMessages
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
 import com.ansmi.gestsquadre.shared.location.LocationTracker
-import com.ansmi.gestsquadre.shared.model.GpsPosition
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
 import com.ansmi.gestsquadre.shared.model.formatTocPanelMessage
@@ -40,6 +43,7 @@ data class SquadUiState(
     val lastGpsAccuracyM: Double? = null,
     val gpsStatusLabel: String? = null,
     val requestLocationPermission: Boolean = false,
+    val requestBackgroundLocationPermission: Boolean = false,
     val requestNotificationPermission: Boolean = false,
     val pushStatusLabel: String? = null,
     val pushStatusOk: Boolean = false,
@@ -47,6 +51,7 @@ data class SquadUiState(
 )
 
 class SquadViewModel(
+    private val appContext: Context,
     private val facade: GestSquadreFacade,
     private val locationTracker: LocationTracker,
     private val sessionStorage: SessionStorage,
@@ -65,18 +70,28 @@ class SquadViewModel(
     )
     val uiState: StateFlow<SquadUiState> = _uiState.asStateFlow()
 
-    private var stopLocationUpdates: (() -> Unit)? = null
-    private var lastPublished: GpsPosition? = null
-    private var lastPublishedAtMs: Long? = null
-    private var gpsJob: Job? = null
-    private var gpsHeartbeatJob: Job? = null
     private var sessionWatchJob: Job? = null
     private var pushWatchJob: Job? = null
+    private var activityInForeground = false
+    private var pendingGpsStart = false
 
     init {
         viewModelScope.launch {
             restoreSessionOnStart()
             _uiState.update { it.copy(isInitializing = false) }
+        }
+        viewModelScope.launch {
+            GpsTrackingRuntime.status.collect { status ->
+                if (status == null) {
+                    return@collect
+                }
+                _uiState.update {
+                    it.copy(
+                        lastGpsAccuracyM = status.accuracyM,
+                        gpsStatusLabel = status.label,
+                    )
+                }
+            }
         }
         viewModelScope.launch {
             FcmPushBus.messages.collect { push ->
@@ -234,6 +249,9 @@ class SquadViewModel(
 
     fun onLocationPermissionResult(granted: Boolean) {
         if (granted) {
+            if (GpsLocationPermissions.shouldPromptBackgroundLocation(appContext)) {
+                _uiState.update { it.copy(requestBackgroundLocationPermission = true) }
+            }
             startGpsTracking()
         } else {
             _uiState.update {
@@ -243,6 +261,24 @@ class SquadViewModel(
                 )
             }
         }
+    }
+
+    fun clearBackgroundLocationPermissionRequest() {
+        _uiState.update { it.copy(requestBackgroundLocationPermission = false) }
+    }
+
+    fun onBackgroundLocationPermissionResult(granted: Boolean) {
+        clearBackgroundLocationPermissionRequest()
+        if (!granted) {
+            _uiState.update {
+                it.copy(
+                    bannerMessage =
+                        "Per il tracking in tasca scegli «Consenti sempre» per la posizione " +
+                            "(Impostazioni → gestSQUADRE → Posizione).",
+                )
+            }
+        }
+        startGpsTracking()
     }
 
     fun retryPushRegistration() {
@@ -260,19 +296,26 @@ class SquadViewModel(
         }
     }
 
-    /** App tornata in primo piano: ripristina stream GPS (alcuni device lo sospendono). */
+    /** App tornata in primo piano: avvia GPS solo ora (evita crash durante splash). */
     fun onAppResumed() {
-        if (_uiState.value.session == null) {
+        activityInForeground = true
+        if (_uiState.value.session != null) {
+            pendingGpsStart = true
+            tryStartGpsIfReady()
+            retryPushRegistration()
+        }
+    }
+
+    fun onAppPaused() {
+        activityInForeground = false
+    }
+
+    private fun tryStartGpsIfReady() {
+        if (!activityInForeground || !pendingGpsStart || _uiState.value.session == null) {
             return
         }
+        pendingGpsStart = false
         startGpsTracking()
-        viewModelScope.launch {
-            val fix = locationTracker.getCurrentFix()
-            if (fix != null) {
-                maybePublishPosition(fix)
-            }
-        }
-        retryPushRegistration()
     }
 
     fun onNotificationPermissionResult(granted: Boolean) {
@@ -337,7 +380,8 @@ class SquadViewModel(
                 gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
             )
         }
-        startGpsTracking()
+        pendingGpsStart = true
+        tryStartGpsIfReady()
         startPushWatchdog()
         if (fcmManager.isConfigured) {
             if (!fcmManager.ensureNotificationPermission() &&
@@ -493,102 +537,33 @@ class SquadViewModel(
     }
 
     private fun startGpsTracking() {
-        if (_uiState.value.session == null) {
-            return
-        }
-        stopLocationUpdates?.invoke()
-        stopLocationUpdates = null
-        gpsHeartbeatJob?.cancel()
-        gpsJob?.cancel()
-        gpsJob =
-            viewModelScope.launch {
-                if (!locationTracker.isLocationServiceEnabled()) {
-                    _uiState.update {
-                        it.copy(
-                            bannerMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC.",
-                            gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
-                        )
-                    }
-                    return@launch
-                }
-                if (!locationTracker.hasLocationPermission()) {
-                    _uiState.update { it.copy(requestLocationPermission = true) }
-                    return@launch
-                }
-                val initial = locationTracker.getCurrentFix()
-                if (initial != null) {
-                    maybePublishPosition(initial)
-                }
-                stopLocationUpdates =
-                    locationTracker.startUpdates { fix ->
-                        viewModelScope.launch {
-                            maybePublishPosition(fix)
-                        }
-                    }
-            }
-        gpsHeartbeatJob =
-            viewModelScope.launch {
-                while (isActive) {
-                    delay(GpsPublishPolicy.MAP_REFRESH_INTERVAL_MS)
-                    if (_uiState.value.session == null) {
-                        continue
-                    }
-                    if (!locationTracker.hasLocationPermission()) {
-                        continue
-                    }
-                    val now = System.currentTimeMillis()
-                    val lastAt = lastPublishedAtMs
-                    if (lastAt != null && now - lastAt < GpsPublishPolicy.MAP_REFRESH_INTERVAL_MS) {
-                        continue
-                    }
-                    val fix = locationTracker.getCurrentFix() ?: continue
-                    maybePublishPosition(fix)
-                }
-            }
-    }
-
-    private suspend fun maybePublishPosition(position: GpsPosition) {
         val session = _uiState.value.session ?: return
-        val now = System.currentTimeMillis()
-        if (
-            !GpsPublishPolicy.shouldPublish(
-                position = position,
-                lastPublished = lastPublished,
-                lastPublishedAtMs = lastPublishedAtMs,
-                nowMs = now,
-            )
-        ) {
-            return
-        }
-        try {
-            facade.updatePosition(session.sessionId, position)
-            lastPublished = position
-            lastPublishedAtMs = now
-            val accuracy = position.accuracyMeters
-            _uiState.update {
-                it.copy(
-                    lastGpsAccuracyM = accuracy,
-                    gpsStatusLabel = GpsPublishPolicy.accuracyLabel(accuracy),
-                    bannerMessage = null,
-                )
+        viewModelScope.launch {
+            if (!locationTracker.isLocationServiceEnabled()) {
+                _uiState.update {
+                    it.copy(
+                        bannerMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC.",
+                        gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
+                    )
+                }
+                return@launch
             }
-        } catch (_: Exception) {
+            if (!locationTracker.hasLocationPermission()) {
+                _uiState.update { it.copy(requestLocationPermission = true) }
+                return@launch
+            }
+            if (GpsLocationPermissions.shouldPromptBackgroundLocation(appContext)) {
+                _uiState.update { it.copy(requestBackgroundLocationPermission = true) }
+            }
+            GpsTrackingController.start(appContext, session.sessionId)
         }
     }
 
     private fun stopGpsTracking() {
-        gpsJob?.cancel()
-        gpsJob = null
-        gpsHeartbeatJob?.cancel()
-        gpsHeartbeatJob = null
-        stopLocationUpdates?.invoke()
-        stopLocationUpdates = null
-        lastPublished = null
-        lastPublishedAtMs = null
+        GpsTrackingController.stop(appContext)
     }
 
     override fun onCleared() {
-        stopGpsTracking()
         stopPushWatchdog()
         sessionWatchJob?.cancel()
         super.onCleared()

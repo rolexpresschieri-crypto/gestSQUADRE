@@ -50,6 +50,21 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
     actual fun hasLocationPermission(): Boolean =
         isAuthorized(CLLocationManager.authorizationStatus())
 
+    fun hasBackgroundLocationPermission(): Boolean {
+        val status = CLLocationManager.authorizationStatus()
+        return status == kCLAuthorizationStatusAuthorizedAlways
+    }
+
+    fun shouldPromptBackgroundLocation(): Boolean =
+        hasLocationPermission() && !hasBackgroundLocationPermission()
+
+    /** Richiesta «Sempre» per tracking in tasca / schermo spento. */
+    fun requestBackgroundLocationAuthorization() {
+        runOnMain {
+            manager.requestAlwaysAuthorization()
+        }
+    }
+
     fun isLocationPermissionDenied(): Boolean {
         val status = CLLocationManager.authorizationStatus()
         return status == kCLAuthorizationStatusDenied || status == kCLAuthorizationStatusRestricted
@@ -122,6 +137,9 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = DISTANCE_FILTER_METERS
         locationManager.pausesLocationUpdatesAutomatically = false
+        if (CLLocationManager.authorizationStatus() == kCLAuthorizationStatusAuthorizedAlways) {
+            locationManager.allowsBackgroundLocationUpdates = true
+        }
     }
 
     private fun stopContinuous() {
