@@ -17,33 +17,48 @@ struct AlarmRequestSheet: View {
         NavigationStack {
             ZStack {
                 TacticalColors.alarmDialogBg.ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(SquadAlarmCopy.dialogBody)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                        Text("Cosa richiedi? (scelta multipla)")
-                            .font(.subheadline.bold())
-                            .foregroundStyle(TacticalColors.yellow)
-                        alarmRow("1. Sanitario", $sanitario)
-                        alarmRow("2. Security", $security)
-                        alarmRow("3. Vigili del Fuoco", $vigiliFuoco)
-                        alarmRow("4. Strutture", $strutture)
-                        alarmRow("5. Altro", $altro)
-                        if altro {
-                            TextField("Descrizione breve", text: $otherDetail, axis: .vertical)
-                                .lineLimit(2...5)
-                                .textFieldStyle(.roundedBorder)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text(SquadAlarmCopy.dialogBody)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.white)
+                            Text("Cosa richiedi? (scelta multipla)")
+                                .font(.subheadline.bold())
+                                .foregroundStyle(TacticalColors.yellow)
+                            alarmRow("1. Sanitario", $sanitario)
+                            alarmRow("2. Security", $security)
+                            alarmRow("3. Vigili del Fuoco", $vigiliFuoco)
+                            alarmRow("4. Strutture", $strutture)
+                            alarmRow("5. Altro", $altro)
+                            if altro {
+                                TextField("Descrizione breve", text: $otherDetail, axis: .vertical)
+                                    .lineLimit(2...5)
+                                    .textFieldStyle(.roundedBorder)
+                                    .id("altroField")
+                            }
+                            if let validationError {
+                                Text(validationError)
+                                    .font(.footnote)
+                                    .foregroundStyle(TacticalColors.red)
+                                    .id("validationError")
+                            }
+                            Color.clear.frame(height: 1).id("bottom")
                         }
-                        if let validationError {
-                            Text(validationError)
-                                .font(.footnote)
-                                .foregroundStyle(TacticalColors.red)
+                        .padding()
+                    }
+                    .scrollDismissesKeyboard(.interactively)
+                    .onChange(of: altro) { isOn in
+                        if isOn {
+                            scrollToBottom(proxy)
                         }
                     }
-                    .padding()
+                    .onChange(of: validationError) { error in
+                        if error != nil {
+                            scrollToBottom(proxy)
+                        }
+                    }
                 }
-                .scrollDismissesKeyboard(.interactively)
             }
             .navigationTitle(SquadAlarmCopy.dialogTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -66,6 +81,17 @@ struct AlarmRequestSheet: View {
                 .foregroundStyle(.white)
         }
         .tint(TacticalColors.red)
+        .onChange(of: value.wrappedValue) { _ in
+            validationError = nil
+        }
+    }
+
+    private func scrollToBottom(_ proxy: ScrollViewProxy) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.easeOut(duration: 0.25)) {
+                proxy.scrollTo("bottom", anchor: .bottom)
+            }
+        }
     }
 
     private func submit() {

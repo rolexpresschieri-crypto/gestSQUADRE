@@ -171,7 +171,7 @@ final class FcmManager {
 
         let title = TocPushParser.tocTitle(from: userInfo)
         let body = TocPushParser.tocBodyForDisplay(from: userInfo)
-        let message = TocMessageStorage.formatDisplayMessage(title: title, body: body)
+        guard let message = TocMessageStorage.formatDisplayMessage(title: title, body: body) else { return }
         TocMessageStorage.shared.save(message: message)
         FcmPushBus.emit(title: title, body: body)
         showLocalNotification(
@@ -240,7 +240,7 @@ final class FcmManager {
                 ) { uploadError in
                     DispatchQueue.main.async {
                         if let uploadError {
-                            completion(uploadError)
+                            completion(NetworkErrorMessages.shared.format(message: uploadError))
                             return
                         }
                         if notificationsMissing {
@@ -267,7 +267,8 @@ final class FcmManager {
             }
 
             DispatchQueue.main.async {
-                completion(error?.localizedDescription ?? "Token push non ottenuto: verifica Firebase iOS e rifai login.")
+                let raw = error?.localizedDescription ?? "Token push non ottenuto: verifica Firebase iOS e rifai login."
+                completion(NetworkErrorMessages.shared.format(message: raw))
             }
         }
     }

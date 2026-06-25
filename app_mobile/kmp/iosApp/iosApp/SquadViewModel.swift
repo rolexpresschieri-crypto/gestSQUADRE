@@ -36,6 +36,7 @@ final class SquadViewModel: ObservableObject {
     private var lastPublishedAtMs: Int64?
     private var sessionWatchTimer: Timer?
     private var pushWatchTimer: Timer?
+    private var gpsHeartbeatTimer: Timer?
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
@@ -206,8 +207,14 @@ final class SquadViewModel: ObservableObject {
 
     /// App tornata in primo piano: ripristina stream GPS (come Android onAppResumed).
     func onAppResumed() {
-        guard isLoggedIn else { return }
+        guard isLoggedIn, session != nil else { return }
         startGpsTracking()
+        locationTracker.getCurrentFixSafe { [weak self] fix in
+            DispatchQueue.main.async {
+                guard let self, let fix else { return }
+                self.maybePublish(position: fix)
+            }
+        }
         retryPushRegistration()
     }
 
@@ -406,7 +413,7 @@ final class SquadViewModel: ObservableObject {
             guard let self else { return }
             let title = notification.userInfo?["title"] as? String ?? ""
             let body = notification.userInfo?["body"] as? String ?? ""
-            let message = TocMessageStorage.formatDisplayMessage(title: title, body: body)
+            guard let message = TocMessageStorage.formatDisplayMessage(title: title, body: body) else { return }
             TocMessageStorage.shared.save(message: message)
             self.lastTocMessage = message
         }
@@ -520,6 +527,7 @@ final class SquadViewModel: ObservableObject {
             locationTracker.requestBackgroundLocationAuthorization()
         }
 
+        stopGpsHeartbeat()
         stopLocationUpdates?()
         stopLocationUpdates = nil
 
@@ -541,16 +549,18 @@ final class SquadViewModel: ObservableObject {
 
     private func startGpsHeartbeat() {
         stopGpsHeartbeat()
-        let intervalSec = Double(GpsPublishPolicy.shared.MAP_REFRESH_INTERVAL_MS) / 1000.0
-        gpsHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: intervalSec, repeats: true) { [weak self] _ in
-            guard let self, self.isLoggedIn, self.locationTracker.hasLocationPermission() else { return }
+        let interval = TimeInterval(GpsPublishPolicy.shared.MAP_REFRESH_INTERVAL_MS) / 1000.0
+        gpsHeartbeatTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            guard let self, self.isLoggedIn, !self.sessionId.isEmpty else { return }
+            guard self.locationTracker.hasLocationPermission() else { return }
             let now = Int64(Date().timeIntervalSince1970 * 1000)
-            if let lastAt = self.lastPublishedAtMs, now - lastAt < GpsPublishPolicy.shared.MAP_REFRESH_INTERVAL_MS {
+            if let lastAt = self.lastPublishedAtMs,
+               now - lastAt < GpsPublishPolicy.shared.MAP_REFRESH_INTERVAL_MS {
                 return
             }
-            self.locationTracker.getCurrentFixSafe { fix in
+            self.locationTracker.getCurrentFixSafe { [weak self] fix in
                 DispatchQueue.main.async {
-                    guard let fix else { return }
+                    guard let self, let fix else { return }
                     self.maybePublish(position: fix)
                 }
             }
@@ -597,6 +607,7 @@ final class SquadViewModel: ObservableObject {
                 self.gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(
                     accuracyM: position.accuracyMeters
                 )
+                self.bannerMessage = nil
             }
         }
     }

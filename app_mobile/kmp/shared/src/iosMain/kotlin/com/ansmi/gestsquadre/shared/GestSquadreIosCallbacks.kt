@@ -15,6 +15,13 @@ import kotlinx.datetime.Instant
 
 private val iosScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+private fun iosCallbackErrorMessage(e: Throwable): String {
+    if (e is GestSquadreException) {
+        return e.message ?: e.toString()
+    }
+    return NetworkErrorMessages.format(e)
+}
+
 object SessionCache {
     fun parse(raw: String): SquadSession? {
         val parts = raw.split("|")
@@ -46,7 +53,7 @@ fun GestSquadreFacade.loginSquadSafe(
         try {
             onComplete(loginSquad(squadCode, password), null)
         } catch (e: Throwable) {
-            onComplete(null, e.message ?: e.toString())
+            onComplete(null, iosCallbackErrorMessage(e))
         }
     }
 }
@@ -60,7 +67,7 @@ fun GestSquadreFacade.logoutSquadSafe(
             logoutSquad(session)
             onComplete(null)
         } catch (e: Throwable) {
-            onComplete(e.message ?: e.toString())
+            onComplete(iosCallbackErrorMessage(e))
         }
     }
 }
@@ -75,7 +82,7 @@ fun GestSquadreFacade.updatePositionSafe(
             updatePosition(sessionId, position)
             onComplete(null)
         } catch (e: Throwable) {
-            onComplete(e.message ?: e.toString())
+            onComplete(iosCallbackErrorMessage(e))
         }
     }
 }
@@ -113,7 +120,7 @@ fun GestSquadreFacade.sendAlarmSafe(
             sendAlarm(session, request)
             onComplete(null)
         } catch (e: Throwable) {
-            onComplete(e.message ?: e.toString())
+            onComplete(iosCallbackErrorMessage(e))
         }
     }
 }
@@ -128,7 +135,7 @@ fun GestSquadreFacade.dismissTocNotificationSafe(
             dismissTocNotification(session, panelMessage)
             onComplete(null)
         } catch (e: Throwable) {
-            onComplete(e.message ?: e.toString())
+            onComplete(iosCallbackErrorMessage(e))
         }
     }
 }
@@ -141,7 +148,7 @@ fun GestSquadreFacade.restoreOnlineSessionSafe(
         try {
             onComplete(restoreOnlineSession(sessionId), null)
         } catch (e: Throwable) {
-            onComplete(null, e.message ?: e.toString())
+            onComplete(null, iosCallbackErrorMessage(e))
         }
     }
 }
@@ -168,7 +175,7 @@ fun GestSquadreFacade.loadActiveRouteAssignmentSafe(
         try {
             onComplete(loadActiveRouteAssignment(sessionId), null)
         } catch (e: Throwable) {
-            onComplete(null, e.message ?: e.toString())
+            onComplete(null, iosCallbackErrorMessage(e))
         }
     }
 }
@@ -211,7 +218,7 @@ fun GestSquadreFacade.registerFcmTokenSafe(
             registerFcmToken(sessionId, squadId, token)
             onComplete(null)
         } catch (e: Throwable) {
-            onComplete(e.message ?: e.toString())
+            onComplete(iosCallbackErrorMessage(e))
         }
     }
 }
@@ -237,7 +244,7 @@ fun GestSquadreFacade.fetchActivePanelMessageSafe(
         try {
             onComplete(fetchActivePanelMessage(session), null)
         } catch (e: Throwable) {
-            onComplete(null, e.message ?: e.toString())
+            onComplete(null, iosCallbackErrorMessage(e))
         }
     }
 }
