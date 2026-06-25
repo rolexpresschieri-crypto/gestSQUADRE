@@ -55,8 +55,14 @@ final class TocMapViewModel: ObservableObject {
                     self.loading = false
                     self.errorMessage = error
                     let alarmingSet = Set(alarmingIds)
+                    if !silent {
+                        self.squads = squads
+                        self.waypoints = waypoints
+                        self.alarmingSessionIds = alarmingSet
+                        self.activeRoute = route
+                        return
+                    }
                     let mapDataUnchanged =
-                        silent &&
                         TocMapSignature.squadsPositionSig(self.squads) == TocMapSignature.squadsPositionSig(squads) &&
                         TocMapSignature.squadsVisualSig(self.squads, alarmingSessionIds: self.alarmingSessionIds, focusSessionId: self.focusSessionId) ==
                             TocMapSignature.squadsVisualSig(squads, alarmingSessionIds: alarmingSet, focusSessionId: self.focusSessionId) &&

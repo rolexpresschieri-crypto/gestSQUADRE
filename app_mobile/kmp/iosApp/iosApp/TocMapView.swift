@@ -383,7 +383,8 @@ private struct TocMapRepresentable: UIViewRepresentable {
         }
 
         private func squadFingerprint(squad: LiveSquadPin, alarming: Bool, isSelf: Bool) -> String {
-            "sq:\(squad.sessionId)|\(squad.mapIconKey)|\(squad.mapColorArgb)|\(alarming)|\(isSelf)|\(squad.squadName)|\(squad.squadCode)"
+            let acc = squad.accuracyM.map { String(Int($0.doubleValue.rounded())) } ?? ""
+            return "sq:\(squad.sessionId)|\(squad.latitude),\(squad.longitude)|\(acc)|\(squad.mapIconKey)|\(squad.mapColorArgb)|\(alarming)|\(isSelf)|\(squad.squadName)|\(squad.squadCode)"
         }
 
         private func applyWaypointView(_ view: MKAnnotationView, waypoint: MapWaypointPin) {

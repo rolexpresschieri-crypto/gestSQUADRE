@@ -43,6 +43,7 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
     private val manager = CLLocationManager()
     private var continuousDelegate: ContinuousLocationDelegate? = null
     private var oneShotDelegate: OneShotLocationDelegate? = null
+    private var lastKnownPosition: GpsPosition? = null
 
     actual fun isLocationServiceEnabled(): Boolean =
         CLLocationManager.locationServicesEnabled()
@@ -87,6 +88,10 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
             }
             return null
         }
+        // Con stream attivo non sostituire il delegate (rompe startUpdatingLocation).
+        if (continuousDelegate != null) {
+            return manager.location?.toGpsPosition() ?: lastKnownPosition
+        }
         return withTimeoutOrNull(INITIAL_FIX_TIMEOUT_MS) {
             suspendCoroutine { cont ->
                 runOnMain {
@@ -94,6 +99,7 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
                     val delegate =
                         OneShotLocationDelegate(
                             onResult = { position ->
+                                position?.let { lastKnownPosition = it }
                                 clearOneShot()
                                 cont.resume(position)
                             },
@@ -121,7 +127,10 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
             stopContinuous()
             val delegate =
                 ContinuousLocationDelegate { location ->
-                    location.toGpsPosition()?.let(onFix)
+                    location.toGpsPosition()?.let { position ->
+                        lastKnownPosition = position
+                        onFix(position)
+                    }
                 }
             continuousDelegate = delegate
             configureManager(manager)
@@ -150,7 +159,14 @@ actual class LocationTracker actual constructor(@Suppress("UNUSED_PARAMETER") pl
 
     private fun clearOneShot() {
         oneShotDelegate = null
-        if (continuousDelegate == null) {
+        restoreContinuousDelegateIfNeeded()
+    }
+
+    private fun restoreContinuousDelegateIfNeeded() {
+        val continuous = continuousDelegate
+        if (continuous != null) {
+            manager.delegate = continuous
+        } else if (manager.delegate != null) {
             manager.delegate = null
         }
     }
