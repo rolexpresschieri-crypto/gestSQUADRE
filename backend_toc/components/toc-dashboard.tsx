@@ -49,7 +49,6 @@ import {
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
-import { formatPhotoGpsDetail } from "@/lib/squad-field-photos";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
 import { type SquadWaypoint, waypointDisplayName } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
@@ -57,6 +56,7 @@ import styles from "./toc-dashboard.module.css";
 const TOC_PUSH_TITLE = "TOC — ALLARME";
 const TOC_PUSH_BODY =
   "MESSAGGIO URGENTE DAL TACTICAL OPERATIONS CENTER. METTITI IN CONTATTO CON IL TOC.";
+const PHOTO_NOTIFY_LABEL = "RICEZIONE FOTO DA SQUADRE";
 
 type AlarmRow = {
   id: string;
@@ -93,7 +93,6 @@ export default function TocDashboard() {
   const [statusMessage, setStatusMessage] = useState("");
   const [photoNotification, setPhotoNotification] = useState<{
     photoId: string;
-    label: string;
   } | null>(null);
   const [pushOpen, setPushOpen] = useState(false);
   const [pushTitle, setPushTitle] = useState(TOC_PUSH_TITLE);
@@ -164,16 +163,7 @@ export default function TocDashboard() {
     if (row.status !== "inviato") {
       return;
     }
-    const detail = formatPhotoGpsDetail(
-      row.latitude,
-      row.longitude,
-      row.accuracy_m,
-      row.note,
-    );
-    setPhotoNotification({
-      photoId: row.id,
-      label: `Foto da ${row.squad_code} — apri Log eventi / scarica JPEG. ${detail}`,
-    });
+    setPhotoNotification({ photoId: row.id });
   }, []);
 
   const pollFieldPhotoNotifications = useCallback(async () => {
@@ -1152,15 +1142,6 @@ export default function TocDashboard() {
               </h1>
               <p className={styles.message}>{statusMessage}</p>
             </div>
-            {photoNotification ? (
-              <Link
-                href={`/logs?photoId=${encodeURIComponent(photoNotification.photoId)}`}
-                className={styles.photoNotifyBanner}
-                title="Apri Log eventi sulla foto ricevuta"
-              >
-                {photoNotification.label}
-              </Link>
-            ) : null}
           </div>
           <div className={styles.headerLogoWrapRight}>
             <Image
@@ -1172,6 +1153,17 @@ export default function TocDashboard() {
             />
           </div>
         </div>
+        {photoNotification ? (
+          <div className={styles.photoNotifyBannerWrap}>
+            <Link
+              href={`/logs?photoId=${encodeURIComponent(photoNotification.photoId)}`}
+              className={styles.photoNotifyBanner}
+              title="Apri Log eventi sulla foto ricevuta"
+            >
+              {PHOTO_NOTIFY_LABEL}
+            </Link>
+          </div>
+        ) : null}
         <div className={styles.actions}>
           <button className={`${styles.btn} ${styles.btnPrimary}`} type="button" onClick={() => void loadSquads()}>
             Aggiorna
