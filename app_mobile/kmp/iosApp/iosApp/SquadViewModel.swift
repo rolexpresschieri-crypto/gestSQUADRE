@@ -24,9 +24,12 @@ final class SquadViewModel: ObservableObject {
     @Published var tocOperatorAdminCode: String?
     @Published var showAlarmSheet = false
     @Published var isAlarmBusy = false
+    @Published var fieldPhotoQueueCount = 0
 
     private(set) var facade: GestSquadreFacade?
     private var session: SquadSession?
+    private let fieldPhotoQueue = FieldPhotoUploadQueue.shared
+    private var fieldPhotoQueueProcessing = false
     private let locationTracker = LocationTracker(platformContext: NSObject())
     private let sessionStorage = SessionStorage()
     private let tocOperatorStorage = TocOperatorStorage()
@@ -215,6 +218,128 @@ final class SquadViewModel: ObservableObject {
             }
         }
         retryPushRegistration()
+        processFieldPhotoQueue()
+    }
+
+    func sendFieldPhoto(
+        jpegData: Data,
+        note: String?,
+        onComplete: @escaping (String?) -> Void
+    ) {
+        guard let session else {
+            onComplete("Sessione non attiva.")
+            return
+        }
+
+        isBusy = true
+        let compressed = FieldPhotoCompressor.compressJpeg(jpegData)
+        locationTracker.getCurrentFixSafe { [weak self] fix in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                guard let fix else {
+                    self.isBusy = false
+                    onComplete("GPS obbligatorio: attendi fix o abilita la posizione.")
+                    return
+                }
+                self.uploadFieldPhotoNow(
+                    sessionId: session.sessionId,
+                    latitude: fix.latitude,
+                    longitude: fix.longitude,
+                    accuracyM: fix.accuracyMeters?.doubleValue,
+                    note: note,
+                    jpegData: compressed
+                ) { message in
+                    self.isBusy = false
+                    self.fieldPhotoQueueCount = self.fieldPhotoQueue.pendingCount()
+                    onComplete(message)
+                }
+            }
+        }
+    }
+
+    func processFieldPhotoQueue() {
+        guard let session, isLoggedIn, !fieldPhotoQueueProcessing else { return }
+        fieldPhotoQueueProcessing = true
+
+        func processNext(_ items: [PendingFieldPhoto]) {
+            guard let item = items.first else {
+                DispatchQueue.main.async {
+                    self.fieldPhotoQueueProcessing = false
+                    self.fieldPhotoQueueCount = self.fieldPhotoQueue.pendingCount()
+                }
+                return
+            }
+            guard item.sessionId == session.sessionId,
+                  let bytes = fieldPhotoQueue.readJpeg(item: item) else {
+                fieldPhotoQueue.remove(item: item)
+                processNext(Array(items.dropFirst()))
+                return
+            }
+
+            FieldPhotoUploadClient.upload(
+                sessionId: item.sessionId,
+                latitude: item.latitude,
+                longitude: item.longitude,
+                accuracyM: item.accuracyM,
+                note: item.note,
+                jpegData: bytes
+            ) { [weak self] result in
+                guard let self else { return }
+                switch result {
+                case .success:
+                    self.fieldPhotoQueue.remove(item: item)
+                    processNext(Array(items.dropFirst()))
+                case .networkError:
+                    DispatchQueue.main.async {
+                        self.fieldPhotoQueueProcessing = false
+                        self.fieldPhotoQueueCount = self.fieldPhotoQueue.pendingCount()
+                    }
+                case .permanentError:
+                    self.fieldPhotoQueue.remove(item: item)
+                    processNext(Array(items.dropFirst()))
+                }
+            }
+        }
+
+        processNext(fieldPhotoQueue.listPending())
+    }
+
+    private func uploadFieldPhotoNow(
+        sessionId: String,
+        latitude: Double,
+        longitude: Double,
+        accuracyM: Double?,
+        note: String?,
+        jpegData: Data,
+        onComplete: @escaping (String?) -> Void
+    ) {
+        FieldPhotoUploadClient.upload(
+            sessionId: sessionId,
+            latitude: latitude,
+            longitude: longitude,
+            accuracyM: accuracyM,
+            note: note,
+            jpegData: jpegData
+        ) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success:
+                self.processFieldPhotoQueue()
+                onComplete(nil)
+            case .networkError:
+                _ = self.fieldPhotoQueue.enqueue(
+                    sessionId: sessionId,
+                    latitude: latitude,
+                    longitude: longitude,
+                    accuracyM: accuracyM,
+                    note: note,
+                    jpegData: jpegData
+                )
+                onComplete("Rete assente: foto in coda, invio automatico al ripristino.")
+            case .permanentError(let message):
+                onComplete(message)
+            }
+        }
     }
 
     func sendAlarm(
@@ -323,6 +448,8 @@ final class SquadViewModel: ObservableObject {
         syncActivePanelMessage(session: session)
         setupPushForSession(session)
         startSimulatorPushRelayIfNeeded(session: session)
+        fieldPhotoQueueCount = fieldPhotoQueue.pendingCount()
+        processFieldPhotoQueue()
     }
 
     private func syncActivePanelMessage(session: SquadSession) {

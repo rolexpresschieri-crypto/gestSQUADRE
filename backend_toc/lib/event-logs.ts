@@ -1,4 +1,5 @@
 import { formatAlarmRequestDetail, parseAlarmRequestTypes } from "@/lib/squad-alarms";
+import { formatPhotoGpsDetail } from "@/lib/squad-field-photos";
 
 export type SquadAlarmLogRow = {
   id: string;
@@ -45,6 +46,23 @@ export type SquadMobileDismissLogRow = {
   squad_code: string;
   squad_name: string;
   panel_message: string | null;
+  created_at: string;
+};
+
+export type SquadFieldPhotoLogRow = {
+  id: string;
+  event_id: string | null;
+  session_id: string;
+  squad_id: string;
+  squad_code: string;
+  squad_name: string;
+  latitude: number;
+  longitude: number;
+  accuracy_m: number | null;
+  note: string | null;
+  storage_path: string | null;
+  status: "inviato" | "fallito";
+  error_message: string | null;
   created_at: string;
 };
 
@@ -156,6 +174,7 @@ export type UnifiedEventLog = {
     | "toc_mission_close"
     | "toc_force_dismiss"
     | "mobile_dismiss"
+    | "squad_field_photo"
     | "alarm_auto_notify";
   createdAt: string;
   squadCode: string;
@@ -166,6 +185,8 @@ export type UnifiedEventLog = {
   actor: string;
   /** Tipologie allarme (solo righe legate a squad_alarms / inoltri GT). */
   alarmTypeCodes?: string[];
+  /** Download JPEG (solo invio foto con status inviato). */
+  photoId?: string;
 };
 
 export function mergeEventLogs(
@@ -176,6 +197,7 @@ export function mergeEventLogs(
   sessionAuthLogs: SquadSessionAuthLogRow[] = [],
   autoNotifies: AlarmAutoNotifyLogRow[] = [],
   forceDismisses: TocMissionForceDismissLogRow[] = [],
+  fieldPhotos: SquadFieldPhotoLogRow[] = [],
 ): UnifiedEventLog[] {
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
@@ -303,6 +325,23 @@ export function mergeEventLogs(
       status: "notifica chiusa" as const,
       actor: d.squad_code,
     })),
+    ...fieldPhotos.map((p) => ({
+      id: p.id,
+      kind: "squad_field_photo" as const,
+      createdAt: p.created_at,
+      squadCode: p.squad_code,
+      squadName: p.squad_name,
+      summary: "Invio foto",
+      detail: formatPhotoGpsDetail(
+        p.latitude,
+        p.longitude,
+        p.accuracy_m,
+        p.note,
+      ),
+      status: p.status,
+      actor: p.squad_code,
+      photoId: p.status === "inviato" && p.storage_path ? p.id : undefined,
+    })),
     ...forceDismisses.map((f) => ({
       id: f.id,
       kind: "toc_force_dismiss" as const,
@@ -403,6 +442,7 @@ export function eventLogsToCsv(
     "Dettaglio",
     "Stato",
     "Operatore",
+    "Foto",
   ].join(";");
 
   const lines = rows.map((r) =>
@@ -414,6 +454,7 @@ export function eventLogsToCsv(
       r.detail,
       r.status,
       r.actor,
+      r.photoId ? "Scarica JPEG" : "",
     ]
       .map((c) => csvEscape(String(c)))
       .join(";"),
@@ -460,6 +501,7 @@ export function eventLogsPrintHtml(
         <td>${escapeHtml(r.detail)}</td>
         <td>${escapeHtml(r.status)}</td>
         <td>${escapeHtml(r.actor)}</td>
+        <td>${r.photoId ? "Scarica JPEG" : ""}</td>
       </tr>`,
     )
     .join("");
@@ -494,6 +536,7 @@ export function eventLogsPrintHtml(
         <th>Dettaglio messaggio</th>
         <th>Stato</th>
         <th>Operatore</th>
+        <th>Foto</th>
       </tr>
     </thead>
     <tbody>${bodyRows}</tbody>

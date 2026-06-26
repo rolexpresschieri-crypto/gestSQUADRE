@@ -98,5 +98,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: sessionAuthErr.message }, { status: 500 });
   }
 
+  const { data: photoRows, error: photoSelectErr } = await admin
+    .from("squad_field_photo_logs")
+    .select("storage_path")
+    .eq("event_id", eventId);
+
+  if (photoSelectErr && !photoSelectErr.message.includes("squad_field_photo_logs")) {
+    return NextResponse.json({ error: photoSelectErr.message }, { status: 500 });
+  }
+
+  const storagePaths =
+    photoRows
+      ?.map((row) =>
+        typeof row.storage_path === "string" ? row.storage_path.trim() : "",
+      )
+      .filter(Boolean) ?? [];
+
+  if (storagePaths.length > 0) {
+    const { error: storageErr } = await admin.storage
+      .from("squad-photos")
+      .remove(storagePaths);
+    if (storageErr) {
+      return NextResponse.json({ error: storageErr.message }, { status: 500 });
+    }
+  }
+
+  const { error: photoDeleteErr } = await admin
+    .from("squad_field_photo_logs")
+    .delete()
+    .eq("event_id", eventId);
+
+  if (photoDeleteErr && !photoDeleteErr.message.includes("squad_field_photo_logs")) {
+    return NextResponse.json({ error: photoDeleteErr.message }, { status: 500 });
+  }
+
   return NextResponse.json({ ok: true });
 }

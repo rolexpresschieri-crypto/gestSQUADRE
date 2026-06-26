@@ -1,9 +1,13 @@
 package com.ansmi.gestsquadre.kmp.ui
 
 import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -50,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -77,6 +82,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
+import java.io.File
 
 private const val SquadAlarmHint =
     "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
@@ -85,6 +91,9 @@ private const val SquadAlarmDialogBody =
     "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
 private const val SquadAlarmSentOk =
     "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
+private const val FieldPhotoHint =
+    "Invia una foto al TOC (log eventi). GPS obbligatorio. Nota opzionale (max 200 caratteri)."
+private const val FieldPhotoSentOk = "Foto inviata al TOC."
 
 enum class AppScreen {
     Splash,
@@ -257,6 +266,48 @@ fun HomeScreen(
     val session = uiState.session
     val isLogged = session != null
     var showAlarmDialog by remember { mutableStateOf(false) }
+    var showPhotoNoteDialog by remember { mutableStateOf(false) }
+    var capturedPhotoBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    val context = LocalContext.current
+
+    val cameraLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            val uri = pendingCameraUri
+            if (!success || uri == null) {
+                return@rememberLauncherForActivityResult
+            }
+            val bytes =
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    stream.readBytes()
+                }
+            if (bytes == null || bytes.isEmpty()) {
+                onShowMessage("Foto non acquisita.")
+            } else {
+                capturedPhotoBytes = bytes
+                showPhotoNoteDialog = true
+            }
+        }
+
+    val cameraPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                launchFieldPhotoCamera(context, cameraLauncher) { pendingCameraUri = it }
+            } else {
+                onShowMessage("Permesso fotocamera negato.")
+            }
+        }
+
+    fun startPhotoCapture() {
+        if (
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            launchFieldPhotoCamera(context, cameraLauncher) { pendingCameraUri = it }
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
 
     val scrollState = rememberScrollState()
     val showScrollHint by remember {
@@ -366,6 +417,21 @@ fun HomeScreen(
                         fontSize = 13,
                         modifier = Modifier.padding(bottom = 8.dp),
                     )
+                    TacticalBodyText(
+                        text = FieldPhotoHint,
+                        fontSize = 13,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    if (uiState.fieldPhotoQueueCount > 0) {
+                        TacticalBodyText(
+                            text =
+                                "Foto in coda: ${uiState.fieldPhotoQueueCount} " +
+                                    "(invio automatico con rete).",
+                            fontSize = 13,
+                            color = TacticalYellow,
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
@@ -408,6 +474,15 @@ fun HomeScreen(
                     foregroundColor = if (isLogged) Color.White else TacticalMuted,
                     fontWeight = FontWeight.Black,
                     onClick = if (isLogged) { { showAlarmDialog = true } } else null,
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+
+                MainButton(
+                    label = "INVIA FOTO A TOC",
+                    backgroundColor = if (isLogged) TacticalNavy else TacticalDisabled,
+                    foregroundColor = if (isLogged) Color.White else TacticalMuted,
+                    fontWeight = FontWeight.Bold,
+                    onClick = if (isLogged && !uiState.isBusy) { { startPhotoCapture() } } else null,
                 )
                 Spacer(modifier = Modifier.height(18.dp))
 
@@ -472,6 +547,143 @@ fun HomeScreen(
                     }
                 },
             )
+        }
+
+        if (showPhotoNoteDialog) {
+            FieldPhotoNoteOverlay(
+                onDismiss = {
+                    showPhotoNoteDialog = false
+                    capturedPhotoBytes = null
+                },
+                onConfirm = { note ->
+                    val bytes = capturedPhotoBytes
+                    showPhotoNoteDialog = false
+                    capturedPhotoBytes = null
+                    if (bytes == null) {
+                        onShowMessage("Foto non disponibile.")
+                        return@FieldPhotoNoteOverlay
+                    }
+                    viewModel.sendFieldPhoto(bytes, note) { err ->
+                        onShowMessage(err ?: FieldPhotoSentOk)
+                    }
+                },
+            )
+        }
+    }
+}
+
+private fun launchFieldPhotoCamera(
+    context: android.content.Context,
+    launcher: androidx.activity.result.ActivityResultLauncher<Uri>,
+    onUriReady: (Uri) -> Unit,
+) {
+    val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+    val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
+    val uri =
+        FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file,
+        )
+    onUriReady(uri)
+    launcher.launch(uri)
+}
+
+@Composable
+private fun FieldPhotoNoteOverlay(
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit,
+) {
+    var note by remember { mutableStateOf("") }
+    val scrimInteraction = remember { MutableInteractionSource() }
+
+    BackHandler(onBack = onDismiss)
+
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .imePadding(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .matchParentSize()
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .clickable(
+                        interactionSource = scrimInteraction,
+                        indication = null,
+                        onClick = onDismiss,
+                    ),
+        )
+        Surface(
+            modifier =
+                Modifier
+                    .fillMaxWidth(0.94f)
+                    .padding(vertical = 12.dp),
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF1A2E1A),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "Invia foto al TOC",
+                    color = Color.White,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 20.sp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text =
+                        "GPS obbligatorio. Nota opzionale (max 200 caratteri). " +
+                            "Nel log TOC: solo download JPEG.",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = note,
+                    onValueChange = { note = it.take(200) },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 72.dp, max = 120.dp),
+                    label = { Text("Nota (opzionale)") },
+                    singleLine = false,
+                    minLines = 2,
+                    maxLines = 4,
+                    colors =
+                        OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = TacticalYellow,
+                            unfocusedBorderColor = TacticalMuted,
+                            focusedLabelColor = TacticalYellow,
+                            unfocusedLabelColor = TacticalMuted,
+                            cursorColor = TacticalYellow,
+                        ),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text(text = "Annulla", color = TacticalMuted)
+                    }
+                    TextButton(
+                        onClick = {
+                            onConfirm(note.trim().takeIf { it.isNotEmpty() })
+                        },
+                    ) {
+                        Text(
+                            text = "INVIA FOTO",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
+                }
+            }
         }
     }
 }

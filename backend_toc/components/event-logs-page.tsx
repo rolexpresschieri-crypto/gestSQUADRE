@@ -22,6 +22,7 @@ import {
   type AlarmAutoNotifyLogRow,
   type EventLogAlarmFilterCode,
   type SquadAlarmLogRow,
+  type SquadFieldPhotoLogRow,
   type SquadMobileDismissLogRow,
   type SquadSessionAuthLogRow,
   type TocMissionCloseLogRow,
@@ -44,6 +45,8 @@ export default function EventLogsPage() {
   const [sessionAuthLogs, setSessionAuthLogs] = useState<SquadSessionAuthLogRow[]>([]);
   const [autoNotifies, setAutoNotifies] = useState<AlarmAutoNotifyLogRow[]>([]);
   const [forceDismisses, setForceDismisses] = useState<TocMissionForceDismissLogRow[]>([]);
+  const [fieldPhotos, setFieldPhotos] = useState<SquadFieldPhotoLogRow[]>([]);
+  const [photoDownloadBusy, setPhotoDownloadBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
   const [clearBusy, setClearBusy] = useState(false);
@@ -96,6 +99,7 @@ export default function EventLogsPage() {
       setSessionAuthLogs([]);
       setAutoNotifies([]);
       setForceDismisses([]);
+      setFieldPhotos([]);
       return;
     }
 
@@ -111,6 +115,7 @@ export default function EventLogsPage() {
         setSessionAuthLogs([]);
         setAutoNotifies([]);
         setForceDismisses([]);
+        setFieldPhotos([]);
         return;
       }
     }
@@ -131,6 +136,8 @@ export default function EventLogsPage() {
         setMobileDismisses([]);
         setSessionAuthLogs([]);
         setAutoNotifies([]);
+        setForceDismisses([]);
+        setFieldPhotos([]);
         return;
       }
     }
@@ -177,6 +184,12 @@ export default function EventLogsPage() {
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500);
+    let fieldPhotoQuery = supabase
+      .from("squad_field_photo_logs")
+      .select("*")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500);
 
     if (squadCodes) {
       alarmQuery = alarmQuery.in("squad_id", squadIds!);
@@ -186,6 +199,7 @@ export default function EventLogsPage() {
       sessionAuthQuery = sessionAuthQuery.in("squad_id", squadIds!);
       autoNotifyQuery = autoNotifyQuery.in("squad_code", squadCodes);
       forceDismissQuery = forceDismissQuery.in("squad_code", squadCodes);
+      fieldPhotoQuery = fieldPhotoQuery.in("squad_code", squadCodes);
     }
 
     const [
@@ -196,6 +210,7 @@ export default function EventLogsPage() {
       sessionAuthRes,
       autoNotifyRes,
       forceDismissRes,
+      fieldPhotoRes,
     ] = await Promise.all([
       alarmQuery,
       pushQuery,
@@ -204,6 +219,7 @@ export default function EventLogsPage() {
       sessionAuthQuery,
       autoNotifyQuery,
       forceDismissQuery,
+      fieldPhotoQuery,
     ]);
 
     if (alarmRes.error) {
@@ -273,6 +289,15 @@ export default function EventLogsPage() {
     } else {
       setForceDismisses((forceDismissRes.data ?? []) as TocMissionForceDismissLogRow[]);
     }
+
+    if (fieldPhotoRes.error) {
+      if (fieldPhotoRes.error.message.includes("squad_field_photo_logs")) {
+        setStatus("Esegui sql/squad_field_photos.sql su Supabase per i log invio foto.");
+      }
+      setFieldPhotos([]);
+    } else {
+      setFieldPhotos((fieldPhotoRes.data ?? []) as SquadFieldPhotoLogRow[]);
+    }
   }, [supabase, eventId, session?.golfCourseId]);
 
   useEffect(() => {
@@ -319,8 +344,9 @@ export default function EventLogsPage() {
         sessionAuthLogs,
         autoNotifies,
         forceDismisses,
+        fieldPhotos,
       ),
-    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies, forceDismisses],
+    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies, forceDismisses, fieldPhotos],
   );
 
   const filteredUnified = useMemo(
@@ -343,6 +369,47 @@ export default function EventLogsPage() {
   function toggleExportAlarmType(code: EventLogAlarmFilterCode, checked: boolean) {
     setExportAllLogs(false);
     setExportAlarmTypes((prev) => ({ ...prev, [code]: checked }));
+  }
+
+  async function downloadFieldPhoto(photoId: string) {
+    if (!session) {
+      return;
+    }
+    setPhotoDownloadBusy(photoId);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/squad-field-photo/download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, photoId }),
+      });
+      if (!res.ok) {
+        let message = res.statusText;
+        try {
+          const payload = (await res.json()) as { error?: string };
+          if (payload.error) {
+            message = payload.error;
+          }
+        } catch {
+          // body non JSON
+        }
+        throw new Error(message);
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="([^"]+)"/i);
+      const filename = match?.[1] ?? `gestSQUADRE_foto_${photoId.slice(0, 8)}.jpg`;
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setStatus(e instanceof Error ? e.message : "Download foto fallito.");
+    } finally {
+      setPhotoDownloadBusy(null);
+    }
   }
 
   function exportCsv() {
@@ -390,7 +457,7 @@ export default function EventLogsPage() {
     if (
       !window.confirm(
         `Cancellare TUTTI i log dell'evento "${eventTitle}"?\n` +
-          "Verranno eliminati allarmi squadra e push TOC. Operazione irreversibile.",
+          "Verranno eliminati allarmi squadra, push TOC e foto campo. Operazione irreversibile.",
       )
     ) {
       return;
@@ -535,6 +602,7 @@ export default function EventLogsPage() {
                   <th>Dettaglio messaggio</th>
                   <th>Stato</th>
                   <th>Operatore</th>
+                  <th>Foto</th>
                 </tr>
               </thead>
               <tbody>
@@ -546,9 +614,23 @@ export default function EventLogsPage() {
                       {r.squadCode}
                       {r.squadName !== "—" ? ` — ${r.squadName}` : ""}
                     </td>
-                    <td>{r.detail}</td>
+                    <td className={styles.detailCell}>{r.detail}</td>
                     <td>{r.status}</td>
                     <td>{r.actor}</td>
+                    <td>
+                      {r.photoId ? (
+                        <button
+                          type="button"
+                          className={styles.photoDownloadBtn}
+                          disabled={photoDownloadBusy === r.photoId}
+                          onClick={() => void downloadFieldPhoto(r.photoId!)}
+                        >
+                          {photoDownloadBusy === r.photoId ? "…" : "Scarica JPEG"}
+                        </button>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

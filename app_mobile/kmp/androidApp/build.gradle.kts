@@ -84,4 +84,6 @@ dependencies {
     implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.1")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("androidx.core:core-ktx:1.15.0")
 }

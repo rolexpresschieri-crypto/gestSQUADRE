@@ -23,6 +23,8 @@ enum TocOperatorNotifyClient {
         return defaultBackendUrl
     }
 
+    static var resolvedBackendBaseUrl: String { backendBaseUrl }
+
     static func registerOperatorFcm(
         adminCode: String,
         password: String,

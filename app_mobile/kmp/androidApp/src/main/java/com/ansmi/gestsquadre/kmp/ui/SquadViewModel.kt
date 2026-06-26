@@ -10,7 +10,11 @@ import com.ansmi.gestsquadre.kmp.data.TocOperatorStorage
 import com.ansmi.gestsquadre.kmp.location.GpsLocationPermissions
 import com.ansmi.gestsquadre.kmp.location.GpsTrackingController
 import com.ansmi.gestsquadre.kmp.location.GpsTrackingRuntime
+import com.ansmi.gestsquadre.kmp.network.FieldPhotoUploadClient
+import com.ansmi.gestsquadre.kmp.network.FieldPhotoUploadResult
 import com.ansmi.gestsquadre.kmp.network.TocOperatorNotifyClient
+import com.ansmi.gestsquadre.kmp.photo.FieldPhotoCompressor
+import com.ansmi.gestsquadre.kmp.photo.FieldPhotoUploadQueue
 import com.ansmi.gestsquadre.kmp.push.FcmManager
 import com.ansmi.gestsquadre.kmp.map.RouteRefreshBus
 import com.ansmi.gestsquadre.kmp.push.FcmPushBus
@@ -48,6 +52,7 @@ data class SquadUiState(
     val pushStatusLabel: String? = null,
     val pushStatusOk: Boolean = false,
     val tocOperatorAdminCode: String? = null,
+    val fieldPhotoQueueCount: Int = 0,
 )
 
 class SquadViewModel(
@@ -59,6 +64,9 @@ class SquadViewModel(
     private val tocOperatorStorage: TocOperatorStorage,
     private val fcmManager: FcmManager,
 ) : ViewModel() {
+
+    private val fieldPhotoQueue = FieldPhotoUploadQueue(appContext)
+    private var fieldPhotoQueueJob: Job? = null
 
     private val _uiState = MutableStateFlow(
         SquadUiState(
@@ -185,6 +193,116 @@ class SquadViewModel(
         }
     }
 
+    fun sendFieldPhoto(
+        jpegBytes: ByteArray,
+        note: String?,
+        onResult: (String?) -> Unit,
+    ) {
+        val session = _uiState.value.session ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true) }
+            val compressed = FieldPhotoCompressor.compressJpeg(jpegBytes)
+            val fix = locationTracker.getCurrentFix()
+            if (fix == null) {
+                _uiState.update { it.copy(isBusy = false) }
+                onResult("GPS obbligatorio: attendi fix o abilita la posizione.")
+                return@launch
+            }
+            val message =
+                uploadFieldPhotoNow(
+                    sessionId = session.sessionId,
+                    latitude = fix.latitude,
+                    longitude = fix.longitude,
+                    accuracyM = fix.accuracyMeters,
+                    note = note,
+                    jpegBytes = compressed,
+                )
+            _uiState.update {
+                it.copy(
+                    isBusy = false,
+                    fieldPhotoQueueCount = fieldPhotoQueue.pendingCount(),
+                )
+            }
+            onResult(message)
+        }
+    }
+
+    fun processFieldPhotoQueue() {
+        val session = _uiState.value.session ?: return
+        if (fieldPhotoQueueJob?.isActive == true) {
+            return
+        }
+        fieldPhotoQueueJob =
+            viewModelScope.launch {
+                for (item in fieldPhotoQueue.listPending()) {
+                    if (item.sessionId != session.sessionId) {
+                        continue
+                    }
+                    val bytes = fieldPhotoQueue.readJpeg(item)
+                    if (bytes == null) {
+                        fieldPhotoQueue.remove(item)
+                        continue
+                    }
+                    when (
+                        val result =
+                            FieldPhotoUploadClient.upload(
+                                sessionId = item.sessionId,
+                                latitude = item.latitude,
+                                longitude = item.longitude,
+                                accuracyM = item.accuracyM,
+                                note = item.note,
+                                jpegBytes = bytes,
+                            )
+                    ) {
+                        FieldPhotoUploadResult.Success -> fieldPhotoQueue.remove(item)
+                        FieldPhotoUploadResult.NetworkError -> break
+                        is FieldPhotoUploadResult.PermanentError -> fieldPhotoQueue.remove(item)
+                    }
+                }
+                _uiState.update {
+                    it.copy(fieldPhotoQueueCount = fieldPhotoQueue.pendingCount())
+                }
+            }
+    }
+
+    private suspend fun uploadFieldPhotoNow(
+        sessionId: String,
+        latitude: Double,
+        longitude: Double,
+        accuracyM: Double?,
+        note: String?,
+        jpegBytes: ByteArray,
+    ): String? {
+        when (
+            val result =
+                FieldPhotoUploadClient.upload(
+                    sessionId = sessionId,
+                    latitude = latitude,
+                    longitude = longitude,
+                    accuracyM = accuracyM,
+                    note = note,
+                    jpegBytes = jpegBytes,
+                )
+        ) {
+            FieldPhotoUploadResult.Success -> {
+                processFieldPhotoQueue()
+                return null
+            }
+            FieldPhotoUploadResult.NetworkError -> {
+                fieldPhotoQueue.enqueue(
+                    sessionId = sessionId,
+                    latitude = latitude,
+                    longitude = longitude,
+                    accuracyM = accuracyM,
+                    note = note,
+                    jpegBytes = jpegBytes,
+                )
+                return "Rete assente: foto in coda, invio automatico al ripristino."
+            }
+            is FieldPhotoUploadResult.PermanentError -> return result.message
+        }
+    }
+
     fun registerTocOperatorNotify(
         adminCode: String,
         password: String,
@@ -303,6 +421,7 @@ class SquadViewModel(
             pendingGpsStart = true
             tryStartGpsIfReady()
             retryPushRegistration()
+            processFieldPhotoQueue()
         }
     }
 
@@ -400,6 +519,7 @@ class SquadViewModel(
                 )
             }
         }
+        processFieldPhotoQueue()
     }
 
     private fun bindFcmSession(session: SquadSession) {

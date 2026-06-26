@@ -28,6 +28,8 @@
 	<string>Con «Sempre» la posizione viene inviata al TOC anche con telefono in tasca e schermo spento.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>Posizione in background per il tracking squadra verso il TOC.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>La fotocamera serve per inviare foto di campo al TOC.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

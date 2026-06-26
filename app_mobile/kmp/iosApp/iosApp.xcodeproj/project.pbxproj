@@ -61,6 +61,7 @@
 		F1A2B3C41F60718293A4B72B /* squad_waypoint_toc.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73B /* squad_waypoint_toc.png */; };
 		F1A2B3C41F60718293A4B72C /* waypoint_pma.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73C /* waypoint_pma.png */; };
 		F1A2B3C41F60718293A4B72D /* waypoint_toc.png in Resources */ = {isa = PBXBuildFile; fileRef = F1A2B3C41F60718293A4B73D /* waypoint_toc.png */; };
+		F1E2D3C41F60718293A4B901 /* FieldPhotoSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2D3C41F60718293A4B911 /* FieldPhotoSupport.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -120,6 +121,7 @@
 		F1A2B3C41F60718293A4B73B /* squad_waypoint_toc.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = squad_waypoint_toc.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B73C /* waypoint_pma.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_pma.png; sourceTree = "<group>"; };
 		F1A2B3C41F60718293A4B73D /* waypoint_toc.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = waypoint_toc.png; sourceTree = "<group>"; };
+		F1E2D3C41F60718293A4B911 /* FieldPhotoSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FieldPhotoSupport.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -176,6 +178,7 @@
 				A1B2C3D41F60718293A4B811 /* TocOperatorStorage.swift */,
 				A1B2C3D41F60718293A4B812 /* TocOperatorNotifyClient.swift */,
 				A1B2C3D41F60718293A4B813 /* TocOperatorNotifyView.swift */,
+				F1E2D3C41F60718293A4B911 /* FieldPhotoSupport.swift */,
 				D1E2F3A41F60718293A4B5F1 /* TacticalTheme.swift */,
 				D1E2F3A41F60718293A4B5F2 /* TacticalComponents.swift */,
 				D1E2F3A41F60718293A4B5FA /* SessionStorage.swift */,
@@ -384,6 +387,7 @@
 				A1B2C3D41F60718293A4B801 /* TocOperatorStorage.swift in Sources */,
 				A1B2C3D41F60718293A4B802 /* TocOperatorNotifyClient.swift in Sources */,
 				A1B2C3D41F60718293A4B803 /* TocOperatorNotifyView.swift in Sources */,
+				F1E2D3C41F60718293A4B901 /* FieldPhotoSupport.swift in Sources */,
 				D1E2F3A41F60718293A4B5E1 /* TacticalTheme.swift in Sources */,
 				D1E2F3A41F60718293A4B5E2 /* TacticalComponents.swift in Sources */,
 				D1E2F3A41F60718293A4B5EA /* SessionStorage.swift in Sources */,

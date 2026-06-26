@@ -22,6 +22,9 @@ struct HomeView: View {
     let onShowMessage: (String) -> Void
 
     @State private var showAlarmSheet = false
+    @State private var showFieldPhotoCamera = false
+    @State private var showFieldPhotoNote = false
+    @State private var capturedFieldPhotoData: Data?
     @State private var showScrollHint = false
     @State private var measuredContentHeight: CGFloat = 0
     @State private var measuredViewportHeight: CGFloat = 0
@@ -89,6 +92,15 @@ struct HomeView: View {
                             foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
                             enabled: viewModel.isLoggedIn && !viewModel.isBusy,
                             action: { showAlarmSheet = true }
+                        )
+                        .padding(.top, 18)
+
+                        MainButton(
+                            label: "INVIA FOTO A TOC",
+                            backgroundColor: viewModel.isLoggedIn ? TacticalColors.navy : TacticalColors.disabled,
+                            foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
+                            enabled: viewModel.isLoggedIn && !viewModel.isBusy,
+                            action: { showFieldPhotoCamera = true }
                         )
                         .padding(.top, 18)
 
@@ -168,6 +180,25 @@ struct HomeView: View {
         .sheet(isPresented: $showAlarmSheet) {
             AlarmRequestSheet(viewModel: viewModel) { message in
                 onShowMessage(message)
+            }
+        }
+        .fullScreenCover(isPresented: $showFieldPhotoCamera) {
+            FieldPhotoCameraPicker { data in
+                capturedFieldPhotoData = data
+                showFieldPhotoNote = true
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $showFieldPhotoNote) {
+            FieldPhotoNoteSheet { note in
+                guard let data = capturedFieldPhotoData else {
+                    onShowMessage("Foto non disponibile.")
+                    return
+                }
+                capturedFieldPhotoData = nil
+                viewModel.sendFieldPhoto(jpegData: data, note: note) { err in
+                    onShowMessage(err ?? FieldPhotoCopy.sentOk)
+                }
             }
         }
     }
@@ -261,6 +292,16 @@ struct HomeView: View {
             }
             TacticalBodyText(text: SquadAlarmCopy.hint, fontSize: 13)
                 .padding(.bottom, 8)
+            TacticalBodyText(text: FieldPhotoCopy.hint, fontSize: 13)
+                .padding(.bottom, 8)
+            if viewModel.fieldPhotoQueueCount > 0 {
+                TacticalBodyText(
+                    text: "Foto in coda: \(viewModel.fieldPhotoQueueCount) (invio automatico con rete).",
+                    fontSize: 13,
+                    color: TacticalColors.yellow
+                )
+                .padding(.bottom, 8)
+            }
         }
     }
 
