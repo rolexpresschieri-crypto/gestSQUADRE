@@ -193,6 +193,11 @@
   max-width: 280px;
 }
 
+.logRowPhotoHighlight td {
+  background: rgba(26, 48, 102, 0.55);
+  outline: 2px solid #e0be3a;
+}
+
 .photoDownloadBtn {
   background: #1a3066;
   color: #e0be3a;

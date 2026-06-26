@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ADMIN_SESSION_STORAGE_KEY,
   canManageEventLogs,
@@ -33,6 +34,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase-browser";
 import styles from "./event-logs-page.module.css";
 
 export default function EventLogsPage() {
+  const searchParams = useSearchParams();
+  const highlightPhotoId = searchParams.get("photoId")?.trim() ?? "";
   const [supabase, setSupabase] = useState<ReturnType<typeof getSupabaseBrowserClient>>(null);
   const [session, setSession] = useState<AdminSessionData | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -75,6 +78,15 @@ export default function EventLogsPage() {
     () => eventLogAlarmFilterLabel(selectedAlarmFilterCodes),
     [selectedAlarmFilterCodes],
   );
+
+  const photoHighlightDoneRef = useRef(false);
+
+  useEffect(() => {
+    photoHighlightDoneRef.current = false;
+    if (highlightPhotoId) {
+      setExportAllLogs(true);
+    }
+  }, [highlightPhotoId]);
 
   useEffect(() => {
     setSupabase(getSupabaseBrowserClient());
@@ -354,6 +366,18 @@ export default function EventLogsPage() {
     [unified, selectedAlarmFilterCodes],
   );
 
+  useEffect(() => {
+    if (!highlightPhotoId || loading || photoHighlightDoneRef.current) {
+      return;
+    }
+    const row = document.getElementById(`log-row-squad_field_photo-${highlightPhotoId}`);
+    if (!row) {
+      return;
+    }
+    photoHighlightDoneRef.current = true;
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightPhotoId, loading, filteredUnified]);
+
   function toggleExportAll(checked: boolean) {
     setExportAllLogs(checked);
     if (checked) {
@@ -476,7 +500,7 @@ export default function EventLogsPage() {
         throw new Error(payload.error ?? res.statusText);
       }
       await refreshLogs();
-      setStatus("Log evento cancellati.");
+      setStatus("Log eventi cancellati.");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Errore cancellazione log.");
     } finally {
@@ -503,7 +527,7 @@ export default function EventLogsPage() {
     <div className={styles.root}>
       <header className={styles.topBar}>
         <h1>
-          Log evento
+          Log eventi
           {session && isCampoGolfSession(session) && session.golfCourseCode ? (
             <span className={styles.campoTag}> · {session.golfCourseCode}</span>
           ) : null}
@@ -538,7 +562,7 @@ export default function EventLogsPage() {
               checked={exportAllLogs}
               onChange={(e) => toggleExportAll(e.target.checked)}
             />
-            Tutti i log evento (login, push, missioni, allarmi…)
+            Tutti i log eventi (login, push, missioni, allarmi…)
           </label>
           <p className={styles.filterHint}>Oppure solo righe legate a tipologia allarme:</p>
           <div className={styles.filterGrid} role="group" aria-label="Tipologia allarme">
@@ -575,7 +599,7 @@ export default function EventLogsPage() {
               onClick={() => void clearEventLogs()}
               disabled={loading || clearBusy || !eventId}
             >
-              {clearBusy ? "Cancellazione…" : "Cancella log evento"}
+              {clearBusy ? "Cancellazione…" : "Cancella log eventi"}
             </button>
           ) : null}
           <button type="button" className={styles.btnGhost} onClick={() => void refreshLogs()}>
@@ -607,7 +631,15 @@ export default function EventLogsPage() {
               </thead>
               <tbody>
                 {filteredUnified.map((r) => (
-                  <tr key={`${r.kind}-${r.id}`}>
+                  <tr
+                    key={`${r.kind}-${r.id}`}
+                    id={`log-row-${r.kind}-${r.id}`}
+                    className={
+                      highlightPhotoId && r.id === highlightPhotoId
+                        ? styles.logRowPhotoHighlight
+                        : undefined
+                    }
+                  >
                     <td>{new Date(r.createdAt).toLocaleString("it-IT")}</td>
                     <td>{r.summary}</td>
                     <td>

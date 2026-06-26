@@ -510,7 +510,7 @@ export function eventLogsPrintHtml(
 <html lang="it">
 <head>
   <meta charset="utf-8" />
-  <title>Log evento gestSQUADRE</title>
+  <title>Log eventi gestSQUADRE</title>
   <style>
     @page { size: A4 landscape; margin: 12mm; }
     body { font-family: system-ui, sans-serif; padding: 16px; color: #111; }
@@ -523,7 +523,7 @@ export function eventLogsPrintHtml(
   </style>
 </head>
 <body>
-  <h1>Log evento: ${escapeHtml(eventTitle)}</h1>
+  <h1>Log eventi: ${escapeHtml(eventTitle)}</h1>
   <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Login/logout · allarmi · missioni · push</p>
   ${filterMeta}
   <table>

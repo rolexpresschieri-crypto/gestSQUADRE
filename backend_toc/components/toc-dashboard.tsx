@@ -91,6 +91,10 @@ export default function TocDashboard() {
   const [alarms, setAlarms] = useState<AlarmRow[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState("");
+  const [photoNotification, setPhotoNotification] = useState<{
+    photoId: string;
+    label: string;
+  } | null>(null);
   const [pushOpen, setPushOpen] = useState(false);
   const [pushTitle, setPushTitle] = useState(TOC_PUSH_TITLE);
   const [pushBody, setPushBody] = useState(TOC_PUSH_BODY);
@@ -624,9 +628,10 @@ export default function TocDashboard() {
             row.accuracy_m,
             row.note,
           );
-          setStatusMessage(
-            `FOTO INVIATA: ${row.squad_code} — apri Log eventi per scaricare JPEG. ${detail}`,
-          );
+          setPhotoNotification({
+            photoId: row.id,
+            label: `Foto da ${row.squad_code} — apri Log eventi / scarica JPEG. ${detail}`,
+          });
         },
       )
       .subscribe();
@@ -1060,14 +1065,25 @@ export default function TocDashboard() {
               priority
             />
           </div>
-          <div className={styles.headerTitleBlock}>
-            <h1>
-              gestSQUADRE — TOC
-              {session.golfCourseCode ? (
-                <span className={styles.courseTag}> · {session.golfCourseCode}</span>
-              ) : null}
-            </h1>
-            <p className={styles.message}>{statusMessage}</p>
+          <div className={styles.headerCenterCluster}>
+            <div className={styles.headerTitleBlock}>
+              <h1>
+                gestSQUADRE — TOC
+                {session.golfCourseCode ? (
+                  <span className={styles.courseTag}> · {session.golfCourseCode}</span>
+                ) : null}
+              </h1>
+              <p className={styles.message}>{statusMessage}</p>
+            </div>
+            {photoNotification ? (
+              <Link
+                href={`/logs?photoId=${encodeURIComponent(photoNotification.photoId)}`}
+                className={styles.photoNotifyBanner}
+                title="Apri Log eventi sulla foto ricevuta"
+              >
+                {photoNotification.label}
+              </Link>
+            ) : null}
           </div>
           <div className={styles.headerLogoWrapRight}>
             <Image
@@ -1121,7 +1137,7 @@ export default function TocDashboard() {
           ) : null}
           {canOpenEventLogs ? (
             <Link className={`${styles.btn} ${styles.btnYellow}`} href="/logs">
-              Log evento
+              Log eventi
             </Link>
           ) : null}
           {canOpenAlarmRouting ? (

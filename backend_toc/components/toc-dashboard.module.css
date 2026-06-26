@@ -132,10 +132,44 @@
 }
 
 .headerTitleBlock {
-  justify-self: center;
   text-align: center;
   min-width: 0;
   max-width: 100%;
+}
+
+.headerCenterCluster {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2vw, 20px);
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.photoNotifyBanner {
+  display: block;
+  flex: 0 1 280px;
+  max-width: min(300px, 34vw);
+  background: #1a3066;
+  border: 2px solid #4a6bb8;
+  color: #fff;
+  font-weight: 800;
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  white-space: pre-wrap;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: background 0.15s ease;
+}
+
+.photoNotifyBanner:hover {
+  background: #243f85;
+  color: #fff;
 }
 
 .headerLogoWrap {
@@ -636,6 +670,11 @@
   .headerTop {
     grid-template-columns: 1fr;
     justify-items: center;
+  }
+
+  .headerCenterCluster {
+    grid-column: auto;
+    flex-direction: column;
   }
 
   .headerLogoWrap,
