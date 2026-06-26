@@ -53,3 +53,8 @@ create policy "gest anon insert squad_field_photo_logs"
 
 comment on table squad_field_photo_logs is
   'Foto inviate da app squadra. storage_path valorizzato solo se status=inviato.';
+
+-- Dashboard TOC (notifica realtime come allarmi):
+-- Database → Replication → supabase_realtime → aggiungi squad_field_photo_logs
+-- oppure eseguire (una volta):
+-- alter publication supabase_realtime add table squad_field_photo_logs;

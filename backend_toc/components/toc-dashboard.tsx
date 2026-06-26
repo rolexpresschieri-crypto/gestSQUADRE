@@ -49,6 +49,7 @@ import {
   fetchSquadMapPoints,
 } from "@/lib/squad-map-points-feed";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
+import { formatPhotoGpsDetail } from "@/lib/squad-field-photos";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
 import { type SquadWaypoint, waypointDisplayName } from "@/lib/waypoints";
 import styles from "./toc-dashboard.module.css";
@@ -67,6 +68,17 @@ type AlarmRow = {
   other_detail?: string | null;
   created_at: string;
   acknowledged_at: string | null;
+};
+
+type FieldPhotoLogRow = {
+  id: string;
+  squad_code: string;
+  squad_name: string;
+  latitude: number;
+  longitude: number;
+  accuracy_m: number | null;
+  note: string | null;
+  status: string;
 };
 
 export default function TocDashboard() {
@@ -596,6 +608,29 @@ export default function TocDashboard() {
       )
       .subscribe();
 
+    const fieldPhotoChannel = supabase
+      .channel("gest-squad-field-photos")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "squad_field_photo_logs" },
+        (payload) => {
+          const row = payload.new as FieldPhotoLogRow;
+          if (row.status !== "inviato") {
+            return;
+          }
+          const detail = formatPhotoGpsDetail(
+            row.latitude,
+            row.longitude,
+            row.accuracy_m,
+            row.note,
+          );
+          setStatusMessage(
+            `FOTO INVIATA: ${row.squad_code} — apri Log eventi per scaricare JPEG. ${detail}`,
+          );
+        },
+      )
+      .subscribe();
+
     const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
 
     return () => {
@@ -607,6 +642,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(autoNotifyChannel);
       void supabase.removeChannel(mobileDismissChannel);
       void supabase.removeChannel(tocPushChannel);
+      void supabase.removeChannel(fieldPhotoChannel);
     };
   }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies]);
 
