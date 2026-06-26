@@ -32,6 +32,7 @@ export type TocPushLogRow = {
   mobile_dismissed_at?: string | null;
   closed_at?: string | null;
   closed_by?: string | null;
+  operational_event_id?: string | null;
   fcm_message_id: string | null;
   status: string;
   error_message: string | null;
@@ -87,6 +88,7 @@ export type TocMissionCloseLogRow = {
   route_code: string | null;
   target_waypoint_label: string | null;
   admin_code: string;
+  operational_event_id?: string | null;
   created_at: string;
 };
 
@@ -147,6 +149,7 @@ export type TocMissionForceDismissLogRow = {
   admin_code: string;
   source_ref: string | null;
   detail: string | null;
+  operational_event_id?: string | null;
   created_at: string;
 };
 
@@ -161,6 +164,11 @@ export const EVENT_LOG_ALARM_FILTER_OPTIONS: {
   { code: "vvf", label: "Vigili del Fuoco" },
   { code: "strutture", label: "Strutture" },
 ];
+
+export type OperationalEventLogMeta = {
+  displayNumber: number;
+  interventionRef: string | null;
+};
 
 export type UnifiedEventLog = {
   id: string;
@@ -183,11 +191,38 @@ export type UnifiedEventLog = {
   detail: string;
   status: string;
   actor: string;
+  operationalEventNumber: number | null;
+  interventionRef: string | null;
   /** Tipologie allarme (solo righe legate a squad_alarms / inoltri GT). */
   alarmTypeCodes?: string[];
   /** Download JPEG (solo invio foto con status inviato). */
   photoId?: string;
 };
+
+function operationalLogFields(
+  operationalEventId: string | null | undefined,
+  metaById: Map<string, OperationalEventLogMeta>,
+): Pick<UnifiedEventLog, "operationalEventNumber" | "interventionRef"> {
+  if (!operationalEventId) {
+    return { operationalEventNumber: null, interventionRef: null };
+  }
+  const meta = metaById.get(operationalEventId);
+  return {
+    operationalEventNumber: meta?.displayNumber ?? null,
+    interventionRef: meta?.interventionRef ?? null,
+  };
+}
+
+export function sortUnifiedEventLogs(rows: UnifiedEventLog[]): UnifiedEventLog[] {
+  return [...rows].sort((a, b) => {
+    const an = a.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
+    const bn = b.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
+    if (an !== bn) {
+      return an - bn;
+    }
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+}
 
 export function mergeEventLogs(
   alarms: SquadAlarmLogRow[],
@@ -198,7 +233,9 @@ export function mergeEventLogs(
   autoNotifies: AlarmAutoNotifyLogRow[] = [],
   forceDismisses: TocMissionForceDismissLogRow[] = [],
   fieldPhotos: SquadFieldPhotoLogRow[] = [],
+  operationalEventMetaById: Map<string, OperationalEventLogMeta> = new Map(),
 ): UnifiedEventLog[] {
+  const emptyOp = { operationalEventNumber: null, interventionRef: null };
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
     const typeCodes = parseAlarmRequestTypes(a.request_types);
@@ -212,6 +249,7 @@ export function mergeEventLogs(
       detail: formatAlarmRequestDetail(a),
       status: a.acknowledged_at ? "chiuso" : "inviato",
       actor: "—",
+      ...emptyOp,
       alarmTypeCodes: typeCodes,
     });
     if (a.acknowledged_at) {
@@ -225,6 +263,7 @@ export function mergeEventLogs(
         detail: formatAlarmRequestDetail(a),
         status: "chiuso",
         actor: a.acknowledged_by?.trim() || "—",
+        ...emptyOp,
         alarmTypeCodes: typeCodes,
       });
     }
@@ -243,6 +282,8 @@ export function mergeEventLogs(
     const detail = formatTocPushDetail(p);
     const actor = p.admin_code;
 
+    const opFields = operationalLogFields(p.operational_event_id, operationalEventMetaById);
+
     if (failed) {
       pushRows.push({
         id: p.id,
@@ -254,6 +295,7 @@ export function mergeEventLogs(
         detail,
         status: `fallito${p.error_message?.trim() ? `: ${p.error_message.trim()}` : ""}`,
         actor,
+        ...opFields,
       });
       continue;
     }
@@ -268,6 +310,7 @@ export function mergeEventLogs(
       detail,
       status: "inviato",
       actor,
+      ...opFields,
     });
 
     if (p.closed_at) {
@@ -281,6 +324,7 @@ export function mergeEventLogs(
         detail,
         status: "chiuso",
         actor: p.closed_by?.trim() || "—",
+        ...opFields,
       });
     }
   }
@@ -304,6 +348,7 @@ export function mergeEventLogs(
           : `Squadra ${recipient}`,
       status: skipped ? "saltato" : failed ? "fallito" : "inviato",
       actor: recipient,
+      ...emptyOp,
       alarmTypeCodes: typeCodes,
     };
   });
@@ -324,6 +369,7 @@ export function mergeEventLogs(
         "Pannello TOC azzerato dal telefono della squadra destinatario.",
       status: "notifica chiusa" as const,
       actor: d.squad_code,
+      ...emptyOp,
     })),
     ...fieldPhotos.map((p) => ({
       id: p.id,
@@ -340,6 +386,7 @@ export function mergeEventLogs(
       ),
       status: p.status,
       actor: p.squad_code,
+      ...emptyOp,
       photoId: p.status === "inviato" && p.storage_path ? p.id : undefined,
     })),
     ...forceDismisses.map((f) => ({
@@ -355,6 +402,7 @@ export function mergeEventLogs(
       detail: f.detail?.trim() || "Chiusura missione dall'operatore in dashboard TOC.",
       status: "forzato" as const,
       actor: f.admin_code,
+      ...operationalLogFields(f.operational_event_id, operationalEventMetaById),
     })),
     ...missionCloses.map((m) => ({
       id: m.id,
@@ -366,6 +414,7 @@ export function mergeEventLogs(
       detail: formatMissionDetail(m.route_code, m.target_waypoint_label),
       status: "chiuso",
       actor: m.admin_code,
+      ...operationalLogFields(m.operational_event_id, operationalEventMetaById),
     })),
     ...sessionAuthLogs.map((entry) => {
       const isLogin = entry.action === "login";
@@ -379,13 +428,12 @@ export function mergeEventLogs(
         detail: `Sessione ${entry.session_id.slice(0, 8)}…`,
         status: "registrato" as const,
         actor: entry.squad_code,
+        ...emptyOp,
       };
     }),
   ];
 
-  return rows.sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  );
+  return sortUnifiedEventLogs(rows);
 }
 
 /** Filtra log per tipologia allarme (multipla). `null` = tutti i tipi di log. */
@@ -435,6 +483,8 @@ export function eventLogsToCsv(
   filterLabel?: string,
 ): string {
   const header = [
+    "N° evento",
+    "N° intervento",
     "Data/ora",
     "Tipo",
     "Squadra",
@@ -447,6 +497,8 @@ export function eventLogsToCsv(
 
   const lines = rows.map((r) =>
     [
+      r.operationalEventNumber != null ? String(r.operationalEventNumber) : "",
+      r.interventionRef ?? "",
       new Date(r.createdAt).toLocaleString("it-IT"),
       r.summary,
       r.squadCode,
@@ -494,6 +546,8 @@ export function eventLogsPrintHtml(
   const bodyRows = rows
     .map(
       (r) => `<tr>
+        <td>${r.operationalEventNumber != null ? escapeHtml(String(r.operationalEventNumber)) : ""}</td>
+        <td>${escapeHtml(r.interventionRef ?? "")}</td>
         <td>${escapeHtml(new Date(r.createdAt).toLocaleString("it-IT"))}</td>
         <td>${escapeHtml(r.summary)}</td>
         <td>${escapeHtml(r.squadCode)}</td>
@@ -529,6 +583,8 @@ export function eventLogsPrintHtml(
   <table>
     <thead>
       <tr>
+        <th>N° evento</th>
+        <th>N° intervento</th>
         <th>Data/ora</th>
         <th>Tipo</th>
         <th>Squadra</th>

@@ -22,6 +22,7 @@ import {
   printEventLogsAsPdf,
   type AlarmAutoNotifyLogRow,
   type EventLogAlarmFilterCode,
+  type OperationalEventLogMeta,
   type SquadAlarmLogRow,
   type SquadFieldPhotoLogRow,
   type SquadMobileDismissLogRow,
@@ -41,6 +42,9 @@ export default function EventLogsPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [eventId, setEventId] = useState<string | null>(null);
   const [eventTitle, setEventTitle] = useState("");
+  const [operationalEventMetaById, setOperationalEventMetaById] = useState<
+    Map<string, OperationalEventLogMeta>
+  >(new Map());
   const [alarms, setAlarms] = useState<SquadAlarmLogRow[]>([]);
   const [pushes, setPushes] = useState<TocPushLogRow[]>([]);
   const [missionCloses, setMissionCloses] = useState<TocMissionCloseLogRow[]>([]);
@@ -103,7 +107,7 @@ export default function EventLogsPage() {
   }, []);
 
   const refreshLogs = useCallback(async () => {
-    if (!supabase || !eventId) {
+    if (!supabase) {
       setAlarms([]);
       setPushes([]);
       setMissionCloses([]);
@@ -128,6 +132,7 @@ export default function EventLogsPage() {
         setAutoNotifies([]);
         setForceDismisses([]);
         setFieldPhotos([]);
+        setOperationalEventMetaById(new Map());
         return;
       }
     }
@@ -150,58 +155,68 @@ export default function EventLogsPage() {
         setAutoNotifies([]);
         setForceDismisses([]);
         setFieldPhotos([]);
+        setOperationalEventMetaById(new Map());
         return;
       }
     }
 
+    let opEventsQuery = supabase
+      .from("operational_events")
+      .select("id, display_number, intervention_ref")
+      .order("display_number", { ascending: true });
+    if (golfCourseId) {
+      opEventsQuery = opEventsQuery.eq("golf_course_id", golfCourseId);
+    }
+    const { data: opEventRows } = await opEventsQuery;
+    const metaById = new Map<string, OperationalEventLogMeta>();
+    for (const row of opEventRows ?? []) {
+      metaById.set(String(row.id), {
+        displayNumber: Number(row.display_number),
+        interventionRef: (row.intervention_ref as string | null)?.trim() || null,
+      });
+    }
+    setOperationalEventMetaById(metaById);
+
     let alarmQuery = supabase
       .from("squad_alarms")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let pushQuery = supabase
       .from("toc_push_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let missionCloseQuery = supabase
       .from("toc_mission_close_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let mobileDismissQuery = supabase
       .from("squad_mobile_dismiss_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let sessionAuthQuery = supabase
       .from("squad_session_auth_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let autoNotifyQuery = supabase
       .from("alarm_auto_notify_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let forceDismissQuery = supabase
       .from("toc_mission_force_dismiss_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
     let fieldPhotoQuery = supabase
       .from("squad_field_photo_logs")
       .select("*")
-      .eq("event_id", eventId)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(2000);
 
     if (squadCodes) {
       alarmQuery = alarmQuery.in("squad_id", squadIds!);
@@ -310,7 +325,7 @@ export default function EventLogsPage() {
     } else {
       setFieldPhotos((fieldPhotoRes.data ?? []) as SquadFieldPhotoLogRow[]);
     }
-  }, [supabase, eventId, session?.golfCourseId]);
+  }, [supabase, session?.golfCourseId]);
 
   useEffect(() => {
     if (!authChecked || !session || !supabase) {
@@ -328,23 +343,22 @@ export default function EventLogsPage() {
         .maybeSingle();
 
       if (error || !ev) {
-        setStatus("Nessun evento attivo.");
-        setLoading(false);
-        return;
+        setEventTitle("—");
+        setEventId(null);
+      } else {
+        setEventId(ev.id as string);
+        setEventTitle((ev.title as string) ?? "Evento");
       }
-
-      setEventId(ev.id as string);
-      setEventTitle((ev.title as string) ?? "Evento");
       setLoading(false);
     })();
   }, [authChecked, session, supabase]);
 
   useEffect(() => {
-    if (!eventId) {
+    if (!authChecked || !session || !supabase) {
       return;
     }
     void refreshLogs();
-  }, [eventId, refreshLogs]);
+  }, [authChecked, session, supabase, refreshLogs]);
 
   const unified = useMemo(
     () =>
@@ -357,8 +371,19 @@ export default function EventLogsPage() {
         autoNotifies,
         forceDismisses,
         fieldPhotos,
+        operationalEventMetaById,
       ),
-    [alarms, pushes, missionCloses, mobileDismisses, sessionAuthLogs, autoNotifies, forceDismisses, fieldPhotos],
+    [
+      alarms,
+      pushes,
+      missionCloses,
+      mobileDismisses,
+      sessionAuthLogs,
+      autoNotifies,
+      forceDismisses,
+      fieldPhotos,
+      operationalEventMetaById,
+    ],
   );
 
   const filteredUnified = useMemo(
@@ -475,13 +500,13 @@ export default function EventLogsPage() {
   }
 
   async function clearEventLogs() {
-    if (!session || !eventId || !isAdmin) {
+    if (!session || !isAdmin) {
       return;
     }
     if (
       !window.confirm(
-        `Cancellare TUTTI i log dell'evento "${eventTitle}"?\n` +
-          "Verranno eliminati allarmi squadra, push TOC e foto campo. Operazione irreversibile.",
+        "Resettare TUTTI i log eventi e azzerare il progressivo N° evento operativo?\n" +
+          "Verranno eliminati allarmi, push, missioni, login/logout e foto campo. Operazione irreversibile.",
       )
     ) {
       return;
@@ -493,14 +518,14 @@ export default function EventLogsPage() {
       const res = await fetch("/api/event-logs/clear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session, eventId }),
+        body: JSON.stringify({ session, eventId: eventId ?? undefined }),
       });
       const payload = (await res.json()) as { error?: string };
       if (!res.ok) {
         throw new Error(payload.error ?? res.statusText);
       }
       await refreshLogs();
-      setStatus("Log eventi cancellati.");
+      setStatus("Log eventi resettati. Prossimo N° evento operativo: 1.");
     } catch (e) {
       setStatus(e instanceof Error ? e.message : "Errore cancellazione log.");
     } finally {
@@ -539,7 +564,8 @@ export default function EventLogsPage() {
 
       <div className={styles.panel}>
         <p className={styles.hint}>
-          Evento: <strong>{eventTitle || "—"}</strong> · Login/logout squadra · Allarmi · Missioni · Push
+          Giornata attiva: <strong>{eventTitle || "—"}</strong> · Log unificati (tutta la storia) ·
+          ordinati per N° evento operativo e data/ora
           {session && isCampoGolfSession(session) ? (
             <>
               {" "}
@@ -597,9 +623,9 @@ export default function EventLogsPage() {
               type="button"
               className={styles.btnDanger}
               onClick={() => void clearEventLogs()}
-              disabled={loading || clearBusy || !eventId}
+              disabled={loading || clearBusy}
             >
-              {clearBusy ? "Cancellazione…" : "Cancella log eventi"}
+              {clearBusy ? "Reset in corso…" : "Resetta log eventi"}
             </button>
           ) : null}
           <button type="button" className={styles.btnGhost} onClick={() => void refreshLogs()}>
@@ -612,7 +638,7 @@ export default function EventLogsPage() {
         ) : filteredUnified.length === 0 ? (
           <p>
             {unified.length === 0
-              ? "Nessun log registrato per questo evento."
+              ? "Nessun log registrato."
               : "Nessun log corrisponde al filtro tipologia selezionato."}
           </p>
         ) : (
@@ -620,6 +646,8 @@ export default function EventLogsPage() {
             <table className={styles.table}>
               <thead>
                 <tr>
+                  <th>N° evento</th>
+                  <th>N° intervento</th>
                   <th>Data/ora</th>
                   <th>Tipo</th>
                   <th>Squadra</th>
@@ -640,6 +668,8 @@ export default function EventLogsPage() {
                         : undefined
                     }
                   >
+                    <td>{r.operationalEventNumber ?? "—"}</td>
+                    <td>{r.interventionRef?.trim() || "—"}</td>
                     <td>{new Date(r.createdAt).toLocaleString("it-IT")}</td>
                     <td>{r.summary}</td>
                     <td>

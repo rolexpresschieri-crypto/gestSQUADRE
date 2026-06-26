@@ -51,6 +51,7 @@ import {
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
 import { type SquadWaypoint, waypointDisplayName } from "@/lib/waypoints";
+import type { OperationalEventSummary } from "@/lib/operational-events";
 import styles from "./toc-dashboard.module.css";
 
 const TOC_PUSH_TITLE = "TOC — ALLARME";
@@ -129,6 +130,14 @@ export default function TocDashboard() {
   const [squadLogoutPickId, setSquadLogoutPickId] = useState<string | null>(null);
   const [squadLogoutBusy, setSquadLogoutBusy] = useState(false);
   const [onlineSessionsLogout, setOnlineSessionsLogout] = useState<LiveSquad[]>([]);
+  const [openOperationalEvents, setOpenOperationalEvents] = useState<
+    OperationalEventSummary[]
+  >([]);
+  const [operationalBusy, setOperationalBusy] = useState<string | null>(null);
+  const [interventionDrafts, setInterventionDrafts] = useState<Record<string, string>>(
+    {},
+  );
+  const [pushOperationalEventId, setPushOperationalEventId] = useState("");
 
   const canForceSquadLogout = session?.role === "admin";
   const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
@@ -315,6 +324,157 @@ export default function TocDashboard() {
   }, []);
 
   const golfCourseId = session?.golfCourseId ?? null;
+
+  const loadOpenOperationalEvents = useCallback(async () => {
+    if (!session) {
+      setOpenOperationalEvents([]);
+      return;
+    }
+    const params = new URLSearchParams({ status: "aperto" });
+    if (golfCourseId) {
+      params.set("golfCourseId", golfCourseId);
+    }
+    try {
+      const res = await fetch(`/api/operational-events?${params.toString()}`);
+      if (!res.ok) {
+        return;
+      }
+      const body = (await res.json()) as {
+        rows?: OperationalEventSummary[];
+        schemaMissing?: boolean;
+      };
+      const rows = body.rows ?? [];
+      setOpenOperationalEvents(rows);
+      setInterventionDrafts((prev) => {
+        const next = { ...prev };
+        for (const row of rows) {
+          if (next[row.id] === undefined) {
+            next[row.id] = row.interventionRef ?? "";
+          }
+        }
+        return next;
+      });
+    } catch {
+      /* best effort */
+    }
+  }, [session, golfCourseId]);
+
+  async function openOperationalEvent() {
+    if (!session) {
+      return;
+    }
+    setOperationalBusy("open");
+    try {
+      const res = await fetch("/api/operational-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session, action: "open" }),
+      });
+      const payload = (await res.json()) as { error?: string; event?: OperationalEventSummary };
+      if (!res.ok) {
+        setStatusMessage(payload.error ?? "Apertura evento fallita.");
+        return;
+      }
+      await loadOpenOperationalEvents();
+      if (payload.event) {
+        setInterventionDrafts((prev) => ({
+          ...prev,
+          [payload.event!.id]: payload.event!.interventionRef ?? "",
+        }));
+      }
+      setStatusMessage(
+        payload.event
+          ? `Evento operativo n° ${payload.event.displayNumber} aperto.`
+          : "Evento operativo aperto.",
+      );
+    } catch {
+      setStatusMessage("Apertura evento: errore di rete.");
+    } finally {
+      setOperationalBusy(null);
+    }
+  }
+
+  async function closeOperationalEvent(event: OperationalEventSummary) {
+    if (!session) {
+      return;
+    }
+    if (
+      !window.confirm(
+        `Chiudere evento operativo n° ${event.displayNumber}?\n` +
+          "Non sarà più selezionabile per nuove missioni.",
+      )
+    ) {
+      return;
+    }
+    setOperationalBusy(`close-${event.id}`);
+    try {
+      const res = await fetch("/api/operational-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session,
+          action: "close",
+          operationalEventId: event.id,
+        }),
+      });
+      const payload = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setStatusMessage(payload.error ?? "Chiusura evento fallita.");
+        return;
+      }
+      await loadOpenOperationalEvents();
+      setStatusMessage(`Evento operativo n° ${event.displayNumber} chiuso.`);
+    } catch {
+      setStatusMessage("Chiusura evento: errore di rete.");
+    } finally {
+      setOperationalBusy(null);
+    }
+  }
+
+  async function saveInterventionRef(event: OperationalEventSummary) {
+    if (!session) {
+      return;
+    }
+    setOperationalBusy(`intervention-${event.id}`);
+    try {
+      const res = await fetch("/api/operational-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session,
+          action: "intervention",
+          operationalEventId: event.id,
+          interventionRef: interventionDrafts[event.id] ?? "",
+        }),
+      });
+      const payload = (await res.json()) as {
+        error?: string;
+        event?: OperationalEventSummary;
+      };
+      if (!res.ok) {
+        setStatusMessage(payload.error ?? "Salvataggio N° intervento fallito.");
+        return;
+      }
+      await loadOpenOperationalEvents();
+      if (payload.event) {
+        setInterventionDrafts((prev) => ({
+          ...prev,
+          [payload.event!.id]: payload.event!.interventionRef ?? "",
+        }));
+      }
+      setStatusMessage(`N° intervento aggiornato — evento ${event.displayNumber}.`);
+    } catch {
+      setStatusMessage("N° intervento: errore di rete.");
+    } finally {
+      setOperationalBusy(null);
+    }
+  }
+
+  function formatMissionOperationalEventLabel(
+    eventNumber: number | null | undefined,
+  ): string {
+    return eventNumber != null ? String(eventNumber) : "—";
+  }
 
   const loadSquads = useCallback(async () => {
     if (!supabase) {
@@ -545,6 +705,15 @@ export default function TocDashboard() {
       }, 400);
     };
   }, [loadActiveAutoNotifies]);
+
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    void loadOpenOperationalEvents();
+    const timer = window.setInterval(() => void loadOpenOperationalEvents(), 12_000);
+    return () => window.clearInterval(timer);
+  }, [session, loadOpenOperationalEvents]);
 
   useEffect(() => {
     if (!session) {
@@ -849,6 +1018,7 @@ export default function TocDashboard() {
       route_code: assignment.routeCode,
       target_waypoint_label: assignment.targetLabel,
       admin_code: session.code,
+      operational_event_id: assignment.operationalEventId,
     });
 
     await loadSelectedRouteAssignment();
@@ -946,6 +1116,7 @@ export default function TocDashboard() {
     setPushTitle(tocPushTextUpper(readStoredPushTitle(TOC_PUSH_TITLE)));
     setPushBody(tocPushTextUpper(readStoredPushBody(TOC_PUSH_BODY)));
     setPushTargetWaypointId(waypoints[0]?.id ?? "");
+    setPushOperationalEventId("");
     setPushAlert(null);
     setPushSending(false);
     setPushTargetAll(false);
@@ -1029,6 +1200,7 @@ export default function TocDashboard() {
           alarm: true,
           targetWaypointId: pushWaypoint?.id ?? null,
           targetWaypointLabel: pushWaypoint ? waypointDisplayName(pushWaypoint) : null,
+          operationalEventId: pushOperationalEventId.trim() || null,
         }),
       });
       let payload: { error?: string; code?: string } = {};
@@ -1220,6 +1392,65 @@ export default function TocDashboard() {
         </div>
       </header>
 
+      <section className={styles.operationalEventsPanel}>
+        <div className={styles.operationalEventsHeader}>
+          <h2 className={styles.operationalEventsTitle}>Eventi operativi TOC</h2>
+          <button
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            type="button"
+            disabled={operationalBusy === "open"}
+            onClick={() => void openOperationalEvent()}
+          >
+            {operationalBusy === "open" ? "Apertura…" : "APERTURA EVENTO"}
+          </button>
+        </div>
+        <p className={styles.operationalEventsHint}>
+          N° evento progressivo (reset solo con «Resetta log eventi»). N° intervento max 20
+          caratteri alfanumerici, modificabile finché l&apos;evento è aperto.
+        </p>
+        {openOperationalEvents.length === 0 ? (
+          <p className={styles.operationalEventsEmpty}>Nessun evento operativo aperto.</p>
+        ) : (
+          <ul className={styles.operationalEventsList}>
+            {openOperationalEvents.map((event) => (
+              <li key={event.id} className={styles.operationalEventRow}>
+                <span className={styles.operationalEventNumber}>N° {event.displayNumber}</span>
+                <label className={styles.operationalInterventionField}>
+                  N° intervento
+                  <input
+                    className={styles.operationalInterventionInput}
+                    value={interventionDrafts[event.id] ?? ""}
+                    maxLength={20}
+                    onChange={(e) =>
+                      setInterventionDrafts((prev) => ({
+                        ...prev,
+                        [event.id]: e.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <button
+                  className={`${styles.btn} ${styles.btnSmallInline}`}
+                  type="button"
+                  disabled={operationalBusy === `intervention-${event.id}`}
+                  onClick={() => void saveInterventionRef(event)}
+                >
+                  Salva
+                </button>
+                <button
+                  className={`${styles.btn} ${styles.btnDanger}`}
+                  type="button"
+                  disabled={operationalBusy === `close-${event.id}`}
+                  onClick={() => void closeOperationalEvent(event)}
+                >
+                  CHIUDI EVENTO
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <div className={styles.opsGrid}>
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>Squadre online ({squads.length})</h2>
@@ -1382,6 +1613,10 @@ export default function TocDashboard() {
                     <div className={styles.alarmBody}>
                       <p className={styles.alarmTitle}>
                         {squad.squadCode} — {squad.squadName}
+                        {" · "}
+                        <span className={styles.missionEventRef}>
+                          Ev. {formatMissionOperationalEventLabel(assignment.operationalEventNumber)}
+                        </span>
                       </p>
                       <p className={styles.alarmMessage}>
                         Via <strong>{assignment.routeCode}</strong>
@@ -1444,6 +1679,10 @@ export default function TocDashboard() {
                       <div className={styles.alarmBody}>
                         <p className={styles.alarmTitle}>
                           {row.squadCode} — {row.squadName}
+                          {" · "}
+                          <span className={styles.missionEventRef}>
+                            Ev. {formatMissionOperationalEventLabel(row.operationalEventNumber)}
+                          </span>
                         </p>
                         <p className={styles.alarmMessage}>
                           Push da <strong>{row.adminCode}</strong>
@@ -1750,6 +1989,22 @@ export default function TocDashboard() {
                 applica in invio multiplo.
               </p>
             ) : null}
+            <label className={styles.pushField}>
+              Evento operativo (missione)
+              <select
+                className={styles.pushInput}
+                value={pushOperationalEventId}
+                onChange={(e) => setPushOperationalEventId(e.target.value)}
+              >
+                <option value="">Nessuno</option>
+                {openOperationalEvents.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    Evento {event.displayNumber}
+                    {event.interventionRef ? ` · ${event.interventionRef}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className={styles.pushField}>
               Titolo notifica
               <input

@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     sessionId?: string;
     routeId?: string;
     targetWaypointId?: string | null;
+    operationalEventId?: string | null;
   };
 
   const adminSession = payload.session;
@@ -62,6 +63,30 @@ export async function POST(request: Request) {
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const operationalEventIdRaw =
+    typeof payload.operationalEventId === "string"
+      ? payload.operationalEventId.trim()
+      : "";
+  let operationalEventId: string | null = null;
+  if (operationalEventIdRaw) {
+    if (!UUID_RE.test(operationalEventIdRaw)) {
+      return NextResponse.json(
+        { error: "operationalEventId UUID non valido." },
+        { status: 400 },
+      );
+    }
+    const { validateOpenOperationalEvent } = await import("@/lib/operational-events");
+    const { error: opErr } = await validateOpenOperationalEvent(
+      admin,
+      operationalEventIdRaw,
+      adminSession.golfCourseId ?? null,
+    );
+    if (opErr) {
+      return NextResponse.json({ error: opErr }, { status: 409 });
+    }
+    operationalEventId = operationalEventIdRaw;
+  }
 
   const { data: routeRow, error: routeErr } = await admin
     .from("map_routes")
@@ -118,20 +143,41 @@ export async function POST(request: Request) {
     .eq("session_id", sessionId)
     .is("cleared_at", null);
 
-  const { data: inserted, error: insertErr } = await admin
+  const insertRow = {
+    session_id: sessionId,
+    route_id: routeId,
+    target_waypoint_id: targetWaypointId,
+    assigned_by_admin_code: adminSession.code,
+    operational_event_id: operationalEventId,
+  };
+
+  let insertResult = await admin
     .from("squad_route_assignments")
-    .insert({
-      session_id: sessionId,
-      route_id: routeId,
-      target_waypoint_id: targetWaypointId,
-      assigned_by_admin_code: adminSession.code,
-    })
+    .insert(insertRow)
     .select("id, assigned_at")
     .single();
 
-  if (insertErr) {
-    return NextResponse.json({ error: insertErr.message }, { status: 500 });
+  if (
+    insertResult.error &&
+    /operational_event_id|column/i.test(insertResult.error.message)
+  ) {
+    insertResult = await admin
+      .from("squad_route_assignments")
+      .insert({
+        session_id: sessionId,
+        route_id: routeId,
+        target_waypoint_id: targetWaypointId,
+        assigned_by_admin_code: adminSession.code,
+      })
+      .select("id, assigned_at")
+      .single();
   }
+
+  if (insertResult.error) {
+    return NextResponse.json({ error: insertResult.error.message }, { status: 500 });
+  }
+
+  const inserted = insertResult.data;
 
   return NextResponse.json({
     ok: true,

@@ -10,6 +10,8 @@ export type ActiveTocPushDelivery = {
   body: string;
   isAlarm: boolean;
   createdAt: string;
+  operationalEventId: string | null;
+  operationalEventNumber: number | null;
 };
 
 export type FetchActiveTocPushOptions = {
@@ -32,6 +34,7 @@ type TocPushLogRow = {
   created_at: string;
   mobile_dismissed_at?: string | null;
   closed_at?: string | null;
+  operational_event_id?: string | null;
 };
 
 function normalizeIds(ids?: string[] | null): string[] {
@@ -41,11 +44,17 @@ function normalizeIds(ids?: string[] | null): string[] {
   return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 }
 
-function mapRow(row: TocPushLogRow): ActiveTocPushDelivery | null {
+function mapRow(
+  row: TocPushLogRow,
+  eventNumberById: Map<string, number>,
+): ActiveTocPushDelivery | null {
   const squadCode = String(row.squad_code ?? "").trim();
   if (!squadCode) {
     return null;
   }
+  const operationalEventId = row.operational_event_id
+    ? String(row.operational_event_id)
+    : null;
   return {
     id: row.id,
     sessionId: row.session_id ? String(row.session_id) : null,
@@ -56,6 +65,10 @@ function mapRow(row: TocPushLogRow): ActiveTocPushDelivery | null {
     body: row.body,
     isAlarm: Boolean(row.is_alarm),
     createdAt: row.created_at,
+    operationalEventId,
+    operationalEventNumber: operationalEventId
+      ? (eventNumberById.get(operationalEventId) ?? null)
+      : null,
   };
 }
 
@@ -82,7 +95,7 @@ export async function fetchActiveTocPushDeliveries(
   const recipientSquadIds = normalizeIds(options.recipientSquadIds);
 
   const modernSelect =
-    "id, event_id, session_id, squad_id, squad_code, squad_name, admin_code, title, body, is_alarm, status, created_at, mobile_dismissed_at, closed_at";
+    "id, event_id, session_id, squad_id, squad_code, squad_name, admin_code, title, body, is_alarm, status, created_at, mobile_dismissed_at, closed_at, operational_event_id";
 
   let query = supabase
     .from("toc_push_logs")
@@ -141,15 +154,33 @@ export async function fetchActiveTocPushDeliveries(
     return { rows: [], error: error.message };
   }
 
+  const operationalEventIds = [
+    ...new Set(
+      ((data ?? []) as TocPushLogRow[])
+        .map((row) => row.operational_event_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const eventNumberById = new Map<string, number>();
+  if (operationalEventIds.length > 0) {
+    const { data: opRows } = await supabase
+      .from("operational_events")
+      .select("id, display_number")
+      .in("id", operationalEventIds);
+    for (const row of opRows ?? []) {
+      eventNumberById.set(String(row.id), Number(row.display_number));
+    }
+  }
+
   const rows = ((data ?? []) as TocPushLogRow[])
     .map((row) => {
       if (legacySchema) {
-        return mapRow(row);
+        return mapRow(row, eventNumberById);
       }
       if (row.mobile_dismissed_at || row.closed_at) {
         return null;
       }
-      return mapRow(row);
+      return mapRow(row, eventNumberById);
     })
     .filter((row): row is ActiveTocPushDelivery => row !== null);
 

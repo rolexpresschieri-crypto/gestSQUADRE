@@ -26,9 +26,10 @@ async function insertForceDismissLog(
     adminCode: string;
     sourceRef?: string | null;
     detail?: string | null;
+    operationalEventId?: string | null;
   },
 ): Promise<void> {
-  const { error } = await admin.from("toc_mission_force_dismiss_logs").insert({
+  const baseRow = {
     event_id: row.eventId,
     mission_kind: row.missionKind,
     squad_code: row.squadCode,
@@ -36,7 +37,16 @@ async function insertForceDismissLog(
     admin_code: row.adminCode,
     source_ref: row.sourceRef ?? null,
     detail: row.detail ?? null,
-  });
+  };
+  const withOperational = {
+    ...baseRow,
+    operational_event_id: row.operationalEventId ?? null,
+  };
+  let error = (await admin.from("toc_mission_force_dismiss_logs").insert(withOperational))
+    .error;
+  if (error && /operational_event_id|column/i.test(error.message)) {
+    error = (await admin.from("toc_mission_force_dismiss_logs").insert(baseRow)).error;
+  }
   if (error && !error.message.includes("toc_mission_force_dismiss_logs")) {
     console.error("toc_mission_force_dismiss_logs insert failed:", error.message);
   }
@@ -55,7 +65,7 @@ export async function forceDismissTocPushLog(
   const { data: row, error: fetchErr } = await admin
     .from("toc_push_logs")
     .select(
-      "id, event_id, session_id, squad_code, squad_name, title, body, mobile_dismissed_at, closed_at",
+      "id, event_id, session_id, squad_code, squad_name, title, body, mobile_dismissed_at, closed_at, operational_event_id",
     )
     .eq("id", pushLogId)
     .maybeSingle();
@@ -96,6 +106,9 @@ export async function forceDismissTocPushLog(
     adminCode: adminCode.trim() || "TOC",
     sourceRef: pushLogId,
     detail,
+    operationalEventId: row.operational_event_id
+      ? String(row.operational_event_id)
+      : null,
   });
 
   const sessionId = row.session_id as string | null;

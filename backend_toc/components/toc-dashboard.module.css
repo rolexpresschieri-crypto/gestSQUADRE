@@ -690,3 +690,105 @@
     justify-self: center;
   }
 }
+
+.operationalEventsPanel {
+  margin: 0 0 12px;
+  padding: 12px 14px;
+  border: 2px solid #1a3066;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.operationalEventsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.operationalEventsTitle {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.operationalEventsHint {
+  margin: 8px 0 10px;
+  font-size: 0.85rem;
+  color: #ccc;
+}
+
+.operationalEventsEmpty {
+  margin: 0;
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+.operationalEventsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.operationalEventRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.operationalEventNumber {
+  font-weight: 800;
+  min-width: 3.5rem;
+}
+
+.operationalInterventionField {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.78rem;
+  color: #ccc;
+}
+
+.operationalInterventionInput {
+  min-width: 140px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #4a5568;
+  background: #0d1a12;
+  color: #fff;
+}
+
+.operationalDefaultRouteField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #ddd;
+  max-width: 360px;
+}
+
+.operationalSelect {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #4a5568;
+  background: #0d1a12;
+  color: #fff;
+}
+
+.btnSmallInline {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.missionEventRef {
+  color: #e0be3a;
+  font-weight: 700;
+}

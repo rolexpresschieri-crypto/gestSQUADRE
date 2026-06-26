@@ -55,6 +55,7 @@ export async function POST(request: Request) {
     routeCode?: string;
     targetWaypointId?: string | null;
     targetWaypointLabel?: string | null;
+    operationalEventId?: string | null;
   };
 
   const adminSessionRaw = payload.session;
@@ -109,6 +110,30 @@ export async function POST(request: Request) {
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const operationalEventIdRaw =
+    typeof payload.operationalEventId === "string"
+      ? payload.operationalEventId.trim()
+      : "";
+  let operationalEventId: string | null = null;
+  if (operationalEventIdRaw) {
+    if (!UUID_RE.test(operationalEventIdRaw)) {
+      return NextResponse.json(
+        { error: "operationalEventId UUID non valido." },
+        { status: 400 },
+      );
+    }
+    const { validateOpenOperationalEvent } = await import("@/lib/operational-events");
+    const { error: opErr } = await validateOpenOperationalEvent(
+      admin,
+      operationalEventIdRaw,
+      adminSession.golfCourseId ?? null,
+    );
+    if (opErr) {
+      return NextResponse.json({ error: opErr }, { status: 409 });
+    }
+    operationalEventId = operationalEventIdRaw;
+  }
 
   const { data: sessionRow, error: sessionErr } = await admin
     .from("squad_sessions")
@@ -169,12 +194,15 @@ export async function POST(request: Request) {
       ...baseRow,
       route_code: routeCode || null,
       target_waypoint_label: targetWaypointLabel,
+      operational_event_id: operationalEventId,
     };
 
     let insertErr = (await admin.from("toc_push_logs").insert(withMission)).error;
     if (
       insertErr &&
-      /route_code|target_waypoint_label|column/i.test(insertErr.message)
+      /route_code|target_waypoint_label|operational_event_id|column/i.test(
+        insertErr.message,
+      )
     ) {
       insertErr = (await admin.from("toc_push_logs").insert(baseRow)).error;
     }

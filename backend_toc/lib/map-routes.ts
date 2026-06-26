@@ -27,6 +27,8 @@ export type SquadRouteAssignment = {
   targetWaypointId: string | null;
   targetLabel: string | null;
   assignedAt: string;
+  operationalEventId: string | null;
+  operationalEventNumber: number | null;
 };
 
 export function parsePoints(raw: unknown): MapRoutePoint[] {
@@ -100,12 +102,16 @@ function buildRouteAssignment(
   assignment: Record<string, unknown>,
   route: Record<string, unknown>,
   targetLabel: string | null,
+  operationalEventNumber: number | null,
 ): SquadRouteAssignment | null {
   const points = parsePoints(route.points);
   if (points.length < 2) {
     return null;
   }
   const targetId = (assignment.target_waypoint_id as string | null) ?? null;
+  const operationalEventId = assignment.operational_event_id
+    ? String(assignment.operational_event_id)
+    : null;
   return {
     id: String(assignment.id),
     sessionId: String(assignment.session_id),
@@ -117,6 +123,8 @@ function buildRouteAssignment(
     targetWaypointId: targetId,
     targetLabel,
     assignedAt: String(assignment.assigned_at),
+    operationalEventId,
+    operationalEventNumber,
   };
 }
 
@@ -148,7 +156,9 @@ export async function fetchActiveRouteAssignmentsForSessions(
 
   const { data: assignments, error: assignmentErr } = await supabase
     .from("squad_route_assignments")
-    .select("id, session_id, route_id, target_waypoint_id, assigned_at")
+    .select(
+      "id, session_id, route_id, target_waypoint_id, assigned_at, operational_event_id",
+    )
     .in("session_id", uniqueIds)
     .is("cleared_at", null)
     .order("assigned_at", { ascending: false });
@@ -215,16 +225,42 @@ export async function fetchActiveRouteAssignmentsForSessions(
     }
   }
 
+  const operationalEventIds = [
+    ...new Set(
+      [...latestBySession.values()]
+        .map((row) =>
+          row.operational_event_id ? String(row.operational_event_id) : "",
+        )
+        .filter(Boolean),
+    ),
+  ];
+  const eventNumberById = new Map<string, number>();
+  if (operationalEventIds.length > 0) {
+    const { data: opRows } = await supabase
+      .from("operational_events")
+      .select("id, display_number")
+      .in("id", operationalEventIds);
+    for (const row of opRows ?? []) {
+      eventNumberById.set(String(row.id), Number(row.display_number));
+    }
+  }
+
   for (const [sessionId, assignment] of latestBySession) {
     const route = routeById.get(String(assignment.route_id));
     if (!route) {
       continue;
     }
     const targetId = (assignment.target_waypoint_id as string | null) ?? null;
+    const operationalEventId = assignment.operational_event_id
+      ? String(assignment.operational_event_id)
+      : null;
     const built = buildRouteAssignment(
       assignment,
       route,
       targetId ? (targetLabelById.get(targetId) ?? null) : null,
+      operationalEventId
+        ? (eventNumberById.get(operationalEventId) ?? null)
+        : null,
     );
     if (built) {
       result.set(sessionId, built);
