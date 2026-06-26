@@ -311,7 +311,7 @@ struct FieldPhotoNoteSheet: View {
                 TextField("Nota (opzionale)", text: $note, axis: .vertical)
                     .lineLimit(2...4)
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: note) { _, newValue in
+                    .onChange(of: note) { newValue in
                         if newValue.count > 200 {
                             note = String(newValue.prefix(200))
                         }
