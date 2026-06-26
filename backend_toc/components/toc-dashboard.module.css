@@ -590,19 +590,36 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 1000;
+  pointer-events: none;
 }
 
 .modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   background: #1e2a1e;
   padding: 20px;
   border-radius: 12px;
   max-width: 520px;
-  width: 90%;
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
   border: 2px solid #1a3066;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.modalDragHandle {
+  margin: 0 0 8px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+
+.modalDragHandle:active {
+  cursor: grabbing;
 }
 
 .squadCheck {

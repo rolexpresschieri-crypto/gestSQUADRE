@@ -104,6 +104,14 @@ export default function TocDashboard() {
     photoId: string;
   } | null>(null);
   const [pushOpen, setPushOpen] = useState(false);
+  const [pushModalDrag, setPushModalDrag] = useState({ x: 0, y: 0 });
+  const pushModalDragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    baseX: number;
+    baseY: number;
+  } | null>(null);
   const [pushTitle, setPushTitle] = useState(TOC_PUSH_TITLE);
   const [pushBody, setPushBody] = useState(TOC_PUSH_BODY);
   const [pushAlert, setPushAlert] = useState<string | null>(null);
@@ -1175,9 +1183,45 @@ export default function TocDashboard() {
       initialSelected[preselect] = true;
     }
     setPushSelected(initialSelected);
+    setPushModalDrag({ x: 0, y: 0 });
+    pushModalDragRef.current = null;
     setPushOpen(true);
     void loadPushHealth();
     void loadOpenOperationalEvents();
+  }
+
+  function onPushModalDragStart(e: React.PointerEvent<HTMLHeadingElement>) {
+    if (e.button !== 0) {
+      return;
+    }
+    pushModalDragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      baseX: pushModalDrag.x,
+      baseY: pushModalDrag.y,
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function onPushModalDragMove(e: React.PointerEvent<HTMLHeadingElement>) {
+    const drag = pushModalDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) {
+      return;
+    }
+    setPushModalDrag({
+      x: drag.baseX + (e.clientX - drag.startX),
+      y: drag.baseY + (e.clientY - drag.startY),
+    });
+  }
+
+  function onPushModalDragEnd(e: React.PointerEvent<HTMLHeadingElement>) {
+    const drag = pushModalDragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) {
+      return;
+    }
+    pushModalDragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
   }
 
   async function sendPush() {
@@ -1402,7 +1446,7 @@ export default function TocDashboard() {
             type="button"
             onClick={openPushModal}
           >
-            Invia allarme a squadre (push)
+            Invia MISSIONI a squadre (push)
           </button>
           <button
             className={`${styles.btn} ${styles.btnYellow}`}
@@ -1893,10 +1937,25 @@ export default function TocDashboard() {
 
       {pushOpen ? (
         <div className={styles.modalBackdrop}>
-          <div className={styles.modal}>
-            <h2>Push allarme verso squadre</h2>
+          <div
+            className={styles.modal}
+            style={{
+              left: `calc(50% + ${pushModalDrag.x}px)`,
+              top: `calc(50% + ${pushModalDrag.y}px)`,
+            }}
+          >
+            <h2
+              className={styles.modalDragHandle}
+              onPointerDown={onPushModalDragStart}
+              onPointerMove={onPushModalDragMove}
+              onPointerUp={onPushModalDragEnd}
+              onPointerCancel={onPushModalDragEnd}
+            >
+              Invia MISSIONI a squadre (push)
+            </h2>
             <p className={styles.pushHint}>
-              Notifica con suono allarme sul cellulare (canale dedicato Android).
+              Trascina dal titolo per spostare la finestra. Notifica con suono allarme sul
+              cellulare (canale dedicato Android).
             </p>
             {pushHealth && !pushHealth.firebaseAdmin ? (
               <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
@@ -2104,7 +2163,7 @@ export default function TocDashboard() {
                 disabled={pushSending}
                 onClick={() => void sendPush()}
               >
-                {pushSending ? "Invio in corso…" : "Invia push allarme"}
+                {pushSending ? "Invio in corso…" : "Invia missione (push)"}
               </button>
               <button className={styles.btn} type="button" onClick={() => setPushOpen(false)}>
                 Chiudi
