@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 private struct ContentHeightKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -100,7 +101,7 @@ struct HomeView: View {
                             backgroundColor: viewModel.isLoggedIn ? TacticalColors.navy : TacticalColors.disabled,
                             foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
                             enabled: viewModel.isLoggedIn && !viewModel.isBusy,
-                            action: { showFieldPhotoCamera = true }
+                            action: { startFieldPhotoCapture() }
                         )
                         .padding(.top, 18)
 
@@ -207,6 +208,14 @@ struct HomeView: View {
         if let contentHeight { measuredContentHeight = contentHeight }
         if let viewportHeight { measuredViewportHeight = viewportHeight }
         showScrollHint = measuredContentHeight > measuredViewportHeight + 20
+    }
+
+    private func startFieldPhotoCapture() {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            onShowMessage("Fotocamera non disponibile (serve iPhone fisico, non simulatore).")
+            return
+        }
+        showFieldPhotoCamera = true
     }
 
     private var squadBox: some View {

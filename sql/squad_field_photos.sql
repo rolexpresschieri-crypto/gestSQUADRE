@@ -1,11 +1,21 @@
 -- Foto da campo (squadra loggata) → log eventi TOC + Storage privato.
 -- Eseguire su Supabase dopo squad_event_flow.sql
 --
--- Storage (Dashboard Supabase → Storage → New bucket):
---   Nome: squad-photos
---   Public: OFF (privato — download solo via API TOC autenticata)
---   File size limit: 3 MB consigliato
---   MIME: image/jpeg
+-- Bucket Storage privato (anche via SQL sotto, oppure Dashboard → Storage → New bucket):
+--   Nome: squad-photos · Public: OFF · Max ~3 MB · MIME: image/jpeg
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'squad-photos',
+  'squad-photos',
+  false,
+  3145728,
+  array['image/jpeg']::text[]
+)
+on conflict (id) do update set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 create table if not exists squad_field_photo_logs (
   id uuid primary key default gen_random_uuid(),
