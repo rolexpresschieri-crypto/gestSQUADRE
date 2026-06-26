@@ -36,7 +36,6 @@ final class SquadViewModel: ObservableObject {
     private var lastPublishedAtMs: Int64?
     private var sessionWatchTimer: Timer?
     private var pushWatchTimer: Timer?
-    private var gpsHeartbeatTimer: Timer?
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
