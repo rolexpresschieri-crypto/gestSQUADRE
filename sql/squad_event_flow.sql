@@ -1,4 +1,4 @@
--- Flusso eventi mobile ↔ TOC: stati inviato / registrato / chiuso
+-- Flusso eventi mobile ↔ TOC: inviato → notifica chiusa (reset squadra) → chiuso (TOC)
 -- Eseguire su Supabase dopo event_logs_and_campo.sql e toc_mission_logs.sql
 
 alter table toc_push_logs

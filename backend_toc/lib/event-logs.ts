@@ -300,7 +300,7 @@ export function mergeEventLogs(
       detail:
         d.panel_message?.trim() ||
         "Pannello TOC azzerato dal telefono della squadra destinatario.",
-      status: "registrato" as const,
+      status: "notifica chiusa" as const,
       actor: d.squad_code,
     })),
     ...forceDismisses.map((f) => ({
