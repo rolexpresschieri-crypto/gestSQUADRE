@@ -2005,6 +2005,14 @@ export default function TocDashboard() {
                 ))}
               </select>
             </label>
+            {openOperationalEvents.length === 0 ? (
+              <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
+                Nessun evento operativo aperto. Usa <strong>APERTURA EVENTO</strong> nel pannello
+                sopra la dashboard. L&apos;allarme volontario dalla squadra (colonna a sinistra){" "}
+                <strong>non</strong> crea un evento operativo: per il push scegli{" "}
+                <strong>Nessuno</strong> oppure apri prima un evento TOC.
+              </p>
+            ) : null}
             <label className={styles.pushField}>
               Titolo notifica
               <input
