@@ -14,6 +14,7 @@ export type SquadAlarmLogRow = {
   created_at: string;
   acknowledged_at: string | null;
   acknowledged_by: string | null;
+  operational_event_id?: string | null;
 };
 
 export type TocPushLogRow = {
@@ -239,6 +240,10 @@ export function mergeEventLogs(
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
     const typeCodes = parseAlarmRequestTypes(a.request_types);
+    const opFields = operationalLogFields(
+      a.operational_event_id,
+      operationalEventMetaById,
+    );
     alarmRows.push({
       id: a.id,
       kind: "squad_alarm",
@@ -249,7 +254,7 @@ export function mergeEventLogs(
       detail: formatAlarmRequestDetail(a),
       status: a.acknowledged_at ? "chiuso" : "inviato",
       actor: "—",
-      ...emptyOp,
+      ...opFields,
       alarmTypeCodes: typeCodes,
     });
     if (a.acknowledged_at) {
@@ -263,7 +268,7 @@ export function mergeEventLogs(
         detail: formatAlarmRequestDetail(a),
         status: "chiuso",
         actor: a.acknowledged_by?.trim() || "—",
-        ...emptyOp,
+        ...opFields,
         alarmTypeCodes: typeCodes,
       });
     }

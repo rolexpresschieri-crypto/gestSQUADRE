@@ -101,39 +101,13 @@ export async function POST(request: Request) {
   const golfCourseId = session.golfCourseId ?? null;
 
   if (action === "open") {
-    const { allocateOperationalEventNumber, operationalEventScopeKey } = await import(
-      "@/lib/operational-events"
+    return NextResponse.json(
+      {
+        error:
+          "Gli eventi operativi si aprono solo dalle squadre attivatore (01_TOC, 01_RR) inviando allarme dal campo.",
+      },
+      { status: 403 },
     );
-    const scopeKey = operationalEventScopeKey(golfCourseId);
-    const { number, error: allocErr } = await allocateOperationalEventNumber(
-      admin,
-      scopeKey,
-    );
-    if (allocErr) {
-      return NextResponse.json({ error: allocErr }, { status: 500 });
-    }
-
-    const { data, error } = await admin
-      .from("operational_events")
-      .insert({
-        display_number: number,
-        status: "aperto",
-        golf_course_id: golfCourseId,
-        opened_by_admin_code: session.code,
-      })
-      .select(
-        "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
-      )
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      ok: true,
-      event: mapOperationalEventRow(data as OperationalEventRow),
-    });
   }
 
   if (action === "close") {

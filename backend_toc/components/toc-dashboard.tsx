@@ -52,6 +52,14 @@ import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
 import { type SquadWaypoint, waypointDisplayName } from "@/lib/waypoints";
 import type { OperationalEventSummary } from "@/lib/operational-events";
+import {
+  mapOperationalEventRow,
+  type OperationalEventRow,
+} from "@/lib/operational-events";
+import {
+  isOperationalEventActivatorSquad,
+  OPERATIONAL_EVENT_ACTIVATOR_LABEL,
+} from "@/lib/operational-event-activators";
 import styles from "./toc-dashboard.module.css";
 
 const TOC_PUSH_TITLE = "TOC — ALLARME";
@@ -138,6 +146,9 @@ export default function TocDashboard() {
     {},
   );
   const [pushOperationalEventId, setPushOperationalEventId] = useState("");
+  const [operationalEventsLoadError, setOperationalEventsLoadError] = useState<
+    string | null
+  >(null);
 
   const canForceSquadLogout = session?.role === "admin";
   const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
@@ -328,22 +339,73 @@ export default function TocDashboard() {
   const loadOpenOperationalEvents = useCallback(async () => {
     if (!session) {
       setOpenOperationalEvents([]);
+      setOperationalEventsLoadError(null);
       return;
     }
+
+    if (supabase) {
+      let query = supabase
+        .from("operational_events")
+        .select(
+          "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+        )
+        .eq("status", "aperto")
+        .order("display_number", { ascending: true });
+
+      if (golfCourseId) {
+        query = query.eq("golf_course_id", golfCourseId);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        const missing = error.message.includes("operational_events");
+        setOperationalEventsLoadError(
+          missing
+            ? "Esegui sql/operational_events.sql su Supabase."
+            : error.message,
+        );
+        setOpenOperationalEvents([]);
+        return;
+      }
+
+      setOperationalEventsLoadError(null);
+      const rows = ((data ?? []) as OperationalEventRow[]).map(mapOperationalEventRow);
+      setOpenOperationalEvents(rows);
+      setInterventionDrafts((prev) => {
+        const next = { ...prev };
+        for (const row of rows) {
+          if (next[row.id] === undefined) {
+            next[row.id] = row.interventionRef ?? "";
+          }
+        }
+        return next;
+      });
+      return;
+    }
+
     const params = new URLSearchParams({ status: "aperto" });
     if (golfCourseId) {
       params.set("golfCourseId", golfCourseId);
     }
     try {
       const res = await fetch(`/api/operational-events?${params.toString()}`);
-      if (!res.ok) {
-        return;
-      }
       const body = (await res.json()) as {
         rows?: OperationalEventSummary[];
         schemaMissing?: boolean;
+        error?: string;
       };
+      if (!res.ok) {
+        setOperationalEventsLoadError(body.error ?? `Errore HTTP ${res.status}`);
+        setOpenOperationalEvents([]);
+        return;
+      }
+      if (body.schemaMissing) {
+        setOperationalEventsLoadError("Esegui sql/operational_events.sql su Supabase.");
+        setOpenOperationalEvents([]);
+        return;
+      }
       const rows = body.rows ?? [];
+      setOperationalEventsLoadError(null);
       setOpenOperationalEvents(rows);
       setInterventionDrafts((prev) => {
         const next = { ...prev };
@@ -355,44 +417,10 @@ export default function TocDashboard() {
         return next;
       });
     } catch {
-      /* best effort */
+      setOperationalEventsLoadError("Impossibile caricare gli eventi operativi.");
+      setOpenOperationalEvents([]);
     }
-  }, [session, golfCourseId]);
-
-  async function openOperationalEvent() {
-    if (!session) {
-      return;
-    }
-    setOperationalBusy("open");
-    try {
-      const res = await fetch("/api/operational-events", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session, action: "open" }),
-      });
-      const payload = (await res.json()) as { error?: string; event?: OperationalEventSummary };
-      if (!res.ok) {
-        setStatusMessage(payload.error ?? "Apertura evento fallita.");
-        return;
-      }
-      await loadOpenOperationalEvents();
-      if (payload.event) {
-        setInterventionDrafts((prev) => ({
-          ...prev,
-          [payload.event!.id]: payload.event!.interventionRef ?? "",
-        }));
-      }
-      setStatusMessage(
-        payload.event
-          ? `Evento operativo n° ${payload.event.displayNumber} aperto.`
-          : "Evento operativo aperto.",
-      );
-    } catch {
-      setStatusMessage("Apertura evento: errore di rete.");
-    } finally {
-      setOperationalBusy(null);
-    }
-  }
+  }, [session, supabase, golfCourseId]);
 
   async function closeOperationalEvent(event: OperationalEventSummary) {
     if (!session) {
@@ -800,9 +828,15 @@ export default function TocDashboard() {
           if (payload.eventType === "INSERT") {
             const row = payload.new as AlarmRow;
             setAlarms((prev) => [row, ...prev].slice(0, 40));
-            setStatusMessage(
-              `ALLARME: ${row.squad_code} — ${formatAlarmRequestDetail(row)}`,
-            );
+            const detail = formatAlarmRequestDetail(row);
+            if (isOperationalEventActivatorSquad(row.squad_code)) {
+              setStatusMessage(
+                `ALLARME ATTIVATORE ${row.squad_code} — ${detail} (apertura evento operativo…)`,
+              );
+              window.setTimeout(() => void loadOpenOperationalEvents(), 600);
+            } else {
+              setStatusMessage(`ALLARME: ${row.squad_code} — ${detail}`);
+            }
             void loadSelectedRouteAssignment([row.session_id]);
             debouncedLoadActiveAutoNotifies();
           } else {
@@ -810,6 +844,17 @@ export default function TocDashboard() {
             void loadSelectedRouteAssignment();
             debouncedLoadActiveAutoNotifies();
           }
+        },
+      )
+      .subscribe();
+
+    const operationalEventsChannel = supabase
+      .channel("gest-operational-events")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "operational_events" },
+        () => {
+          void loadOpenOperationalEvents();
         },
       )
       .subscribe();
@@ -878,6 +923,7 @@ export default function TocDashboard() {
       window.clearInterval(timer);
       void supabase.removeChannel(squadChannel);
       void supabase.removeChannel(alarmChannel);
+      void supabase.removeChannel(operationalEventsChannel);
       void supabase.removeChannel(wpChannel);
       void supabase.removeChannel(routeChannel);
       void supabase.removeChannel(autoNotifyChannel);
@@ -885,7 +931,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(tocPushChannel);
       void supabase.removeChannel(fieldPhotoChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1131,6 +1177,7 @@ export default function TocDashboard() {
     setPushSelected(initialSelected);
     setPushOpen(true);
     void loadPushHealth();
+    void loadOpenOperationalEvents();
   }
 
   async function sendPush() {
@@ -1394,22 +1441,25 @@ export default function TocDashboard() {
 
       <section className={styles.operationalEventsPanel}>
         <div className={styles.operationalEventsHeader}>
-          <h2 className={styles.operationalEventsTitle}>Eventi operativi TOC</h2>
-          <button
-            className={`${styles.btn} ${styles.btnPrimary}`}
-            type="button"
-            disabled={operationalBusy === "open"}
-            onClick={() => void openOperationalEvent()}
-          >
-            {operationalBusy === "open" ? "Apertura…" : "APERTURA EVENTO"}
-          </button>
+          <h2 className={styles.operationalEventsTitle}>Eventi operativi</h2>
         </div>
         <p className={styles.operationalEventsHint}>
-          N° evento progressivo (reset solo con «Resetta log eventi»). N° intervento max 20
-          caratteri alfanumerici, modificabile finché l&apos;evento è aperto.
+          Apertura automatica quando le squadre attivatore ({OPERATIONAL_EVENT_ACTIVATOR_LABEL})
+          inviano allarme dal campo. N° evento progressivo (reset solo con «Resetta log eventi»).
+          N° intervento max 20 caratteri alfanumerici, modificabile finché l&apos;evento è aperto.
+          Chiusura solo da TOC.
         </p>
         {openOperationalEvents.length === 0 ? (
-          <p className={styles.operationalEventsEmpty}>Nessun evento operativo aperto.</p>
+          <p className={styles.operationalEventsEmpty}>
+            Nessun evento operativo aperto. In attesa di allarme da{" "}
+            {OPERATIONAL_EVENT_ACTIVATOR_LABEL}.
+            {operationalEventsLoadError ? (
+              <>
+                {" "}
+                <strong style={{ color: "#ffb74d" }}>{operationalEventsLoadError}</strong>
+              </>
+            ) : null}
+          </p>
         ) : (
           <ul className={styles.operationalEventsList}>
             {openOperationalEvents.map((event) => (
@@ -2007,10 +2057,14 @@ export default function TocDashboard() {
             </label>
             {openOperationalEvents.length === 0 ? (
               <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
-                Nessun evento operativo aperto. Usa <strong>APERTURA EVENTO</strong> nel pannello
-                sopra la dashboard. L&apos;allarme volontario dalla squadra (colonna a sinistra){" "}
-                <strong>non</strong> crea un evento operativo: per il push scegli{" "}
-                <strong>Nessuno</strong> oppure apri prima un evento TOC.
+                Nessun evento operativo aperto. Si apre automaticamente con l&apos;allarme
+                dalle squadre attivatore ({OPERATIONAL_EVENT_ACTIVATOR_LABEL}). Per push generica
+                usa <strong>Nessuno</strong>.
+              </p>
+            ) : null}
+            {operationalEventsLoadError ? (
+              <p className={styles.pushAlert} role="alert">
+                {operationalEventsLoadError}
               </p>
             ) : null}
             <label className={styles.pushField}>
