@@ -165,6 +165,8 @@
   white-space: pre-wrap;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   transition: background 0.15s ease;
+  z-index: 5;
+  position: relative;
 }
 
 .photoNotifyBanner:hover {

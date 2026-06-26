@@ -157,6 +157,94 @@ export default function TocDashboard() {
   alarmsRef.current = alarms;
 
   const activeAutoNotifyFetchSeq = useRef(0);
+  const dashboardOpenedAtRef = useRef(new Date().toISOString());
+  const lastPhotoPollIdRef = useRef<string | null>(null);
+
+  const applyFieldPhotoNotification = useCallback((row: FieldPhotoLogRow) => {
+    if (row.status !== "inviato") {
+      return;
+    }
+    const detail = formatPhotoGpsDetail(
+      row.latitude,
+      row.longitude,
+      row.accuracy_m,
+      row.note,
+    );
+    setPhotoNotification({
+      photoId: row.id,
+      label: `Foto da ${row.squad_code} — apri Log eventi / scarica JPEG. ${detail}`,
+    });
+  }, []);
+
+  const pollFieldPhotoNotifications = useCallback(async () => {
+    if (!supabase || !session) {
+      return;
+    }
+
+    const courseId = session.golfCourseId ?? null;
+    let squadCodes: string[] | null = null;
+    if (courseId) {
+      const squadIds = await fetchGolfCourseSquadIds(supabase, courseId);
+      if (squadIds.length === 0) {
+        return;
+      }
+      const { data: squadRows } = await supabase
+        .from("squads")
+        .select("squad_code")
+        .in("id", squadIds);
+      squadCodes =
+        squadRows
+          ?.map((r) => String(r.squad_code).trim().toUpperCase())
+          .filter(Boolean) ?? [];
+      if (squadCodes.length === 0) {
+        return;
+      }
+    }
+
+    let query = supabase
+      .from("squad_field_photo_logs")
+      .select(
+        "id, squad_code, squad_name, latitude, longitude, accuracy_m, note, status, created_at",
+      )
+      .eq("status", "inviato")
+      .gt("created_at", dashboardOpenedAtRef.current)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (squadCodes) {
+      query = query.in("squad_code", squadCodes);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error || !data) {
+      return;
+    }
+    if (data.id === lastPhotoPollIdRef.current) {
+      return;
+    }
+    lastPhotoPollIdRef.current = data.id;
+    applyFieldPhotoNotification(data as FieldPhotoLogRow);
+  }, [supabase, session, applyFieldPhotoNotification]);
+
+  useEffect(() => {
+    if (!session) {
+      setPhotoNotification(null);
+      lastPhotoPollIdRef.current = null;
+      return;
+    }
+    dashboardOpenedAtRef.current = new Date().toISOString();
+    lastPhotoPollIdRef.current = null;
+    setPhotoNotification(null);
+  }, [session]);
+
+  useEffect(() => {
+    if (!session || !supabase) {
+      return;
+    }
+    void pollFieldPhotoNotifications();
+    const timer = window.setInterval(() => void pollFieldPhotoNotifications(), 4_000);
+    return () => window.clearInterval(timer);
+  }, [session, supabase, pollFieldPhotoNotifications]);
 
   const onlineSessionIds = useMemo(
     () => new Set(squads.map((s) => s.sessionId)),
@@ -619,19 +707,8 @@ export default function TocDashboard() {
         { event: "INSERT", schema: "public", table: "squad_field_photo_logs" },
         (payload) => {
           const row = payload.new as FieldPhotoLogRow;
-          if (row.status !== "inviato") {
-            return;
-          }
-          const detail = formatPhotoGpsDetail(
-            row.latitude,
-            row.longitude,
-            row.accuracy_m,
-            row.note,
-          );
-          setPhotoNotification({
-            photoId: row.id,
-            label: `Foto da ${row.squad_code} — apri Log eventi / scarica JPEG. ${detail}`,
-          });
+          lastPhotoPollIdRef.current = row.id;
+          applyFieldPhotoNotification(row);
         },
       )
       .subscribe();
@@ -649,7 +726,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(tocPushChannel);
       void supabase.removeChannel(fieldPhotoChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
