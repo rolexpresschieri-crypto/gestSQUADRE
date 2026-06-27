@@ -26,6 +26,7 @@ class SquadController extends ChangeNotifier {
   bool isInitializing = true;
   bool isBusy = false;
   String? bannerMessage;
+  bool bannerAlert = false;
   EventInfo? activeEvent;
   SquadSession? currentSession;
   String? lastTocMessage;
@@ -185,13 +186,15 @@ class SquadController extends ChangeNotifier {
     return true;
   }
 
-  void showTemporaryBanner(String message, {Duration duration = const Duration(seconds: 30)}) {
+  void showTemporaryBanner(String message, {Duration duration = const Duration(seconds: 15)}) {
     _bannerTimer?.cancel();
     bannerMessage = message;
+    bannerAlert = true;
     notifyListeners();
     _bannerTimer = Timer(duration, () {
       if (bannerMessage == message) {
         bannerMessage = null;
+        bannerAlert = false;
         notifyListeners();
       }
     });

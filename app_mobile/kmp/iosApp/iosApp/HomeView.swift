@@ -39,8 +39,21 @@ struct HomeView: View {
                             .padding(.bottom, 24)
 
                         if let banner = viewModel.bannerMessage, !banner.isEmpty {
-                            TacticalBodyText(text: banner)
-                                .padding(.bottom, 12)
+                            if viewModel.bannerAlert {
+                                Text(banner)
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .multilineTextAlignment(.center)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 10)
+                                    .background(TacticalColors.red)
+                                    .cornerRadius(8)
+                                    .padding(.bottom, 12)
+                            } else {
+                                TacticalBodyText(text: banner)
+                                    .padding(.bottom, 12)
+                            }
                         }
 
                         TocNotificationPanel(message: viewModel.lastTocMessage)

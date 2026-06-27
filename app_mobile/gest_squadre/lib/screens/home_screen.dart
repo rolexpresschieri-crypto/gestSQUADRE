@@ -107,11 +107,32 @@ class HomeScreen extends StatelessWidget {
                   if (controller.bannerMessage != null)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: Text(
-                        controller.bannerMessage!,
-                        textAlign: TextAlign.center,
-                        style: kTacticalBodyWhite.copyWith(fontSize: 14),
-                      ),
+                      child: controller.bannerAlert
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              decoration: BoxDecoration(
+                                color: tacticalRed,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                controller.bannerMessage!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              controller.bannerMessage!,
+                              textAlign: TextAlign.center,
+                              style: kTacticalBodyWhite.copyWith(fontSize: 14),
+                            ),
                     ),
                   if (controller.lastTocMessage != null)
                     Padding(

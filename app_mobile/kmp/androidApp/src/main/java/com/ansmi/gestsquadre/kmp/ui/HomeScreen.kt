@@ -328,7 +328,26 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 uiState.bannerMessage?.let { msg ->
-                    TacticalBodyText(text = msg, modifier = Modifier.padding(bottom = 12.dp))
+                    if (uiState.bannerAlert) {
+                        Surface(
+                            color = TacticalRed,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 12.dp),
+                        ) {
+                            Text(
+                                text = msg,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                            )
+                        }
+                    } else {
+                        TacticalBodyText(text = msg, modifier = Modifier.padding(bottom = 12.dp))
+                    }
                 }
 
                 TocNotificationPanel(

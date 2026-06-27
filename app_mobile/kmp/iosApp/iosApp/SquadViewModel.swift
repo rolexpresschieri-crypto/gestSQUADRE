@@ -8,6 +8,7 @@ final class SquadViewModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var loginBlockingMessage: String?
     @Published var bannerMessage: String?
+    @Published var bannerAlert = false
     @Published var lastTocMessage: String?
     @Published var isLoggedIn = false
     @Published var isBusy = false
@@ -355,14 +356,16 @@ final class SquadViewModel: ObservableObject {
     private func showTemporaryBanner(_ message: String) {
         bannerClearWorkItem?.cancel()
         bannerMessage = message
+        bannerAlert = true
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
             if self.bannerMessage == message {
                 self.bannerMessage = nil
+                self.bannerAlert = false
             }
         }
         bannerClearWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: work)
     }
 
     func sendAlarm(

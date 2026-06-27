@@ -43,6 +43,7 @@ data class SquadUiState(
     val isBusy: Boolean = false,
     val isInitializing: Boolean = true,
     val bannerMessage: String? = null,
+    val bannerAlert: Boolean = false,
     val lastTocMessage: String? = null,
     val backendConfigured: Boolean = false,
     val lastGpsAccuracyM: Double? = null,
@@ -186,13 +187,13 @@ class SquadViewModel(
 
     private fun showTemporaryBanner(message: String) {
         bannerClearJob?.cancel()
-        _uiState.update { it.copy(bannerMessage = message) }
+        _uiState.update { it.copy(bannerMessage = message, bannerAlert = true) }
         bannerClearJob =
             viewModelScope.launch {
-                delay(30_000)
+                delay(15_000)
                 _uiState.update { state ->
                     if (state.bannerMessage == message) {
-                        state.copy(bannerMessage = null)
+                        state.copy(bannerMessage = null, bannerAlert = false)
                     } else {
                         state
                     }
@@ -403,6 +404,7 @@ class SquadViewModel(
             _uiState.update {
                 it.copy(
                     bannerMessage = "Permesso posizione negato: abilitalo per gestSQUADRE.",
+                    bannerAlert = false,
                     gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
                 )
             }
@@ -522,6 +524,7 @@ class SquadViewModel(
                 session = session,
                 isBusy = false,
                 bannerMessage = null,
+                bannerAlert = false,
                 lastTocMessage = panelMessage,
                 lastGpsAccuracyM = null,
                 gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
@@ -660,6 +663,7 @@ class SquadViewModel(
                 lastGpsAccuracyM = null,
                 gpsStatusLabel = null,
                 bannerMessage = "Logout effettuato dal TOC.",
+                bannerAlert = false,
                 pushStatusLabel = null,
                 pushStatusOk = false,
             )
@@ -691,6 +695,7 @@ class SquadViewModel(
                 _uiState.update {
                     it.copy(
                         bannerMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC.",
+                        bannerAlert = false,
                         gpsStatusLabel = GpsPublishPolicy.accuracyLabel(null),
                     )
                 }
