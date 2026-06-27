@@ -1475,10 +1475,9 @@ export default function TocDashboard() {
     let fail = 0;
     const errors: string[] = [];
 
-    const pushWaypoint =
-      !pushTargetAll && pushTargetWaypointId
-        ? (waypoints.find((w) => w.id === pushTargetWaypointId) ?? null)
-        : null;
+    const pushWaypoint = pushTargetWaypointId
+      ? (waypoints.find((w) => w.id === pushTargetWaypointId) ?? null)
+      : null;
 
     for (const squad of targets) {
       const res = await fetch("/api/send-push", {
@@ -2300,11 +2299,21 @@ export default function TocDashboard() {
                   );
                 })
               : null}
-            {pushSingleTarget ? (
+            {pushTargetAll || pushSingleTarget ? (
               <>
                 <p className={styles.pushHint}>
-                  Destinatario: <strong>{pushSingleTarget.squadCode}</strong> — scegli il{" "}
-                  <strong>target</strong> (waypoint) da indicare nella notifica.
+                  {pushTargetAll ? (
+                    <>
+                      Push verso tutte le squadre online ({squads.length}).{" "}
+                    </>
+                  ) : (
+                    <>
+                      Destinatario: <strong>{pushSingleTarget!.squadCode}</strong>
+                      {" — "}
+                    </>
+                  )}
+                  Scegli il <strong>target</strong> (waypoint); usa{" "}
+                  <strong>NESSUNO</strong> se è solo una nota senza punto sulla mappa.
                 </p>
                 {waypoints.length > 0 ? (
                   <label className={styles.pushField}>
@@ -2314,7 +2323,7 @@ export default function TocDashboard() {
                       value={pushTargetWaypointId}
                       onChange={(e) => setPushTargetWaypointId(e.target.value)}
                     >
-                      <option value="">— Nessun target —</option>
+                      <option value="">NESSUNO</option>
                       {waypoints.map((wp) => (
                         <option key={wp.id} value={wp.id}>
                           {waypointDisplayName(wp)}
@@ -2325,14 +2334,13 @@ export default function TocDashboard() {
                 ) : (
                   <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
                     Nessun waypoint caricato: apri la pagina Waypoint o verifica l&apos;evento
-                    attivo.
+                    attivo. Puoi comunque inviare con target <strong>NESSUNO</strong>.
                   </p>
                 )}
               </>
-            ) : pushTargetAll ? (
+            ) : squads.length > 0 ? (
               <p className={styles.pushHint}>
-                Push verso tutte le squadre online ({squads.length}). Il target waypoint non si
-                applica in invio multiplo.
+                Seleziona una squadra o attiva «Tutte le squadre online».
               </p>
             ) : null}
             <label className={styles.pushField}>
