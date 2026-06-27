@@ -720,6 +720,7 @@ export default function EventLogsPage() {
                 </button>
               ) : null}
             </div>
+            <div className={styles.tableShell}>
             <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
@@ -810,6 +811,8 @@ export default function EventLogsPage() {
                 ))}
               </tbody>
             </table>
+            <div className={styles.tableScrollPad} aria-hidden="true" />
+          </div>
           </div>
           </>
         )}
