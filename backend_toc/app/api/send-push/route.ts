@@ -4,6 +4,10 @@ import { getFirebaseAdminMessaging } from "@/lib/firebase-admin-app";
 import { fcmIosApnsPayload } from "@/lib/fcm-ios-apns";
 import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
 import { tocPushBodyWithTarget, tocPushTextUpper } from "@/lib/toc-push-text";
+import {
+  fetchAutomaticNotifyRecipientCodes,
+  isAutomaticNotifyRecipientCode,
+} from "@/lib/auto-notify-recipient-codes";
 
 /** Firebase Admin richiede runtime Node (compatibile Vercel serverless). */
 export const runtime = "nodejs";
@@ -56,6 +60,7 @@ export async function POST(request: Request) {
     targetWaypointId?: string | null;
     targetWaypointLabel?: string | null;
     operationalEventId?: string | null;
+    broadcastAll?: boolean;
   };
 
   const adminSessionRaw = payload.session;
@@ -156,6 +161,18 @@ export async function POST(request: Request) {
     | null;
   const squadInfo = Array.isArray(squadJoin) ? squadJoin[0] : squadJoin;
   const eventId = session.event_id as string;
+  const squadCode = String(squadInfo?.squad_code ?? "").trim();
+
+  if (payload.broadcastAll === true) {
+    const autoRecipientCodes = await fetchAutomaticNotifyRecipientCodes(admin);
+    if (isAutomaticNotifyRecipientCode(squadCode, autoRecipientCodes)) {
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "auto_notify_recipient",
+      });
+    }
+  }
 
   let targetWaypointLabel: string | null = targetWaypointLabelFromClient || null;
   if (!targetWaypointLabel && targetWaypointId) {

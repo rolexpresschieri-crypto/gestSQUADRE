@@ -60,6 +60,10 @@ import {
   isOperationalEventActivatorSquad,
   OPERATIONAL_EVENT_ACTIVATOR_LABEL,
 } from "@/lib/operational-event-activators";
+import {
+  fetchAutomaticNotifyRecipientCodes,
+  isAutomaticNotifyRecipientCode,
+} from "@/lib/auto-notify-recipient-codes";
 import styles from "./toc-dashboard.module.css";
 
 const TOC_PUSH_TITLE = "TOC — ALLARME";
@@ -180,6 +184,9 @@ export default function TocDashboard() {
   const [operationalEventsLoadError, setOperationalEventsLoadError] = useState<
     string | null
   >(null);
+  const [autoNotifyRecipientCodes, setAutoNotifyRecipientCodes] = useState<
+    Set<string>
+  >(new Set());
 
   const canForceSquadLogout = session?.role === "admin";
   const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
@@ -337,6 +344,15 @@ export default function TocDashboard() {
     const picked = squads.filter((s) => pushSelected[s.sessionId]);
     return picked.length === 1 ? picked[0]! : null;
   }, [pushTargetAll, pushSelected, squads]);
+
+  const squadsForTocBroadcast = useMemo(
+    () =>
+      squads.filter(
+        (s) =>
+          !isAutomaticNotifyRecipientCode(s.squadCode, autoNotifyRecipientCodes),
+      ),
+    [squads, autoNotifyRecipientCodes],
+  );
 
   const handleSquadRowSelect = useCallback((squad: LiveSquad) => {
     setSelectedSessionId(squad.sessionId);
@@ -995,6 +1011,19 @@ export default function TocDashboard() {
     }
   }, [session, golfCourseId]);
 
+  const loadAutoNotifyRecipientCodes = useCallback(async () => {
+    if (!supabase) {
+      setAutoNotifyRecipientCodes(new Set());
+      return;
+    }
+    const codes = await fetchAutomaticNotifyRecipientCodes(supabase);
+    setAutoNotifyRecipientCodes(codes);
+  }, [supabase]);
+
+  useEffect(() => {
+    void loadAutoNotifyRecipientCodes();
+  }, [loadAutoNotifyRecipientCodes]);
+
   useEffect(() => {
     if (!session) {
       return;
@@ -1441,11 +1470,15 @@ export default function TocDashboard() {
     }
 
     const targets = pushTargetAll
-      ? squads
+      ? squadsForTocBroadcast
       : squads.filter((s) => pushSelected[s.sessionId]);
 
     if (targets.length === 0) {
-      setPushAlert("Seleziona una squadra destinataria.");
+      setPushAlert(
+        pushTargetAll
+          ? "Nessuna squadra volontario online da avvisare (escluse le GT inoltro automatico)."
+          : "Seleziona una squadra destinataria.",
+      );
       return;
     }
     if (!pushTargetAll && targets.length !== 1) {
@@ -1489,6 +1522,7 @@ export default function TocDashboard() {
           title,
           body,
           alarm: true,
+          broadcastAll: pushTargetAll,
           targetWaypointId: pushWaypoint?.id ?? null,
           targetWaypointLabel: pushWaypoint ? waypointDisplayName(pushWaypoint) : null,
           operationalEventId: pushOperationalEventId.trim() || null,
@@ -2304,7 +2338,11 @@ export default function TocDashboard() {
                 <p className={styles.pushHint}>
                   {pushTargetAll ? (
                     <>
-                      Push verso tutte le squadre online ({squads.length}).{" "}
+                      Push verso {squadsForTocBroadcast.length} squadre volontario online
+                      {squadsForTocBroadcast.length !== squads.length
+                        ? ` (escluse ${squads.length - squadsForTocBroadcast.length} GT inoltro automatico)`
+                        : ""}
+                      .{" "}
                     </>
                   ) : (
                     <>
