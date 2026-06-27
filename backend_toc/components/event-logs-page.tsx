@@ -623,6 +623,7 @@ export default function EventLogsPage() {
       </header>
 
       <div className={styles.panel}>
+        <div className={styles.panelScrollHead}>
         <p className={styles.hint}>
           Giornata attiva: <strong>{eventTitle || "—"}</strong> · Log unificati (tutta la storia) ·
           ordine predefinito: <strong>N° evento</strong> (crescente, righe senza numero in fondo)
@@ -694,6 +695,8 @@ export default function EventLogsPage() {
           </button>
         </div>
 
+        </div>
+
         {loading ? (
           <p>Caricamento log…</p>
         ) : filteredUnified.length === 0 ? (
@@ -703,7 +706,7 @@ export default function EventLogsPage() {
               : "Nessun log corrisponde al filtro tipologia selezionato."}
           </p>
         ) : (
-          <>
+          <div className={styles.tableArea}>
             <div className={styles.tableToolbar}>
               <p className={styles.tableSortHint}>
                 {sortColumn
@@ -814,7 +817,7 @@ export default function EventLogsPage() {
             <div className={styles.tableScrollPad} aria-hidden="true" />
           </div>
           </div>
-          </>
+          </div>
         )}
       </div>
     </div>

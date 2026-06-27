@@ -1596,7 +1596,8 @@ export default function TocDashboard() {
         </div>
         <p className={styles.operationalEventsHint}>
           Apertura automatica quando le squadre attivatore ({OPERATIONAL_EVENT_ACTIVATOR_LABEL})
-          inviano allarme dal campo. N° evento progressivo (reset solo con «Resetta log eventi»).
+          inviano allarme dal campo. Possono restare <strong>più eventi aperti</strong> insieme
+          (ogni allarme attivatore apre un nuovo N°). Progressivo reset solo con «Resetta log eventi».
           N° intervento max 20 caratteri alfanumerici, modificabile finché l&apos;evento è aperto.
           Chiusura solo da TOC.
         </p>
