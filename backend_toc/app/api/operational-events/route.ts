@@ -144,7 +144,7 @@ export async function POST(request: Request) {
     if (count > 0) {
       return NextResponse.json(
         {
-          error: `Impossibile chiudere evento ${row.displayNumber}: ${count} missione/i ancora aperta/e. Chiudile o forza reset TOC.`,
+          error: `Missioni collegate all'evento n° ${row.displayNumber} ancora aperte (${count}). Chiudile dalla colonna «Missioni TOC attive» o usa Reset forzato TOC.`,
         },
         { status: 409 },
       );
@@ -165,7 +165,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, eventId: operationalEventId });
+    const { data: linkedAlarms, error: linkedErr } = await admin
+      .from("squad_alarms")
+      .select("id, session_id")
+      .eq("operational_event_id", operationalEventId)
+      .is("acknowledged_at", null);
+
+    if (!linkedErr) {
+      await admin
+        .from("squad_alarms")
+        .update({
+          acknowledged_at: now,
+          acknowledged_by: session.code,
+        })
+        .eq("operational_event_id", operationalEventId)
+        .is("acknowledged_at", null);
+    }
+
+    const acknowledgedSessionIds = [
+      ...new Set(
+        (linkedAlarms ?? [])
+          .map((row) => String(row.session_id ?? "").trim())
+          .filter(Boolean),
+      ),
+    ];
+
+    return NextResponse.json({
+      ok: true,
+      eventId: operationalEventId,
+      acknowledgedSessionIds,
+    });
   }
 
   if (action === "intervention") {

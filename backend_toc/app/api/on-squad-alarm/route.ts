@@ -1,7 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
 import {
   forwardVolunteerAlarmToOperators,
+  hasAutoNotifyLogsForAlarm,
   type SquadAlarmNotifyRow,
 } from "@/lib/forward-volunteer-alarm";
 import { openOperationalEventFromSquadAlarm } from "@/lib/open-operational-event-from-squad-alarm";
@@ -90,11 +92,12 @@ function parseAlarmRow(body: unknown): SquadAlarmNotifyRow | null {
   };
 }
 
-export async function POST(request: Request) {
-  if (!authorizeWebhook(request)) {
-    return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
-  }
+function authorizeSession(session: AdminSessionData | null | undefined): boolean {
+  const role = session?.code ? normalizeAdminRole(session.role) : null;
+  return role === "admin" || role === "viewer";
+}
 
+export async function POST(request: Request) {
   const admin = getServiceSupabase();
   if (!admin) {
     return NextResponse.json(
@@ -110,7 +113,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Body JSON non valido" }, { status: 400 });
   }
 
-  const payload = body as { alarmId?: string };
+  const payload = body as {
+    alarmId?: string;
+    session?: AdminSessionData | null;
+  };
+
+  const webhookOk = authorizeWebhook(request);
+  const sessionOk = authorizeSession(payload.session);
+  if (!webhookOk && !sessionOk) {
+    return NextResponse.json({ error: "Non autorizzato." }, { status: 401 });
+  }
   let alarm: SquadAlarmNotifyRow | null = parseAlarmRow(body);
 
   if (!alarm && typeof payload.alarmId === "string" && UUID_RE.test(payload.alarmId)) {
@@ -143,7 +155,17 @@ export async function POST(request: Request) {
       squad_code: alarm.squad_code,
     });
 
-    const result = await forwardVolunteerAlarmToOperators(admin, alarm);
+    const alreadyForwarded = await hasAutoNotifyLogsForAlarm(admin, alarm.id);
+    const result = alreadyForwarded
+      ? {
+          alarmId: alarm.id,
+          recipientCodes: [] as string[],
+          sent: 0,
+          failed: 0,
+          skipped: 0,
+          alreadyForwarded: true,
+        }
+      : await forwardVolunteerAlarmToOperators(admin, alarm);
     return NextResponse.json({
       ok: true,
       ...result,

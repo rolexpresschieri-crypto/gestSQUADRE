@@ -127,14 +127,39 @@ export async function openOperationalEventFromSquadAlarm(
 
   const event = mapOperationalEventRow(inserted as OperationalEventRow);
 
-  const { error: linkErr } = await admin
+  const { data: linkedRows, error: linkErr } = await admin
     .from("squad_alarms")
     .update({ operational_event_id: event.id })
     .eq("id", alarm.id)
-    .is("operational_event_id", null);
+    .is("operational_event_id", null)
+    .select("operational_event_id");
 
   if (linkErr && !/operational_event_id|column/i.test(linkErr.message)) {
-    return { created: true, skipped: false, event, error: linkErr.message };
+    await admin.from("operational_events").delete().eq("id", event.id);
+    return { created: false, skipped: false, event: null, error: linkErr.message };
+  }
+
+  if (!linkedRows?.length) {
+    await admin.from("operational_events").delete().eq("id", event.id);
+    const { data: relinked } = await admin
+      .from("squad_alarms")
+      .select("operational_event_id")
+      .eq("id", alarm.id)
+      .maybeSingle();
+    const linkedId =
+      typeof relinked?.operational_event_id === "string"
+        ? relinked.operational_event_id.trim()
+        : "";
+    if (linkedId && UUID_RE.test(linkedId)) {
+      const winner = await fetchExistingOperationalEvent(admin, linkedId);
+      return { created: false, skipped: false, event: winner, error: null };
+    }
+    return {
+      created: false,
+      skipped: false,
+      event: null,
+      error: "Collegamento evento all'allarme non riuscito.",
+    };
   }
 
   if (linkErr) {
@@ -148,6 +173,7 @@ export async function openOperationalEventFromSquadAlarm(
         ? relinked.operational_event_id
         : null;
     if (linkedId && linkedId !== event.id) {
+      await admin.from("operational_events").delete().eq("id", event.id);
       const winner = await fetchExistingOperationalEvent(admin, linkedId);
       return { created: false, skipped: false, event: winner, error: null };
     }

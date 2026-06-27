@@ -27,7 +27,26 @@ export type ForwardVolunteerAlarmResult = {
   sent: number;
   failed: number;
   skipped: number;
+  alreadyForwarded?: boolean;
 };
+
+export async function hasAutoNotifyLogsForAlarm(
+  admin: SupabaseClient,
+  alarmId: string,
+): Promise<boolean> {
+  const { count, error } = await admin
+    .from("alarm_auto_notify_logs")
+    .select("id", { count: "exact", head: true })
+    .eq("alarm_id", alarmId);
+
+  if (error) {
+    if (error.message.includes("alarm_auto_notify_logs")) {
+      return false;
+    }
+    throw new Error(error.message);
+  }
+  return (count ?? 0) > 0;
+}
 
 async function writeAutoNotifyLog(
   admin: SupabaseClient,

@@ -455,13 +455,43 @@ export default function TocDashboard() {
     }
   }, [session, supabase, golfCourseId]);
 
+  function countOpenMissionsForEvent(eventId: string): number {
+    let count = 0;
+    for (const { assignment } of activeTocMissions) {
+      if (assignment.operationalEventId === eventId) {
+        count += 1;
+      }
+    }
+    for (const row of activeTocPushes) {
+      if (row.operationalEventId === eventId) {
+        count += 1;
+      }
+    }
+    for (const row of activeAutoNotifies) {
+      const alarm = alarms.find((a) => a.id === row.alarmId);
+      if (alarm?.operational_event_id === eventId) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   async function closeOperationalEvent(event: OperationalEventSummary) {
-    if (!session) {
+    if (!session || !supabase) {
+      return;
+    }
+    const openMissions = countOpenMissionsForEvent(event.id);
+    if (openMissions > 0) {
+      setStatusMessage(
+        `Missioni collegate all'evento n° ${event.displayNumber} ancora aperte (${openMissions}). ` +
+          "Chiudile dalla colonna «Missioni TOC attive» o usa Reset forzato TOC.",
+      );
       return;
     }
     if (
       !window.confirm(
         `Chiudere evento operativo n° ${event.displayNumber}?\n` +
+          "Chiude anche gli allarmi volontario collegati.\n" +
           "Non sarà più selezionabile per nuove missioni.",
       )
     ) {
@@ -478,13 +508,31 @@ export default function TocDashboard() {
           operationalEventId: event.id,
         }),
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json()) as {
+        error?: string;
+        acknowledgedSessionIds?: string[];
+      };
       if (!res.ok) {
         setStatusMessage(payload.error ?? "Chiusura evento fallita.");
         return;
       }
+      const sessionIds = new Set(payload.acknowledgedSessionIds ?? []);
+      for (const alarm of alarms.filter(
+        (row) => row.operational_event_id === event.id,
+      )) {
+        sessionIds.add(alarm.session_id);
+      }
+      for (const sessionId of sessionIds) {
+        await clearRouteAssignmentForSession(supabase, sessionId);
+        await closeSquadPanelOnMobile(sessionId);
+      }
       await loadOpenOperationalEvents();
-      setStatusMessage(`Evento operativo n° ${event.displayNumber} chiuso.`);
+      await loadAlarms();
+      await loadSelectedRouteAssignment();
+      debouncedLoadActiveAutoNotifies();
+      setStatusMessage(
+        `Evento operativo n° ${event.displayNumber} chiuso (allarmi collegati archiviati).`,
+      );
     } catch {
       setStatusMessage("Chiusura evento: errore di rete.");
     } finally {
@@ -622,49 +670,7 @@ export default function TocDashboard() {
     setAlarms(rows);
   }, [supabase, golfCourseId]);
 
-  const ensureOperationalEventForActivatorAlarm = useCallback(
-    async (row: AlarmRow) => {
-      if (!session || !isOperationalEventActivatorSquad(row.squad_code)) {
-        return;
-      }
-      try {
-        const res = await fetch("/api/operational-events/open-from-squad-alarm", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session, alarmId: row.id }),
-        });
-        const payload = (await res.json()) as {
-          error?: string;
-          event?: OperationalEventSummary;
-          created?: boolean;
-        };
-        if (!res.ok) {
-          setOperationalEventsLoadError(
-            payload.error ?? "Apertura evento da squadra attivatore fallita.",
-          );
-          return;
-        }
-        await loadOpenOperationalEvents();
-        await loadAlarms();
-        if (payload.event) {
-          setInterventionDrafts((prev) => ({
-            ...prev,
-            [payload.event!.id]: payload.event!.interventionRef ?? "",
-          }));
-          setStatusMessage(
-            payload.created
-              ? `EVENTO OPERATIVO n° ${payload.event.displayNumber} aperto da ${row.squad_code}.`
-              : `EVENTO OPERATIVO n° ${payload.event.displayNumber} attivo (${row.squad_code}).`,
-          );
-        }
-      } catch {
-        setOperationalEventsLoadError(
-          "Apertura evento da squadra attivatore: errore di rete.",
-        );
-      }
-    },
-    [session, loadOpenOperationalEvents, loadAlarms],
-  );
+  const processedAlarmForwardRef = useRef<Set<string>>(new Set());
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
@@ -840,6 +846,83 @@ export default function TocDashboard() {
     };
   }, [loadActiveAutoNotifies]);
 
+  const ensureVolunteerAlarmProcessed = useCallback(
+    async (row: AlarmRow) => {
+      if (!session || processedAlarmForwardRef.current.has(row.id)) {
+        return;
+      }
+      processedAlarmForwardRef.current.add(row.id);
+
+      const isActivator = isOperationalEventActivatorSquad(row.squad_code);
+      if (isActivator) {
+        setStatusMessage(
+          `ALLARME ATTIVATORE ${row.squad_code} — ${formatAlarmRequestDetail(row)} (inoltro automatico…)`,
+        );
+      }
+
+      try {
+        const res = await fetch("/api/on-squad-alarm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session, alarmId: row.id }),
+        });
+        const payload = (await res.json()) as {
+          error?: string;
+          operationalEvent?: OperationalEventSummary;
+          operationalEventCreated?: boolean;
+          sent?: number;
+          skipped?: number;
+          failed?: number;
+          alreadyForwarded?: boolean;
+        };
+        if (!res.ok) {
+          processedAlarmForwardRef.current.delete(row.id);
+          setStatusMessage(
+            payload.error ?? "Inoltro automatico allarme fallito.",
+          );
+          return;
+        }
+
+        debouncedLoadActiveAutoNotifies();
+
+        if (payload.operationalEvent) {
+          await loadOpenOperationalEvents();
+          setInterventionDrafts((prev) => ({
+            ...prev,
+            [payload.operationalEvent!.id]:
+              payload.operationalEvent!.interventionRef ?? "",
+          }));
+          if (isActivator) {
+            setStatusMessage(
+              payload.operationalEventCreated
+                ? `EVENTO OPERATIVO n° ${payload.operationalEvent.displayNumber} aperto da ${row.squad_code}.`
+                : `EVENTO OPERATIVO n° ${payload.operationalEvent.displayNumber} attivo (${row.squad_code}).`,
+            );
+          }
+        } else if (!isActivator) {
+          const total =
+            (payload.sent ?? 0) + (payload.skipped ?? 0) + (payload.failed ?? 0);
+          if (total > 0 || payload.alreadyForwarded) {
+            setStatusMessage(
+              `ALLARME ${row.squad_code} — inoltro automatico verso squadre GT.`,
+            );
+          }
+        }
+
+        await loadAlarms();
+      } catch {
+        processedAlarmForwardRef.current.delete(row.id);
+        setStatusMessage("Inoltro automatico allarme: errore di rete.");
+      }
+    },
+    [
+      session,
+      loadOpenOperationalEvents,
+      loadAlarms,
+      debouncedLoadActiveAutoNotifies,
+    ],
+  );
+
   useEffect(() => {
     if (!session) {
       return;
@@ -874,6 +957,18 @@ export default function TocDashboard() {
     }
     debouncedLoadActiveAutoNotifies();
   }, [session, openAlarmIdsSig, debouncedLoadActiveAutoNotifies]);
+
+  useEffect(() => {
+    if (!session || !openAlarmIdsSig) {
+      return;
+    }
+    for (const alarmId of openAlarmIdsSig.split("|")) {
+      const row = alarms.find((alarm) => alarm.id === alarmId);
+      if (row) {
+        void ensureVolunteerAlarmProcessed(row);
+      }
+    }
+  }, [session, openAlarmIdsSig, alarms, ensureVolunteerAlarmProcessed]);
 
   useEffect(() => {
     void loadSelectedRouteAssignment();
@@ -937,13 +1032,12 @@ export default function TocDashboard() {
             const detail = formatAlarmRequestDetail(row);
             if (isOperationalEventActivatorSquad(row.squad_code)) {
               setStatusMessage(
-                `ALLARME ATTIVATORE ${row.squad_code} — ${detail} (apertura evento operativo…)`,
+                `ALLARME ATTIVATORE ${row.squad_code} — ${detail} (inoltro automatico…)`,
               );
-              void ensureOperationalEventForActivatorAlarm(row);
-              window.setTimeout(() => void loadOpenOperationalEvents(), 600);
             } else {
               setStatusMessage(`ALLARME: ${row.squad_code} — ${detail}`);
             }
+            void ensureVolunteerAlarmProcessed(row);
             void loadSelectedRouteAssignment([row.session_id]);
             debouncedLoadActiveAutoNotifies();
           } else {
@@ -1038,7 +1132,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(tocPushChannel);
       void supabase.removeChannel(fieldPhotoChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents, ensureOperationalEventForActivatorAlarm]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents, ensureVolunteerAlarmProcessed]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1260,8 +1354,8 @@ export default function TocDashboard() {
     const routeHint = activeRoute ? ` Via ${activeRoute.routeCode} rimossa dalla mappa.` : "";
     setStatusMessage(
       routeClear.error
-        ? `Fine evento — squadra non più in rosso (errore via: ${routeClear.error}).`
-        : `Fine evento registrato — squadra non più in rosso.${routeHint}`,
+        ? `Segnalazione archiviata — squadra non più in rosso (errore via: ${routeClear.error}).`
+        : `Segnalazione archiviata — squadra non più in rosso.${routeHint}`,
     );
   }
 
@@ -1594,13 +1688,6 @@ export default function TocDashboard() {
             </span>
           ) : null}
         </div>
-        <p className={styles.operationalEventsHint}>
-          Apertura automatica quando le squadre attivatore ({OPERATIONAL_EVENT_ACTIVATOR_LABEL})
-          inviano allarme dal campo. Possono restare <strong>più eventi aperti</strong> insieme
-          (ogni allarme attivatore apre un nuovo N°). Progressivo reset solo con «Resetta log eventi».
-          N° intervento max 20 caratteri alfanumerici, modificabile finché l&apos;evento è aperto.
-          Chiusura solo da TOC.
-        </p>
         {openOperationalEvents.length === 0 ? (
           <p className={styles.operationalEventsEmpty}>
             Nessun evento operativo aperto. In attesa di allarme da{" "}
@@ -1728,6 +1815,8 @@ export default function TocDashboard() {
           </h2>
           <p className={styles.opsColumnHint}>
             Segnalazioni dalla squadra sul campo. Nessuna push verso il TOC.
+            Se l&apos;allarme ha un Ev. N, chiudilo con <strong>CHIUDI EVENTO</strong> in alto
+            (dopo aver chiuso le missioni collegate).
           </p>
           <div className={styles.opsColumnBody}>
             {pendingAlarms.length === 0 ? (
@@ -1775,16 +1864,22 @@ export default function TocDashboard() {
                     <p className={styles.alarmMeta}>
                       {new Date(a.created_at).toLocaleString("it-IT")}
                     </p>
-                    <button
-                      className={styles.btnSmall}
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void acknowledgeAlarm(a);
-                      }}
-                    >
-                      Fine evento
-                    </button>
+                    {eventNumber != null ? (
+                      <p className={styles.autoNotifyHint}>
+                        Chiudi con <strong>CHIUDI EVENTO</strong> (N° {eventNumber}) in alto.
+                      </p>
+                    ) : (
+                      <button
+                        className={styles.btnSmall}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void acknowledgeAlarm(a);
+                        }}
+                      >
+                        Archivia segnalazione
+                      </button>
+                    )}
                   </div>
                 </div>
                 );
@@ -1854,7 +1949,7 @@ export default function TocDashboard() {
                           void endTocMission(assignment, squad);
                         }}
                       >
-                        Fine evento
+                        Fine missione
                       </button>
                     </div>
                   </div>

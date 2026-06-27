@@ -380,10 +380,7 @@ export async function supplementMissionsFromOpenAlarms(
       if (covered.has(key) || dismissedKeys.has(key)) {
         continue;
       }
-      const sessionId = sessionByCode.get(recipient);
-      if (!sessionId) {
-        continue;
-      }
+      const sessionId = sessionByCode.get(recipient) ?? null;
 
       supplement.push({
         id: `mission-${alarm.id}-${recipient}`,
