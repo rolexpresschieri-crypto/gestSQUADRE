@@ -41,6 +41,7 @@ final class SquadViewModel: ObservableObject {
     private var sessionWatchTimer: Timer?
     private var pushWatchTimer: Timer?
     private var bannerClearWorkItem: DispatchWorkItem?
+    private var backgroundLocationPromptPending = false
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
@@ -167,10 +168,18 @@ final class SquadViewModel: ObservableObject {
     }
 
     func onLocationPermissionGranted() {
+        if locationTracker.isLocationPermissionDenied() {
+            needsLocationPermission = false
+            bannerMessage = "Permesso posizione negato: abilitalo per gestSQUADRE."
+            bannerAlert = false
+            gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+            return
+        }
         guard locationTracker.hasLocationPermission() else { return }
         needsLocationPermission = false
         if locationTracker.shouldPromptBackgroundLocation() {
             needsBackgroundLocationPermission = true
+            backgroundLocationPromptPending = true
             locationTracker.requestBackgroundLocationAuthorization()
         }
         startGpsTracking()
@@ -184,6 +193,7 @@ final class SquadViewModel: ObservableObject {
     func requestBackgroundLocationPermission() {
         guard isLoggedIn, locationTracker.hasLocationPermission() else { return }
         needsBackgroundLocationPermission = true
+        backgroundLocationPromptPending = true
         locationTracker.requestBackgroundLocationAuthorization()
     }
 
@@ -195,13 +205,33 @@ final class SquadViewModel: ObservableObject {
     func syncBackgroundPermissionFromSettings() {
         if needsBackgroundLocationPermission, locationTracker.hasBackgroundLocationPermission() {
             onBackgroundLocationPermissionGranted()
+            backgroundLocationPromptPending = false
+            return
+        }
+        if backgroundLocationPromptPending,
+           locationTracker.hasLocationPermission(),
+           !locationTracker.hasBackgroundLocationPermission() {
+            backgroundLocationPromptPending = false
+            bannerMessage =
+                "Per il tracking in tasca scegli «Consenti sempre» per la posizione " +
+                "(Impostazioni → gestSQUADRE → Posizione)."
+            bannerAlert = false
         }
     }
 
     func onNotificationPermissionGranted() {
-        needsNotificationPermission = false
-        guard let facade, let session else { return }
-        registerFcmForSession(session, facade: facade)
+        FcmManager.shared.hasNotificationPermission { [weak self] granted in
+            guard let self else { return }
+            self.needsNotificationPermission = !granted
+            if !granted {
+                self.bannerMessage =
+                    "Notifiche disabilitate: abilitale in Impostazioni per vedere gli allarmi sul telefono."
+                self.bannerAlert = false
+                return
+            }
+            guard let facade, let session = self.session else { return }
+            self.registerFcmForSession(session, facade: facade)
+        }
     }
 
     func retryPushRegistration() {
@@ -465,6 +495,7 @@ final class SquadViewModel: ObservableObject {
         sessionLabel = "\(session.squadName) + \(session.loginTimeLabel())"
         statusMessage = "Connesso. I dati vanno su Supabase (TOC Windows li vede subito)."
         bannerMessage = nil
+        bannerAlert = false
         gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
         lastGpsAccuracyM = nil
         let localPanel = TocMessageStorage.shared.load()
@@ -505,14 +536,27 @@ final class SquadViewModel: ObservableObject {
                 guard let self else { return }
                 if !granted {
                     self.needsNotificationPermission = true
-                    FcmManager.shared.requestNotificationPermission { _ in }
+                    FcmManager.shared.requestNotificationPermission { [weak self] allowed in
+                        guard let self else { return }
+                        if !allowed {
+                            self.bannerMessage =
+                                "Notifiche disabilitate: abilitale in Impostazioni per vedere gli allarmi sul telefono."
+                            self.bannerAlert = false
+                        } else {
+                            self.needsNotificationPermission = false
+                        }
+                        self.registerFcmForSession(session, facade: facade)
+                    }
+                } else {
+                    self.needsNotificationPermission = false
+                    self.registerFcmForSession(session, facade: facade)
                 }
-                self.registerFcmForSession(session, facade: facade)
             }
         } else {
             pushStatusLabel = "Push TOC disabilitata (Firebase iOS non configurato)."
             pushStatusOk = false
             bannerMessage = "Push TOC disabilitata: aggiungi FIREBASE_IOS_* in dart-defines.json."
+            bannerAlert = false
         }
     }
 
@@ -534,9 +578,16 @@ final class SquadViewModel: ObservableObject {
                 let registeredOnServer = err.localizedCaseInsensitiveContains("Push registrata")
                 self.pushStatusLabel = err
                 self.pushStatusOk = registeredOnServer
+                self.bannerMessage = err
             } else {
                 self.pushStatusLabel = "Push TOC: attiva (il server può inviarti allarmi)."
                 self.pushStatusOk = true
+                if let msg = self.bannerMessage {
+                    let lower = msg.lowercased()
+                    if lower.contains("token push") || lower.contains("push toc") || lower.contains("notifiche") {
+                        self.bannerMessage = nil
+                    }
+                }
             }
             self.startPushWatchdog(session: session, facade: facade)
         }
@@ -654,7 +705,8 @@ final class SquadViewModel: ObservableObject {
         pushStatusOk = false
         TocMessageStorage.shared.clear()
         lastTocMessage = nil
-        bannerMessage = "Sessione chiusa: login su un altro telefono o logout dal TOC."
+        bannerMessage = "Logout effettuato dal TOC."
+        bannerAlert = false
     }
 
     private func startGpsTracking() {
@@ -663,10 +715,18 @@ final class SquadViewModel: ObservableObject {
         if !locationTracker.isLocationServiceEnabled() {
             gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
             bannerMessage = "Attiva il GPS sul telefono per inviare la posizione al TOC."
+            bannerAlert = false
             return
         }
 
         if !locationTracker.hasLocationPermission() {
+            if locationTracker.isLocationPermissionDenied() {
+                needsLocationPermission = false
+                bannerMessage = "Permesso posizione negato: abilitalo per gestSQUADRE."
+                bannerAlert = false
+                gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
+                return
+            }
             needsLocationPermission = true
             locationTracker.requestLocationAuthorization()
             gpsStatusLabel = GpsPublishPolicy.shared.accuracyLabel(accuracyM: nil)
@@ -676,6 +736,7 @@ final class SquadViewModel: ObservableObject {
         needsLocationPermission = false
         if locationTracker.shouldPromptBackgroundLocation() {
             needsBackgroundLocationPermission = true
+            backgroundLocationPromptPending = true
             locationTracker.requestBackgroundLocationAuthorization()
         }
 
@@ -760,6 +821,7 @@ final class SquadViewModel: ObservableObject {
                     accuracyM: position.accuracyMeters
                 )
                 self.bannerMessage = nil
+                self.bannerAlert = false
             }
         }
     }
@@ -849,6 +911,6 @@ enum SquadAlarmCopy {
         "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
     static let dialogTitle = "Segnala allarme su mappa TOC"
     static let dialogBody =
-        "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Preso in carico»."
+        "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
     static let sentOk = "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
 }
