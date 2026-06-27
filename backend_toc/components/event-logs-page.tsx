@@ -20,8 +20,11 @@ import {
   filterUnifiedEventLogsByAlarmTypes,
   mergeEventLogs,
   printEventLogsAsPdf,
+  sortUnifiedEventLogs,
+  sortUnifiedEventLogsByColumn,
   type AlarmAutoNotifyLogRow,
   type EventLogAlarmFilterCode,
+  type EventLogSortColumn,
   type OperationalEventLogMeta,
   type OperationalEventLogSourceRow,
   type SquadAlarmLogRow,
@@ -70,6 +73,8 @@ export default function EventLogsPage() {
     vvf: false,
     strutture: false,
   });
+  const [sortColumn, setSortColumn] = useState<EventLogSortColumn | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const isAdmin = session ? canManageEventLogs(session.role) : false;
 
@@ -414,6 +419,38 @@ export default function EventLogsPage() {
     [unified, selectedAlarmFilterCodes],
   );
 
+  const displayedUnified = useMemo(() => {
+    if (!sortColumn) {
+      return sortUnifiedEventLogs(filteredUnified);
+    }
+    return sortUnifiedEventLogsByColumn(filteredUnified, sortColumn, sortDirection);
+  }, [filteredUnified, sortColumn, sortDirection]);
+
+  function toggleSortColumn(column: EventLogSortColumn) {
+    if (sortColumn === column) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortColumn(column);
+    setSortDirection("asc");
+  }
+
+  function resetSortOrder() {
+    setSortColumn(null);
+    setSortDirection("asc");
+  }
+
+  function renderSortIndicator(column: EventLogSortColumn) {
+    if (sortColumn !== column) {
+      return <span className={styles.sortIndicator}>↕</span>;
+    }
+    return (
+      <span className={styles.sortIndicator} aria-hidden>
+        {sortDirection === "asc" ? "▲" : "▼"}
+      </span>
+    );
+  }
+
   useEffect(() => {
     if (!highlightPhotoId || loading || photoHighlightDoneRef.current) {
       return;
@@ -424,7 +461,7 @@ export default function EventLogsPage() {
     }
     photoHighlightDoneRef.current = true;
     row.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlightPhotoId, loading, filteredUnified]);
+  }, [highlightPhotoId, loading, displayedUnified]);
 
   function toggleExportAll(checked: boolean) {
     setExportAllLogs(checked);
@@ -490,7 +527,7 @@ export default function EventLogsPage() {
       return;
     }
     const csv = eventLogsToCsv(
-      filteredUnified,
+      displayedUnified,
       eventTitle,
       exportAllLogs ? undefined : filterLabel,
     );
@@ -504,12 +541,12 @@ export default function EventLogsPage() {
       setStatus("Seleziona almeno una tipologia allarme oppure «Tutti i log».");
       return;
     }
-    if (filteredUnified.length === 0) {
+    if (displayedUnified.length === 0) {
       setStatus("Nessun log da esportare con il filtro selezionato.");
       return;
     }
     const ok = printEventLogsAsPdf(
-      filteredUnified,
+      displayedUnified,
       eventTitle,
       exportAllLogs ? undefined : filterLabel,
     );
@@ -588,7 +625,8 @@ export default function EventLogsPage() {
       <div className={styles.panel}>
         <p className={styles.hint}>
           Giornata attiva: <strong>{eventTitle || "—"}</strong> · Log unificati (tutta la storia) ·
-          ordinati per N° evento operativo e data/ora
+          ordine predefinito: <strong>N° evento</strong> (crescente, righe senza numero in fondo)
+          poi <strong>data/ora</strong> (crescente). Clicca le intestazioni per ordinare manualmente.
           {session && isCampoGolfSession(session) ? (
             <>
               {" "}
@@ -665,23 +703,75 @@ export default function EventLogsPage() {
               : "Nessun log corrisponde al filtro tipologia selezionato."}
           </p>
         ) : (
-          <div className={styles.tableWrap}>
+          <>
+            <div className={styles.tableToolbar}>
+              <p className={styles.tableSortHint}>
+                {sortColumn
+                  ? `Ordinamento manuale: ${sortColumn} (${sortDirection === "asc" ? "crescente" : "decrescente"})`
+                  : "Ordinamento predefinito attivo"}
+              </p>
+              {sortColumn ? (
+                <button
+                  type="button"
+                  className={styles.btnSortReset}
+                  onClick={resetSortOrder}
+                >
+                  Ripristina ordine predefinito
+                </button>
+              ) : null}
+            </div>
+            <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>N° evento</th>
-                  <th>N° intervento</th>
-                  <th>Data/ora</th>
-                  <th>Tipo</th>
-                  <th>Squadra</th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "operationalEventNumber" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("operationalEventNumber")}
+                  >
+                    N° evento{renderSortIndicator("operationalEventNumber")}
+                  </th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "interventionRef" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("interventionRef")}
+                  >
+                    N° intervento{renderSortIndicator("interventionRef")}
+                  </th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "createdAt" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("createdAt")}
+                  >
+                    Data/ora{renderSortIndicator("createdAt")}
+                  </th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "summary" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("summary")}
+                  >
+                    Tipo{renderSortIndicator("summary")}
+                  </th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "squadCode" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("squadCode")}
+                  >
+                    Squadra{renderSortIndicator("squadCode")}
+                  </th>
                   <th>Dettaglio messaggio</th>
-                  <th>Stato</th>
-                  <th>Operatore</th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "status" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("status")}
+                  >
+                    Stato{renderSortIndicator("status")}
+                  </th>
+                  <th
+                    className={`${styles.sortableTh} ${sortColumn === "actor" ? styles.sortableThActive : ""}`}
+                    onClick={() => toggleSortColumn("actor")}
+                  >
+                    Operatore{renderSortIndicator("actor")}
+                  </th>
                   <th>Foto</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUnified.map((r) => (
+                {displayedUnified.map((r) => (
                   <tr
                     key={`${r.kind}-${r.id}`}
                     id={`log-row-${r.kind}-${r.id}`}
@@ -721,6 +811,7 @@ export default function EventLogsPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
     </div>

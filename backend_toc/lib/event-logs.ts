@@ -238,6 +238,63 @@ export function sortUnifiedEventLogs(rows: UnifiedEventLog[]): UnifiedEventLog[]
   });
 }
 
+export type EventLogSortColumn =
+  | "operationalEventNumber"
+  | "interventionRef"
+  | "createdAt"
+  | "summary"
+  | "squadCode"
+  | "status"
+  | "actor";
+
+function compareUnifiedEventLogColumn(
+  a: UnifiedEventLog,
+  b: UnifiedEventLog,
+  column: EventLogSortColumn,
+): number {
+  switch (column) {
+    case "operationalEventNumber": {
+      const an = a.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
+      const bn = b.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
+      return an - bn;
+    }
+    case "interventionRef":
+      return (a.interventionRef ?? "").localeCompare(b.interventionRef ?? "", "it", {
+        sensitivity: "base",
+      });
+    case "createdAt":
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    case "summary":
+      return a.summary.localeCompare(b.summary, "it", { sensitivity: "base" });
+    case "squadCode": {
+      const as = `${a.squadCode} ${a.squadName}`;
+      const bs = `${b.squadCode} ${b.squadName}`;
+      return as.localeCompare(bs, "it", { sensitivity: "base" });
+    }
+    case "status":
+      return a.status.localeCompare(b.status, "it", { sensitivity: "base" });
+    case "actor":
+      return a.actor.localeCompare(b.actor, "it", { sensitivity: "base" });
+    default:
+      return 0;
+  }
+}
+
+export function sortUnifiedEventLogsByColumn(
+  rows: UnifiedEventLog[],
+  column: EventLogSortColumn,
+  direction: "asc" | "desc",
+): UnifiedEventLog[] {
+  const mul = direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    let cmp = compareUnifiedEventLogColumn(a, b, column);
+    if (cmp === 0 && column !== "createdAt") {
+      cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    }
+    return cmp * mul;
+  });
+}
+
 export function mergeEventLogs(
   alarms: SquadAlarmLogRow[],
   pushes: TocPushLogRow[],
