@@ -1486,6 +1486,21 @@ export default function TocDashboard() {
       return;
     }
 
+    if (!pushOperationalEventId.trim() && openOperationalEvents.length > 0) {
+      const eventList = openOperationalEvents
+        .map((event) => `N° ${event.displayNumber}`)
+        .join(", ");
+      const proceedWithoutEvent = window.confirm(
+        "Evento di riferimento: NESSUNO.\n\n" +
+          `Eventi operativi aperti: ${eventList}.\n\n` +
+          "Senza evento la missione non sarà collegata alla chiusura dell'evento operativo.\n\n" +
+          "Annulla per tornare indietro e selezionare l'evento, oppure OK per inviare comunque.",
+      );
+      if (!proceedWithoutEvent) {
+        return;
+      }
+    }
+
     const missingPushCodes = new Set(
       (pushHealth?.onlineSquadsMissingPush ?? []).map((c) => c.toUpperCase()),
     );
