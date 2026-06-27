@@ -61,6 +61,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.ansmi.gestsquadre.kmp.location.AndroidPermissionHints
 import com.ansmi.gestsquadre.kmp.ui.components.AppTitleBlock
 import com.ansmi.gestsquadre.kmp.ui.components.MainButton
 import com.ansmi.gestsquadre.kmp.ui.components.TacticalBodyText
@@ -437,6 +438,20 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
+                    TacticalBodyText(
+                        text = AndroidPermissionHints.UNUSED_APP_PERMISSIONS_HINT,
+                        fontSize = 12,
+                        color = TacticalYellow,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                    MainButton(
+                        label = "Impostazioni gestSQUADRE",
+                        backgroundColor = TacticalNavy,
+                        foregroundColor = Color.White,
+                        onClick = { viewModel.openAppSettings() },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))

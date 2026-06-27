@@ -437,6 +437,24 @@
     <p><strong>Verifica manuale:</strong> Impostazioni → App → gestSQUADRE → Autorizzazioni →
       Posizione e Notifiche devono essere <strong>consentite</strong>.</p>
 
+    <h4>0.4b Android — «Gestisci l'app se inutilizzata» (molto importante)</h4>
+    <p>Su molti telefoni Android (Samsung, Xiaomi, Pixel, ecc.) c'è un'opzione che
+      <strong>revoca da sola</strong> GPS e notifiche se l'app non viene aperta per qualche giorno.
+      Se resta attiva, il volontario sembra loggato ma il TOC non vede più la posizione e non arrivano push.</p>
+    <div class="warn">
+      In <strong>Impostazioni → App → gestSQUADRE</strong> (o «Info app»), cerca
+      <strong>«Gestisci l'app se inutilizzata»</strong> / <strong>«Rimuovi autorizzazioni se l'app non viene usata»</strong>
+      e <strong>disattivala</strong> (spunta/toggle <strong>OFF</strong>).
+      Su alcuni modelli è sotto <strong>Autorizzazioni</strong> o nel menu ⋮ in alto a destra.
+    </div>
+    <ol>
+      <li>Impostazioni → App → gestSQUADRE.</li>
+      <li>Apri <strong>Gestisci l'app se inutilizzata</strong> (nome leggermente diverso a seconda del produttore).</li>
+      <li>Disattiva <strong>Rimuovi le autorizzazioni se l'app non viene usata</strong>.</li>
+      <li>Ricontrolla che <strong>Posizione</strong> e <strong>Notifiche</strong> siano ancora consentite.</li>
+    </ol>
+    <p>Dopo ogni aggiornamento APK o cambio telefono, ripetere questa verifica insieme al login di prova.</p>
+
     <h3><span class="platform-tag platform-ios">iOS</span> 0.5 Panoramica installazione iPhone</h3>
     <ul>
       <li>Su iPhone <strong>non</strong> si usa un file APK: l'app è distribuita come <strong>IPA</strong>
@@ -539,6 +557,7 @@
       <li>App <strong>gestSQUADRE</strong> installata e si apre senza errori.</li>
       <li><strong>Posizione</strong> consentita.</li>
       <li><strong>Notifiche</strong> consentite.</li>
+      <li><strong>Android:</strong> disattivato «Rimuovi autorizzazioni se l'app non viene usata» (§0.4b).</li>
       <li>Login di prova con codice squadra e password forniti dal TOC.</li>
       <li>In home: indicatore <strong>Push TOC: attiva</strong> (verde). Se rosso → <strong>Ripara push TOC</strong>.</li>
       <li>Il TOC vede la squadra <strong>online</strong> sulla dashboard.</li>

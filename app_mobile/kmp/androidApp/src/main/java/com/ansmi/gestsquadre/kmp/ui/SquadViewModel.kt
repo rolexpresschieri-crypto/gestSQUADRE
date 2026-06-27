@@ -7,6 +7,7 @@ import com.ansmi.gestsquadre.kmp.BuildConfig
 import com.ansmi.gestsquadre.kmp.data.SessionStorage
 import com.ansmi.gestsquadre.kmp.data.TocMessageStorage
 import com.ansmi.gestsquadre.kmp.data.TocOperatorStorage
+import com.ansmi.gestsquadre.kmp.location.AndroidPermissionHints
 import com.ansmi.gestsquadre.kmp.location.GpsLocationPermissions
 import com.ansmi.gestsquadre.kmp.location.GpsTrackingController
 import com.ansmi.gestsquadre.kmp.location.GpsTrackingRuntime
@@ -84,6 +85,7 @@ class SquadViewModel(
     private var pushWatchJob: Job? = null
     private var activityInForeground = false
     private var pendingGpsStart = false
+    private var runtimePermissionsWereGranted = false
 
     init {
         viewModelScope.launch {
@@ -394,8 +396,33 @@ class SquadViewModel(
         _uiState.update { it.copy(requestNotificationPermission = false) }
     }
 
+    fun openAppSettings() {
+        AndroidPermissionHints.openAppDetailsSettings(appContext)
+    }
+
+    private fun markRuntimePermissionsGrantedIfPresent() {
+        if (AndroidPermissionHints.hasRequiredRuntimePermissions(appContext)) {
+            runtimePermissionsWereGranted = true
+        }
+    }
+
+    private fun checkRevokedPermissionsOnResume() {
+        if (_uiState.value.session == null) {
+            return
+        }
+        val hasNow = AndroidPermissionHints.hasRequiredRuntimePermissions(appContext)
+        if (hasNow) {
+            runtimePermissionsWereGranted = true
+            return
+        }
+        if (runtimePermissionsWereGranted) {
+            showTemporaryBanner(AndroidPermissionHints.PERMISSIONS_REVOKED_HINT)
+        }
+    }
+
     fun onLocationPermissionResult(granted: Boolean) {
         if (granted) {
+            markRuntimePermissionsGrantedIfPresent()
             if (GpsLocationPermissions.shouldPromptBackgroundLocation(appContext)) {
                 _uiState.update { it.copy(requestBackgroundLocationPermission = true) }
             }
@@ -452,6 +479,7 @@ class SquadViewModel(
             tryStartGpsIfReady()
             retryPushRegistration()
             processFieldPhotoQueue()
+            checkRevokedPermissionsOnResume()
         }
     }
 
@@ -470,6 +498,9 @@ class SquadViewModel(
     fun onNotificationPermissionResult(granted: Boolean) {
         val session = _uiState.value.session ?: return
         viewModelScope.launch {
+            if (granted) {
+                markRuntimePermissionsGrantedIfPresent()
+            }
             if (!granted) {
                 _uiState.update {
                     it.copy(
@@ -550,6 +581,7 @@ class SquadViewModel(
                 )
             }
         }
+        markRuntimePermissionsGrantedIfPresent()
         processFieldPhotoQueue()
     }
 
@@ -671,6 +703,7 @@ class SquadViewModel(
     }
 
     private suspend fun clearLocalSession() {
+        runtimePermissionsWereGranted = false
         stopPushWatchdog()
         FcmSessionRegistry.clear()
         sessionStorage.clear()
