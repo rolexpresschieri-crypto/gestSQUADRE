@@ -381,7 +381,7 @@ export default function TocDashboard() {
           "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
         )
         .eq("status", "aperto")
-        .order("display_number", { ascending: true });
+        .order("display_number", { ascending: false });
 
       if (golfCourseId) {
         query = query.eq("golf_course_id", golfCourseId);
@@ -435,7 +435,9 @@ export default function TocDashboard() {
         setOpenOperationalEvents([]);
         return;
       }
-      const rows = body.rows ?? [];
+      const rows = [...(body.rows ?? [])].sort(
+        (a, b) => b.displayNumber - a.displayNumber,
+      );
       setOperationalEventsLoadError(null);
       setOpenOperationalEvents(rows);
       setInterventionDrafts((prev) => {
