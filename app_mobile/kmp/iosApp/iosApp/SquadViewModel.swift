@@ -365,7 +365,7 @@ final class SquadViewModel: ObservableObject {
             }
         }
         bannerClearWorkItem = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 15, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: work)
     }
 
     func sendAlarm(

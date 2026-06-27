@@ -186,7 +186,7 @@ class SquadController extends ChangeNotifier {
     return true;
   }
 
-  void showTemporaryBanner(String message, {Duration duration = const Duration(seconds: 15)}) {
+  void showTemporaryBanner(String message, {Duration duration = const Duration(seconds: 10)}) {
     _bannerTimer?.cancel();
     bannerMessage = message;
     bannerAlert = true;
