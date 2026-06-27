@@ -77,7 +77,30 @@ type AlarmRow = {
   other_detail?: string | null;
   created_at: string;
   acknowledged_at: string | null;
+  operational_event_id?: string | null;
+  operational_events?:
+    | { display_number: number }
+    | { display_number: number }[]
+    | null;
 };
+
+function resolveAlarmOperationalNumber(
+  alarm: AlarmRow,
+  openEvents: OperationalEventSummary[],
+): number | null {
+  const embedded = alarm.operational_events;
+  if (Array.isArray(embedded) && embedded[0]?.display_number != null) {
+    return Number(embedded[0].display_number);
+  }
+  if (embedded && !Array.isArray(embedded) && embedded.display_number != null) {
+    return Number(embedded.display_number);
+  }
+  const eventId = alarm.operational_event_id?.trim();
+  if (!eventId) {
+    return null;
+  }
+  return openEvents.find((event) => event.id === eventId)?.displayNumber ?? null;
+}
 
 type FieldPhotoLogRow = {
   id: string;
@@ -547,11 +570,11 @@ export default function TocDashboard() {
     if (!supabase) {
       return;
     }
+    const baseSelect =
+      "id, session_id, squad_code, squad_name, message, request_types, other_detail, created_at, acknowledged_at, squad_id, operational_event_id, operational_events(display_number)";
     let query = supabase
       .from("squad_alarms")
-      .select(
-        "id, session_id, squad_code, squad_name, message, created_at, acknowledged_at, squad_id",
-      )
+      .select(baseSelect)
       .order("created_at", { ascending: false })
       .limit(40);
 
@@ -564,9 +587,82 @@ export default function TocDashboard() {
       query = query.in("squad_id", squadIds);
     }
 
-    const { data } = await query;
-    setAlarms((data ?? []) as AlarmRow[]);
+    const { data: primaryData, error: primaryError } = await query;
+    let rows: AlarmRow[] = (primaryData ?? []) as AlarmRow[];
+    let error = primaryError;
+    if (
+      error &&
+      /operational_event_id|operational_events|column/i.test(error.message)
+    ) {
+      let fallbackQuery = supabase
+        .from("squad_alarms")
+        .select(
+          "id, session_id, squad_code, squad_name, message, request_types, other_detail, created_at, acknowledged_at, squad_id",
+        )
+        .order("created_at", { ascending: false })
+        .limit(40);
+      if (golfCourseId) {
+        const squadIds = await fetchGolfCourseSquadIds(supabase, golfCourseId);
+        if (squadIds.length === 0) {
+          setAlarms([]);
+          return;
+        }
+        fallbackQuery = fallbackQuery.in("squad_id", squadIds);
+      }
+      const fallback = await fallbackQuery;
+      rows = (fallback.data ?? []) as AlarmRow[];
+      error = fallback.error;
+    }
+
+    if (error) {
+      return;
+    }
+    setAlarms(rows);
   }, [supabase, golfCourseId]);
+
+  const ensureOperationalEventForActivatorAlarm = useCallback(
+    async (row: AlarmRow) => {
+      if (!session || !isOperationalEventActivatorSquad(row.squad_code)) {
+        return;
+      }
+      try {
+        const res = await fetch("/api/operational-events/open-from-squad-alarm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session, alarmId: row.id }),
+        });
+        const payload = (await res.json()) as {
+          error?: string;
+          event?: OperationalEventSummary;
+          created?: boolean;
+        };
+        if (!res.ok) {
+          setOperationalEventsLoadError(
+            payload.error ?? "Apertura evento da squadra attivatore fallita.",
+          );
+          return;
+        }
+        await loadOpenOperationalEvents();
+        await loadAlarms();
+        if (payload.event) {
+          setInterventionDrafts((prev) => ({
+            ...prev,
+            [payload.event!.id]: payload.event!.interventionRef ?? "",
+          }));
+          setStatusMessage(
+            payload.created
+              ? `EVENTO OPERATIVO n° ${payload.event.displayNumber} aperto da ${row.squad_code}.`
+              : `EVENTO OPERATIVO n° ${payload.event.displayNumber} attivo (${row.squad_code}).`,
+          );
+        }
+      } catch {
+        setOperationalEventsLoadError(
+          "Apertura evento da squadra attivatore: errore di rete.",
+        );
+      }
+    },
+    [session, loadOpenOperationalEvents, loadAlarms],
+  );
 
   const loadActiveEventAndWaypoints = useCallback(async () => {
     if (!supabase) {
@@ -841,6 +937,7 @@ export default function TocDashboard() {
               setStatusMessage(
                 `ALLARME ATTIVATORE ${row.squad_code} — ${detail} (apertura evento operativo…)`,
               );
+              void ensureOperationalEventForActivatorAlarm(row);
               window.setTimeout(() => void loadOpenOperationalEvents(), 600);
             } else {
               setStatusMessage(`ALLARME: ${row.squad_code} — ${detail}`);
@@ -939,7 +1036,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(tocPushChannel);
       void supabase.removeChannel(fieldPhotoChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents, ensureOperationalEventForActivatorAlarm]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1486,6 +1583,14 @@ export default function TocDashboard() {
       <section className={styles.operationalEventsPanel}>
         <div className={styles.operationalEventsHeader}>
           <h2 className={styles.operationalEventsTitle}>Eventi operativi</h2>
+          {openOperationalEvents.length > 0 ? (
+            <span className={styles.operationalEventsActiveBadge}>
+              Attivi:{" "}
+              {openOperationalEvents
+                .map((event) => `N° ${event.displayNumber}`)
+                .join(" · ")}
+            </span>
+          ) : null}
         </div>
         <p className={styles.operationalEventsHint}>
           Apertura automatica quando le squadre attivatore ({OPERATIONAL_EVENT_ACTIVATOR_LABEL})
@@ -1625,7 +1730,12 @@ export default function TocDashboard() {
             {pendingAlarms.length === 0 ? (
               <p className={styles.opsEmpty}>Nessun allarme attivo.</p>
             ) : (
-              pendingAlarms.map((a) => (
+              pendingAlarms.map((a) => {
+                const eventNumber = resolveAlarmOperationalNumber(
+                  a,
+                  openOperationalEvents,
+                );
+                return (
                 <div
                   key={a.id}
                   className={
@@ -1649,6 +1759,12 @@ export default function TocDashboard() {
                   <div className={styles.alarmBody}>
                     <p className={styles.alarmTitle}>
                       {a.squad_code} — {a.squad_name}
+                      {eventNumber != null ? (
+                        <span className={styles.alarmEventBadge}>
+                          {" "}
+                          · Ev. {eventNumber}
+                        </span>
+                      ) : null}
                     </p>
                     <p className={styles.alarmMessage}>
                       <SquadAlarmRequestDetail row={a} />
@@ -1668,7 +1784,8 @@ export default function TocDashboard() {
                     </button>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </section>

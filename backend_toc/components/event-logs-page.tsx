@@ -23,6 +23,7 @@ import {
   type AlarmAutoNotifyLogRow,
   type EventLogAlarmFilterCode,
   type OperationalEventLogMeta,
+  type OperationalEventLogSourceRow,
   type SquadAlarmLogRow,
   type SquadFieldPhotoLogRow,
   type SquadMobileDismissLogRow,
@@ -45,6 +46,9 @@ export default function EventLogsPage() {
   const [operationalEventMetaById, setOperationalEventMetaById] = useState<
     Map<string, OperationalEventLogMeta>
   >(new Map());
+  const [operationalEventRows, setOperationalEventRows] = useState<
+    OperationalEventLogSourceRow[]
+  >([]);
   const [alarms, setAlarms] = useState<SquadAlarmLogRow[]>([]);
   const [pushes, setPushes] = useState<TocPushLogRow[]>([]);
   const [missionCloses, setMissionCloses] = useState<TocMissionCloseLogRow[]>([]);
@@ -133,6 +137,7 @@ export default function EventLogsPage() {
         setForceDismisses([]);
         setFieldPhotos([]);
         setOperationalEventMetaById(new Map());
+        setOperationalEventRows([]);
         return;
       }
     }
@@ -156,26 +161,42 @@ export default function EventLogsPage() {
         setForceDismisses([]);
         setFieldPhotos([]);
         setOperationalEventMetaById(new Map());
+        setOperationalEventRows([]);
         return;
       }
     }
 
     let opEventsQuery = supabase
       .from("operational_events")
-      .select("id, display_number, intervention_ref")
+      .select(
+        "id, display_number, intervention_ref, status, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+      )
       .order("display_number", { ascending: true });
     if (golfCourseId) {
       opEventsQuery = opEventsQuery.eq("golf_course_id", golfCourseId);
     }
     const { data: opEventRows } = await opEventsQuery;
     const metaById = new Map<string, OperationalEventLogMeta>();
+    const opRows: OperationalEventLogSourceRow[] = [];
     for (const row of opEventRows ?? []) {
-      metaById.set(String(row.id), {
+      const id = String(row.id);
+      metaById.set(id, {
         displayNumber: Number(row.display_number),
         interventionRef: (row.intervention_ref as string | null)?.trim() || null,
       });
+      opRows.push({
+        id,
+        display_number: Number(row.display_number),
+        intervention_ref: (row.intervention_ref as string | null)?.trim() || null,
+        status: String(row.status ?? "aperto"),
+        opened_at: String(row.opened_at),
+        closed_at: (row.closed_at as string | null) ?? null,
+        opened_by_admin_code: String(row.opened_by_admin_code ?? "—"),
+        closed_by_admin_code: (row.closed_by_admin_code as string | null) ?? null,
+      });
     }
     setOperationalEventMetaById(metaById);
+    setOperationalEventRows(opRows);
 
     let alarmQuery = supabase
       .from("squad_alarms")
@@ -372,6 +393,7 @@ export default function EventLogsPage() {
         forceDismisses,
         fieldPhotos,
         operationalEventMetaById,
+        operationalEventRows,
       ),
     [
       alarms,
@@ -383,6 +405,7 @@ export default function EventLogsPage() {
       forceDismisses,
       fieldPhotos,
       operationalEventMetaById,
+      operationalEventRows,
     ],
   );
 

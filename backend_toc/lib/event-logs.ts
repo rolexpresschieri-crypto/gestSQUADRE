@@ -171,6 +171,17 @@ export type OperationalEventLogMeta = {
   interventionRef: string | null;
 };
 
+export type OperationalEventLogSourceRow = {
+  id: string;
+  display_number: number;
+  intervention_ref?: string | null;
+  status: string;
+  opened_at: string;
+  closed_at?: string | null;
+  opened_by_admin_code: string;
+  closed_by_admin_code?: string | null;
+};
+
 export type UnifiedEventLog = {
   id: string;
   kind:
@@ -178,6 +189,8 @@ export type UnifiedEventLog = {
     | "squad_login"
     | "squad_logout"
     | "fine_evento"
+    | "operational_event_open"
+    | "operational_event_close"
     | "toc_push"
     | "toc_push_close"
     | "toc_mission_close"
@@ -235,8 +248,47 @@ export function mergeEventLogs(
   forceDismisses: TocMissionForceDismissLogRow[] = [],
   fieldPhotos: SquadFieldPhotoLogRow[] = [],
   operationalEventMetaById: Map<string, OperationalEventLogMeta> = new Map(),
+  operationalEvents: OperationalEventLogSourceRow[] = [],
 ): UnifiedEventLog[] {
   const emptyOp = { operationalEventNumber: null, interventionRef: null };
+
+  const operationalLifecycleRows: UnifiedEventLog[] = [];
+  for (const ev of operationalEvents) {
+    const displayNumber = Number(ev.display_number);
+    const interventionRef = ev.intervention_ref?.trim() || null;
+    const openedBy = ev.opened_by_admin_code?.trim() || "—";
+    operationalLifecycleRows.push({
+      id: `${ev.id}-open`,
+      kind: "operational_event_open",
+      createdAt: ev.opened_at,
+      squadCode: openedBy,
+      squadName: "—",
+      summary: "Apertura evento operativo",
+      detail:
+        interventionRef != null
+          ? `Evento operativo n° ${displayNumber} · N° intervento ${interventionRef}`
+          : `Evento operativo n° ${displayNumber}`,
+      status: ev.status === "chiuso" ? "chiuso" : "aperto",
+      actor: openedBy,
+      operationalEventNumber: displayNumber,
+      interventionRef,
+    });
+    if (ev.status === "chiuso" && ev.closed_at) {
+      operationalLifecycleRows.push({
+        id: `${ev.id}-close`,
+        kind: "operational_event_close",
+        createdAt: ev.closed_at,
+        squadCode: openedBy,
+        squadName: "—",
+        summary: "Chiusura evento operativo",
+        detail: `Evento operativo n° ${displayNumber} chiuso`,
+        status: "chiuso",
+        actor: ev.closed_by_admin_code?.trim() || "TOC",
+        operationalEventNumber: displayNumber,
+        interventionRef,
+      });
+    }
+  }
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
     const typeCodes = parseAlarmRequestTypes(a.request_types);
@@ -359,6 +411,7 @@ export function mergeEventLogs(
   });
 
   const rows: UnifiedEventLog[] = [
+    ...operationalLifecycleRows,
     ...alarmRows,
     ...autoNotifyRows,
     ...pushRows,

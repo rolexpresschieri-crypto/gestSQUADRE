@@ -729,6 +729,21 @@
   font-size: 1.05rem;
 }
 
+.operationalEventsActiveBadge {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #7ee787;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(126, 231, 135, 0.12);
+  border: 1px solid rgba(126, 231, 135, 0.35);
+}
+
+.alarmEventBadge {
+  color: #7ee787;
+  font-weight: 800;
+}
+
 .operationalEventsHint {
   margin: 8px 0 10px;
   font-size: 0.85rem;
