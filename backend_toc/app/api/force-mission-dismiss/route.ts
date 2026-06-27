@@ -29,6 +29,7 @@ export async function POST(request: Request) {
     session?: AdminSessionData | null;
     kind?: string;
     id?: string;
+    logId?: string;
     alarmId?: string;
     recipientSquadCode?: string;
     recipientSessionId?: string;
@@ -59,8 +60,11 @@ export async function POST(request: Request) {
   }
 
   if (kind === "gt_notify") {
+    const logId =
+      (typeof payload.logId === "string" ? payload.logId.trim() : "") ||
+      (typeof payload.id === "string" ? payload.id.trim() : "");
     const result = await forceDismissGtNotifyLog(admin, adminSession.code, {
-      logId: payload.id,
+      logId,
       alarmId: payload.alarmId,
       recipientSquadCode: payload.recipientSquadCode,
       recipientSessionId: payload.recipientSessionId,

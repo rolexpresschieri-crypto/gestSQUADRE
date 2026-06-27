@@ -48,6 +48,33 @@ export async function hasAutoNotifyLogsForAlarm(
   return (count ?? 0) > 0;
 }
 
+async function existingRecipientsForAlarm(
+  admin: SupabaseClient,
+  alarmId: string,
+): Promise<Set<string>> {
+  const { data, error } = await admin
+    .from("alarm_auto_notify_logs")
+    .select("recipient_squad_code, admin_code")
+    .eq("alarm_id", alarmId);
+
+  const out = new Set<string>();
+  if (error) {
+    if (error.message.includes("alarm_auto_notify_logs")) {
+      return out;
+    }
+    throw new Error(error.message);
+  }
+  for (const row of data ?? []) {
+    const code = String(row.recipient_squad_code ?? row.admin_code ?? "")
+      .trim()
+      .toUpperCase();
+    if (code) {
+      out.add(code);
+    }
+  }
+  return out;
+}
+
 async function writeAutoNotifyLog(
   admin: SupabaseClient,
   row: {
@@ -151,12 +178,16 @@ export async function forwardVolunteerAlarmToOperators(
     return result;
   }
 
+  const alreadyAttempted = await existingRecipientsForAlarm(admin, alarm.id);
   const messaging = getFirebaseAdminMessaging();
   const detail = formatAlarmRequestDetail(alarm);
   const title = tocPushTextUpper(`ALLARME — ${alarm.squad_code}`);
   const body = tocPushTextUpper(`${alarm.squad_name} — ${detail}`);
 
   for (const recipientCode of recipientCodes) {
+    if (alreadyAttempted.has(recipientCode.trim().toUpperCase())) {
+      continue;
+    }
     const { data: recipientSquad, error: squadErr } = await admin
       .from("squads")
       .select("id, squad_code, squad_name")

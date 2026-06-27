@@ -178,7 +178,7 @@ export async function countOpenMissionsForOperationalEvent(
   admin: SupabaseClient,
   operationalEventId: string,
 ): Promise<{ count: number; error: string | null }> {
-  const [pushRes, routeRes] = await Promise.all([
+  const [pushRes, routeRes, alarmsRes] = await Promise.all([
     admin
       .from("toc_push_logs")
       .select("id", { count: "exact", head: true })
@@ -191,6 +191,11 @@ export async function countOpenMissionsForOperationalEvent(
       .select("id", { count: "exact", head: true })
       .eq("operational_event_id", operationalEventId)
       .is("cleared_at", null),
+    admin
+      .from("squad_alarms")
+      .select("id")
+      .eq("operational_event_id", operationalEventId)
+      .is("acknowledged_at", null),
   ]);
 
   if (pushRes.error && !/operational_event_id|column/i.test(pushRes.error.message)) {
@@ -199,9 +204,45 @@ export async function countOpenMissionsForOperationalEvent(
   if (routeRes.error && !/operational_event_id|column/i.test(routeRes.error.message)) {
     return { count: 0, error: routeRes.error.message };
   }
+  if (
+    alarmsRes.error &&
+    !/operational_event_id|column/i.test(alarmsRes.error.message)
+  ) {
+    return { count: 0, error: alarmsRes.error.message };
+  }
+
+  let autoNotifyCount = 0;
+  const alarmIds = (alarmsRes.data ?? [])
+    .map((row) => String(row.id ?? "").trim())
+    .filter(Boolean);
+  if (alarmIds.length > 0) {
+    const { count, error: autoErr } = await admin
+      .from("alarm_auto_notify_logs")
+      .select("id", { count: "exact", head: true })
+      .in("alarm_id", alarmIds)
+      .eq("status", "sent")
+      .is("mobile_dismissed_at", null);
+
+    if (autoErr && !autoErr.message.includes("alarm_auto_notify_logs")) {
+      if (!/mobile_dismissed_at|column/i.test(autoErr.message)) {
+        return { count: 0, error: autoErr.message };
+      }
+      const { count: legacyCount, error: legacyErr } = await admin
+        .from("alarm_auto_notify_logs")
+        .select("id", { count: "exact", head: true })
+        .in("alarm_id", alarmIds)
+        .eq("status", "sent");
+      if (legacyErr && !legacyErr.message.includes("alarm_auto_notify_logs")) {
+        return { count: 0, error: legacyErr.message };
+      }
+      autoNotifyCount = legacyCount ?? 0;
+    } else {
+      autoNotifyCount = count ?? 0;
+    }
+  }
 
   return {
-    count: (pushRes.count ?? 0) + (routeRes.count ?? 0),
+    count: (pushRes.count ?? 0) + (routeRes.count ?? 0) + autoNotifyCount,
     error: null,
   };
 }

@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import {
   fetchActiveAutoNotifyDeliveries,
-  supplementMissionsFromOpenAlarms,
   type FetchActiveAutoNotifyOptions,
 } from "@/lib/active-auto-notify";
 import {
@@ -78,15 +77,7 @@ export async function GET(request: Request) {
 
   const [{ rows, error }, { rows: tocPushes, error: pushError }] =
     await Promise.all([
-      fetchActiveAutoNotifyDeliveries(admin, autoOptions).then(async (result) => ({
-        ...result,
-        rows: await supplementMissionsFromOpenAlarms(
-          admin,
-          openAlarmIds,
-          result.rows,
-          autoOptions.sourceSquadCodes,
-        ),
-      })),
+      fetchActiveAutoNotifyDeliveries(admin, autoOptions),
       fetchActiveTocPushDeliveries(admin, pushOptions),
     ]);
 

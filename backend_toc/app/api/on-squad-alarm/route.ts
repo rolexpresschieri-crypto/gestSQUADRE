@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
 import {
   forwardVolunteerAlarmToOperators,
-  hasAutoNotifyLogsForAlarm,
   type SquadAlarmNotifyRow,
 } from "@/lib/forward-volunteer-alarm";
 import { openOperationalEventFromSquadAlarm } from "@/lib/open-operational-event-from-squad-alarm";
@@ -155,17 +154,7 @@ export async function POST(request: Request) {
       squad_code: alarm.squad_code,
     });
 
-    const alreadyForwarded = await hasAutoNotifyLogsForAlarm(admin, alarm.id);
-    const result = alreadyForwarded
-      ? {
-          alarmId: alarm.id,
-          recipientCodes: [] as string[],
-          sent: 0,
-          failed: 0,
-          skipped: 0,
-          alreadyForwarded: true,
-        }
-      : await forwardVolunteerAlarmToOperators(admin, alarm);
+    const result = await forwardVolunteerAlarmToOperators(admin, alarm);
     return NextResponse.json({
       ok: true,
       ...result,

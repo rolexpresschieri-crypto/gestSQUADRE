@@ -119,6 +119,50 @@ export async function forceDismissTocPushLog(
   return { ok: true, sessionId };
 }
 
+async function resolveGtMissionEventId(
+  admin: SupabaseClient,
+  alarmId: string,
+  hintEventId?: string | null,
+): Promise<string | null> {
+  const hinted = hintEventId?.trim();
+  if (hinted) {
+    return hinted;
+  }
+  if (!UUID_RE.test(alarmId)) {
+    return null;
+  }
+
+  const { data: alarm } = await admin
+    .from("squad_alarms")
+    .select("event_id, session_id")
+    .eq("id", alarmId)
+    .maybeSingle();
+
+  const alarmEventId =
+    typeof alarm?.event_id === "string" ? alarm.event_id.trim() : "";
+  if (alarmEventId) {
+    return alarmEventId;
+  }
+
+  const sessionId =
+    typeof alarm?.session_id === "string" ? alarm.session_id.trim() : "";
+  if (!sessionId) {
+    return null;
+  }
+
+  const { data: session } = await admin
+    .from("squad_sessions")
+    .select("event_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  return typeof session?.event_id === "string" ? session.event_id.trim() : null;
+}
+
+function mobileDismissColumnMissing(message: string): boolean {
+  return /mobile_dismissed_at|column/i.test(message);
+}
+
 export async function forceDismissGtNotifyLog(
   admin: SupabaseClient,
   adminCode: string,
@@ -136,30 +180,44 @@ export async function forceDismissGtNotifyLog(
   const recipientSessionId = options.recipientSessionId?.trim() ?? "";
   const operator = adminCode.trim() || "TOC";
 
-  let eventId: string | null = null;
   let squadCode = recipientSquadCode || "—";
   let squadName = squadCode;
   let sourceRef: string | null = UUID_RE.test(logId) ? logId : null;
   let detail = "Inoltro automatico GT";
 
   if (UUID_RE.test(logId)) {
-    const { data: logRow } = await admin
+    const { data: logRow, error: fetchErr } = await admin
       .from("alarm_auto_notify_logs")
       .select(
-        "id, event_id, recipient_squad_code, admin_code, squad_code, squad_name, push_body",
+        "id, alarm_id, event_id, recipient_squad_code, admin_code, squad_code, squad_name, push_body, mobile_dismissed_at",
       )
       .eq("id", logId)
       .maybeSingle();
 
-    if (logRow) {
-      eventId = String(logRow.event_id);
-      squadCode =
-        String(logRow.recipient_squad_code ?? logRow.admin_code ?? "").trim().toUpperCase() ||
-        squadCode;
-      squadName = squadCode;
-      detail =
-        String(logRow.push_body ?? "").trim() ||
-        `Allarme da ${String(logRow.squad_code ?? "").trim()}`;
+    if (fetchErr) {
+      if (fetchErr.message.includes("alarm_auto_notify_logs")) {
+        return { ok: false, error: "Tabella inoltri GT non disponibile.", updatedCount: 0 };
+      }
+      if (!mobileDismissColumnMissing(fetchErr.message)) {
+        return { ok: false, error: fetchErr.message, updatedCount: 0 };
+      }
+    }
+
+    if (!logRow?.id) {
+      return { ok: false, error: "Log inoltro GT non trovato.", updatedCount: 0 };
+    }
+
+    const linkedAlarmId = String(logRow.alarm_id ?? alarmId);
+    squadCode =
+      String(logRow.recipient_squad_code ?? logRow.admin_code ?? "").trim().toUpperCase() ||
+      squadCode;
+    squadName = squadCode;
+    detail =
+      String(logRow.push_body ?? "").trim() ||
+      `Allarme da ${String(logRow.squad_code ?? "").trim()}`;
+
+    if (logRow.mobile_dismissed_at) {
+      return { ok: true, updatedCount: 0 };
     }
 
     const { data, error } = await admin
@@ -167,25 +225,57 @@ export async function forceDismissGtNotifyLog(
       .update({ mobile_dismissed_at: now })
       .eq("id", logId)
       .is("mobile_dismissed_at", null)
-      .select("id");
+      .select("id, event_id, push_body, squad_code");
 
     if (error) {
       if (error.message.includes("alarm_auto_notify_logs")) {
         return { ok: false, error: "Tabella inoltri GT non disponibile.", updatedCount: 0 };
       }
+      if (mobileDismissColumnMissing(error.message)) {
+        return {
+          ok: false,
+          error: "Esegui sql/alarm_auto_notify_active.sql su Supabase per abilitare il reset.",
+          updatedCount: 0,
+        };
+      }
       return { ok: false, error: error.message, updatedCount: 0 };
     }
-    if ((data?.length ?? 0) > 0 && eventId) {
-      await insertForceDismissLog(admin, {
-        eventId,
-        missionKind: "gt_notify",
-        squadCode,
-        squadName,
-        adminCode: operator,
-        sourceRef,
-        detail,
-      });
-      return { ok: true, updatedCount: data.length };
+
+    if ((data?.length ?? 0) > 0) {
+      const updated = data![0] as {
+        id: string;
+        event_id?: string | null;
+        push_body?: string | null;
+        squad_code?: string | null;
+      };
+      const eventId = await resolveGtMissionEventId(
+        admin,
+        linkedAlarmId,
+        updated.event_id ?? logRow.event_id,
+      );
+      if (eventId) {
+        await insertForceDismissLog(admin, {
+          eventId,
+          missionKind: "gt_notify",
+          squadCode,
+          squadName,
+          adminCode: operator,
+          sourceRef: updated.id ?? sourceRef,
+          detail:
+            String(updated.push_body ?? "").trim() ||
+            detail,
+        });
+      }
+      return { ok: true, updatedCount: data!.length };
+    }
+
+    const { data: recheck } = await admin
+      .from("alarm_auto_notify_logs")
+      .select("mobile_dismissed_at")
+      .eq("id", logId)
+      .maybeSingle();
+    if (recheck?.mobile_dismissed_at) {
+      return { ok: true, updatedCount: 0 };
     }
   }
 
@@ -194,34 +284,46 @@ export async function forceDismissGtNotifyLog(
       .from("alarm_auto_notify_logs")
       .update({ mobile_dismissed_at: now })
       .eq("alarm_id", alarmId)
-      .eq("status", "sent")
       .is("mobile_dismissed_at", null)
       .or(
         `recipient_squad_code.eq.${recipientSquadCode},admin_code.eq.${recipientSquadCode}`,
       )
       .select("id, event_id, push_body, squad_code");
 
-    if (error && !error.message.includes("alarm_auto_notify_logs")) {
+    if (error) {
+      if (error.message.includes("alarm_auto_notify_logs")) {
+        return { ok: false, error: "Tabella inoltri GT non disponibile.", updatedCount: 0 };
+      }
+      if (mobileDismissColumnMissing(error.message)) {
+        return {
+          ok: false,
+          error: "Esegui sql/alarm_auto_notify_active.sql su Supabase per abilitare il reset.",
+          updatedCount: 0,
+        };
+      }
       return { ok: false, error: error.message, updatedCount: 0 };
     }
     if ((data?.length ?? 0) > 0) {
       const first = data![0] as {
         id: string;
-        event_id: string;
+        event_id?: string | null;
         push_body?: string | null;
         squad_code?: string | null;
       };
-      await insertForceDismissLog(admin, {
-        eventId: String(first.event_id),
-        missionKind: "gt_notify",
-        squadCode: recipientSquadCode,
-        squadName: recipientSquadCode,
-        adminCode: operator,
-        sourceRef: first.id,
-        detail:
-          String(first.push_body ?? "").trim() ||
-          `Allarme da ${String(first.squad_code ?? "").trim()}`,
-      });
+      const eventId = await resolveGtMissionEventId(admin, alarmId, first.event_id);
+      if (eventId) {
+        await insertForceDismissLog(admin, {
+          eventId,
+          missionKind: "gt_notify",
+          squadCode: recipientSquadCode,
+          squadName: recipientSquadCode,
+          adminCode: operator,
+          sourceRef: first.id,
+          detail:
+            String(first.push_body ?? "").trim() ||
+            `Allarme da ${String(first.squad_code ?? "").trim()}`,
+        });
+      }
       return { ok: true, updatedCount: data!.length };
     }
   }

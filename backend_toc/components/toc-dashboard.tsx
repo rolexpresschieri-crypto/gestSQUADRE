@@ -468,6 +468,13 @@ export default function TocDashboard() {
       }
     }
     for (const row of activeAutoNotifies) {
+      if (row.operationalEventId === eventId) {
+        count += 1;
+        continue;
+      }
+      if (!row.recipientSessionId) {
+        continue;
+      }
       const alarm = alarms.find((a) => a.id === row.alarmId);
       if (alarm?.operational_event_id === eventId) {
         count += 1;
@@ -1320,7 +1327,11 @@ export default function TocDashboard() {
         return;
       }
       setStatusMessage(`Reset forzato — ${label}`);
-      await loadActiveAutoNotifies();
+      await Promise.all([
+        loadActiveAutoNotifies(),
+        loadAlarms(),
+        loadSelectedRouteAssignment(),
+      ]);
     } catch {
       setStatusMessage("Reset missione: errore di rete.");
     } finally {
@@ -2031,6 +2042,15 @@ export default function TocDashboard() {
                         s.squadCode.trim().toUpperCase() ===
                         row.recipientSquadCode.trim().toUpperCase(),
                     );
+                  const linkedAlarm = alarms.find((a) => a.id === row.alarmId);
+                  const eventNumber =
+                    row.operationalEventNumber ??
+                    (linkedAlarm
+                      ? resolveAlarmOperationalNumber(
+                          linkedAlarm,
+                          openOperationalEvents,
+                        )
+                      : null);
                   const selected =
                     row.recipientSessionId != null &&
                     selectedSessionId === row.recipientSessionId;
@@ -2057,6 +2077,11 @@ export default function TocDashboard() {
                         <p className={styles.alarmTitle}>
                           {row.recipientSquadCode}
                           {recipientSquad ? ` — ${recipientSquad.squadName}` : ""}
+                          {" · "}
+                          <span className={styles.missionEventRef}>
+                            Ev.{" "}
+                            {formatMissionOperationalEventLabel(eventNumber)}
+                          </span>
                         </p>
                         <p className={styles.alarmMessage}>
                           Allarme da <strong>{row.sourceSquadCode}</strong>
@@ -2083,7 +2108,7 @@ export default function TocDashboard() {
                               row.recipientSquadCode,
                               {
                                 kind: "gt_notify",
-                                id: row.id,
+                                logId: row.logId ?? "",
                                 alarmId: row.alarmId,
                                 recipientSquadCode: row.recipientSquadCode,
                                 recipientSessionId: row.recipientSessionId,

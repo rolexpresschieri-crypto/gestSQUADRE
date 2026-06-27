@@ -5,7 +5,10 @@ import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { tocPushTextUpper } from "@/lib/toc-push-text";
 
 export type ActiveAutoNotifyDelivery = {
+  /** Chiave stabile per UI (mission-alarmId-recipient). */
   id: string;
+  /** UUID riga in alarm_auto_notify_logs (per reset TOC). */
+  logId: string | null;
   alarmId: string;
   sourceSquadCode: string;
   sourceSquadName: string;
@@ -15,6 +18,8 @@ export type ActiveAutoNotifyDelivery = {
   pushBody: string | null;
   requestTypes: unknown;
   createdAt: string;
+  operationalEventId: string | null;
+  operationalEventNumber: number | null;
 };
 
 export type FetchActiveAutoNotifyOptions = {
@@ -91,9 +96,81 @@ function normalizeIds(ids?: string[] | null): string[] {
   return [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
 }
 
+type OperationalEventMeta = {
+  id: string;
+  number: number;
+};
+
+async function operationalEventMetaByAlarmIds(
+  supabase: SupabaseClient,
+  alarmIds: string[],
+): Promise<Map<string, OperationalEventMeta>> {
+  const out = new Map<string, OperationalEventMeta>();
+  const uniqueAlarmIds = normalizeIds(alarmIds);
+  if (uniqueAlarmIds.length === 0) {
+    return out;
+  }
+
+  const { data: alarms, error: alarmsErr } = await supabase
+    .from("squad_alarms")
+    .select("id, operational_event_id")
+    .in("id", uniqueAlarmIds);
+
+  if (alarmsErr || !alarms?.length) {
+    return out;
+  }
+
+  const eventIds = [
+    ...new Set(
+      alarms
+        .map((row) =>
+          typeof row.operational_event_id === "string"
+            ? row.operational_event_id.trim()
+            : "",
+        )
+        .filter(Boolean),
+    ),
+  ];
+  if (eventIds.length === 0) {
+    return out;
+  }
+
+  const { data: events } = await supabase
+    .from("operational_events")
+    .select("id, display_number")
+    .in("id", eventIds);
+
+  const eventMetaById = new Map<string, OperationalEventMeta>();
+  for (const row of events ?? []) {
+    const id = String(row.id ?? "");
+    const number = Number(row.display_number);
+    if (id && Number.isFinite(number)) {
+      eventMetaById.set(id, { id, number });
+    }
+  }
+
+  for (const alarm of alarms) {
+    const alarmId = String(alarm.id ?? "");
+    const eventId =
+      typeof alarm.operational_event_id === "string"
+        ? alarm.operational_event_id.trim()
+        : "";
+    if (!alarmId || !eventId) {
+      continue;
+    }
+    const meta = eventMetaById.get(eventId);
+    if (meta) {
+      out.set(alarmId, meta);
+    }
+  }
+
+  return out;
+}
+
 function mapRowsToDeliveries(
   data: AutoNotifyLogRow[],
   sessionByCode: Map<string, string>,
+  eventMetaByAlarmId: Map<string, OperationalEventMeta>,
   sourceSquadCodes?: string[] | null,
   filterDismissed = true,
 ): ActiveAutoNotifyDelivery[] {
@@ -102,51 +179,61 @@ function mapRowsToDeliveries(
       ? null
       : new Set(sourceSquadCodes.map((c) => c.trim().toUpperCase()));
 
-  return data
-    .map((row) => {
-      if (row.status !== "sent") {
-        return null;
-      }
-      if (filterDismissed && row.mobile_dismissed_at) {
-        return null;
-      }
+  const rows: ActiveAutoNotifyDelivery[] = [];
+  for (const row of data) {
+    if (row.status !== "sent") {
+      continue;
+    }
+    if (filterDismissed && row.mobile_dismissed_at) {
+      continue;
+    }
 
-      const sourceCode = String(row.squad_code ?? "").trim().toUpperCase();
-      if (allowedSources && !allowedSources.has(sourceCode)) {
-        return null;
-      }
+    const sourceCode = String(row.squad_code ?? "").trim().toUpperCase();
+    if (allowedSources && !allowedSources.has(sourceCode)) {
+      continue;
+    }
 
-      const recipient = recipientCode(row);
-      if (!recipient) {
-        return null;
-      }
+    const recipient = recipientCode(row);
+    if (!recipient) {
+      continue;
+    }
 
-      const sessionId =
-        row.recipient_session_id ?? sessionByCode.get(recipient) ?? null;
+    const currentSessionId = sessionByCode.get(recipient) ?? null;
+    if (!currentSessionId) {
+      continue;
+    }
 
-      return {
-        id: `mission-${row.alarm_id}-${recipient}`,
-        alarmId: row.alarm_id,
-        sourceSquadCode: row.squad_code,
-        sourceSquadName: row.squad_name,
-        recipientSquadCode: recipient,
-        recipientSessionId: sessionId ? String(sessionId) : null,
-        pushTitle: row.push_title ?? null,
-        pushBody: row.push_body ?? null,
-        requestTypes: row.request_types,
-        createdAt: row.created_at,
-      } satisfies ActiveAutoNotifyDelivery;
-    })
-    .filter((row): row is ActiveAutoNotifyDelivery => row !== null);
+    const eventMeta = eventMetaByAlarmId.get(row.alarm_id);
+
+    rows.push({
+      id: `mission-${row.alarm_id}-${recipient}`,
+      logId: row.id,
+      alarmId: row.alarm_id,
+      sourceSquadCode: row.squad_code,
+      sourceSquadName: row.squad_name,
+      recipientSquadCode: recipient,
+      recipientSessionId: String(currentSessionId),
+      pushTitle: row.push_title ?? null,
+      pushBody: row.push_body ?? null,
+      requestTypes: row.request_types,
+      createdAt: row.created_at,
+      operationalEventId: eventMeta?.id ?? null,
+      operationalEventNumber: eventMeta?.number ?? null,
+    });
+  }
+  return rows;
 }
 
 export async function fetchActiveAutoNotifyDeliveries(
   supabase: SupabaseClient,
   options: FetchActiveAutoNotifyOptions = {},
 ): Promise<{ rows: ActiveAutoNotifyDelivery[]; error: string | null }> {
-  const eventIds = normalizeIds(options.eventIds);
   const openAlarmIds = normalizeIds(options.openAlarmIds);
   const sourceSquadCodes = options.sourceSquadCodes;
+
+  if (openAlarmIds.length === 0) {
+    return { rows: [], error: null };
+  }
 
   const modernSelect =
     "id, alarm_id, event_id, squad_code, squad_name, recipient_squad_code, admin_code, recipient_session_id, push_title, push_body, request_types, created_at, status, mobile_dismissed_at";
@@ -156,19 +243,9 @@ export async function fetchActiveAutoNotifyDeliveries(
     .select(modernSelect)
     .eq("status", "sent")
     .is("mobile_dismissed_at", null)
+    .in("alarm_id", openAlarmIds)
     .order("created_at", { ascending: false })
     .limit(120);
-
-  const orParts: string[] = [];
-  if (eventIds.length > 0) {
-    orParts.push(`event_id.in.(${eventIds.join(",")})`);
-  }
-  if (openAlarmIds.length > 0) {
-    orParts.push(`alarm_id.in.(${openAlarmIds.join(",")})`);
-  }
-  if (orParts.length > 0) {
-    query = query.or(orParts.join(","));
-  }
 
   let legacySchema = false;
   let data: AutoNotifyLogRow[] | null = null;
@@ -191,12 +268,9 @@ export async function fetchActiveAutoNotifyDeliveries(
         "id, alarm_id, event_id, squad_code, squad_name, recipient_squad_code, admin_code, request_types, created_at, status",
       )
       .eq("status", "sent")
+      .in("alarm_id", openAlarmIds)
       .order("created_at", { ascending: false })
       .limit(120);
-
-    if (orParts.length > 0) {
-      legacyQuery = legacyQuery.or(orParts.join(","));
-    }
 
     const legacyResult = await legacyQuery;
     data = (legacyResult.data ?? null) as AutoNotifyLogRow[] | null;
@@ -211,9 +285,15 @@ export async function fetchActiveAutoNotifyDeliveries(
   }
 
   const sessionByCode = await onlineSessionIdBySquadCode(supabase);
+  const alarmIds = [...new Set((data ?? []).map((row) => String(row.alarm_id ?? "")).filter(Boolean))];
+  const eventMetaByAlarmId = await operationalEventMetaByAlarmIds(
+    supabase,
+    alarmIds,
+  );
   const rows = mapRowsToDeliveries(
     (data ?? []) as AutoNotifyLogRow[],
     sessionByCode,
+    eventMetaByAlarmId,
     sourceSquadCodes,
     !legacySchema,
   );
@@ -255,6 +335,7 @@ type OpenAlarmRow = {
   request_types?: unknown;
   other_detail?: string | null;
   created_at: string;
+  operational_event_id?: string | null;
 };
 
 async function dismissedMissionKeysForOpenAlarms(
@@ -316,7 +397,7 @@ async function dismissedMissionKeysForOpenAlarms(
   return dismissed;
 }
 
-/** Se il log DB manca ma l'allarme è aperto e il destinatario è online, mostra comunque la missione GT. */
+/** Se il log DB manca ma l'allarme è aperto e il destinatario è online, mostra la missione GT. */
 export async function supplementMissionsFromOpenAlarms(
   supabase: SupabaseClient,
   openAlarmIds: string[],
@@ -334,13 +415,20 @@ export async function supplementMissionsFromOpenAlarms(
 
   const { data: alarms, error: alarmsErr } = await supabase
     .from("squad_alarms")
-    .select("id, squad_code, squad_name, request_types, other_detail, created_at")
+    .select(
+      "id, squad_code, squad_name, request_types, other_detail, created_at, operational_event_id",
+    )
     .in("id", openAlarmIds)
     .is("acknowledged_at", null);
 
   if (alarmsErr || !alarms?.length) {
     return existing;
   }
+
+  const eventMetaByAlarmId = await operationalEventMetaByAlarmIds(
+    supabase,
+    (alarms as OpenAlarmRow[]).map((alarm) => alarm.id),
+  );
 
   const { rows: routingRows, error: routingErr } =
     await loadAlarmNotifyRoutingRows(supabase);
@@ -381,9 +469,15 @@ export async function supplementMissionsFromOpenAlarms(
         continue;
       }
       const sessionId = sessionByCode.get(recipient) ?? null;
+      if (!sessionId) {
+        continue;
+      }
+
+      const eventMeta = eventMetaByAlarmId.get(alarm.id);
 
       supplement.push({
         id: `mission-${alarm.id}-${recipient}`,
+        logId: null,
         alarmId: alarm.id,
         sourceSquadCode: alarm.squad_code,
         sourceSquadName: alarm.squad_name,
@@ -393,6 +487,8 @@ export async function supplementMissionsFromOpenAlarms(
         pushBody: body,
         requestTypes: alarm.request_types,
         createdAt: alarm.created_at,
+        operationalEventId: eventMeta?.id ?? null,
+        operationalEventNumber: eventMeta?.number ?? null,
       });
       covered.add(key);
     }

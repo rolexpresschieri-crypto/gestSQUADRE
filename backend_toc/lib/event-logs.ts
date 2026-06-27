@@ -448,6 +448,11 @@ export function mergeEventLogs(
     const skipped = n.status === "skipped";
     const recipient = autoNotifyRecipientCode(n);
     const typeCodes = parseAlarmRequestTypes(n.request_types);
+    const sourceAlarm = alarms.find((a) => a.id === n.alarm_id);
+    const opFields = operationalLogFields(
+      sourceAlarm?.operational_event_id,
+      operationalEventMetaById,
+    );
     return {
       id: n.id,
       kind: "alarm_auto_notify" as const,
@@ -462,7 +467,7 @@ export function mergeEventLogs(
           : `Squadra ${recipient}`,
       status: skipped ? "saltato" : failed ? "fallito" : "inviato",
       actor: recipient,
-      ...emptyOp,
+      ...opFields,
       alarmTypeCodes: typeCodes,
     };
   });
