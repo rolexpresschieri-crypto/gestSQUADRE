@@ -77,6 +77,24 @@ export async function allocateOperationalEventNumber(
   return { number: Math.floor(n), error: null };
 }
 
+/** Ripristina il contatore se un evento allocato viene eliminato prima del collegamento allarme. */
+export async function reclaimOperationalEventNumber(
+  admin: SupabaseClient,
+  scopeKey: string,
+  displayNumber: number,
+): Promise<void> {
+  if (!Number.isFinite(displayNumber) || displayNumber < 1) {
+    return;
+  }
+  const { error } = await admin.rpc("reclaim_operational_event_number", {
+    p_scope_key: scopeKey,
+    p_display_number: Math.floor(displayNumber),
+  });
+  if (error && !error.message.includes("reclaim_operational_event_number")) {
+    console.error("reclaim_operational_event_number:", error.message);
+  }
+}
+
 export async function fetchOpenOperationalEvents(
   admin: SupabaseClient,
   golfCourseId: string | null,

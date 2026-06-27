@@ -163,11 +163,6 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                    Text(
-                      squadAlarmHint,
-                      textAlign: TextAlign.center,
-                      style: kTacticalBodyWhite.copyWith(fontSize: 13),
-                    ),
                   ],
                 const SizedBox(height: 18),
                 if (controller.isBusy)

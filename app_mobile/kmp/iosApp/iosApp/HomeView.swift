@@ -279,15 +279,15 @@ struct HomeView: View {
                 .padding(.bottom, 8)
                 #endif
             }
-            if let pushLabel = viewModel.pushStatusLabel {
-                TacticalBodyText(
-                    text: pushLabel,
-                    fontSize: 13,
-                    color: viewModel.pushStatusOk ? TacticalColors.gpsGood : TacticalColors.red
-                )
-                .padding(.bottom, 8)
-            }
             if !viewModel.pushStatusOk, viewModel.isLoggedIn {
+                if let pushLabel = viewModel.pushStatusLabel {
+                    TacticalBodyText(
+                        text: pushLabel,
+                        fontSize: 13,
+                        color: TacticalColors.red
+                    )
+                    .padding(.bottom, 8)
+                }
                 #if !targetEnvironment(simulator)
                 MainButton(
                     label: "Ripara push TOC",
@@ -299,10 +299,6 @@ struct HomeView: View {
                 .padding(.bottom, 8)
                 #endif
             }
-            TacticalBodyText(text: SquadAlarmCopy.hint, fontSize: 13)
-                .padding(.bottom, 8)
-            TacticalBodyText(text: FieldPhotoCopy.hint, fontSize: 13)
-                .padding(.bottom, 8)
             if viewModel.fieldPhotoQueueCount > 0 {
                 TacticalBodyText(
                     text: "Foto in coda: \(viewModel.fieldPhotoQueueCount) (invio automatico con rete).",

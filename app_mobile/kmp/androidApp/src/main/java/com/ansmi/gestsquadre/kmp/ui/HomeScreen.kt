@@ -84,15 +84,11 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import java.io.File
 
-private const val SquadAlarmHint =
-    "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
 private const val SquadAlarmDialogTitle = "Segnala allarme su mappa TOC"
 private const val SquadAlarmDialogBody =
     "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
 private const val SquadAlarmSentOk =
     "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
-private const val FieldPhotoHint =
-    "Invia una foto al TOC (log eventi). GPS obbligatorio. Nota opzionale (max 200 caratteri)."
 private const val FieldPhotoSentOk = "Foto inviata al TOC."
 
 enum class AppScreen {
@@ -394,15 +390,15 @@ fun HomeScreen(
                             modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
-                    uiState.pushStatusLabel?.let { label ->
-                        TacticalBodyText(
-                            text = label,
-                            fontSize = 13,
-                            color = if (uiState.pushStatusOk) Color(0xFF8FE88F) else TacticalRed,
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
                     if (!uiState.pushStatusOk) {
+                        uiState.pushStatusLabel?.let { label ->
+                            TacticalBodyText(
+                                text = label,
+                                fontSize = 13,
+                                color = TacticalRed,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
                         MainButton(
                             label = "Ripara push TOC",
                             backgroundColor = TacticalNavy,
@@ -412,16 +408,6 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold,
                         )
                     }
-                    TacticalBodyText(
-                        text = SquadAlarmHint,
-                        fontSize = 13,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                    TacticalBodyText(
-                        text = FieldPhotoHint,
-                        fontSize = 13,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
                     if (uiState.fieldPhotoQueueCount > 0) {
                         TacticalBodyText(
                             text =

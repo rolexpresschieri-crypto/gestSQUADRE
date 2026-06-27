@@ -472,9 +472,6 @@ export default function TocDashboard() {
         count += 1;
         continue;
       }
-      if (!row.recipientSessionId) {
-        continue;
-      }
       const alarm = alarms.find((a) => a.id === row.alarmId);
       if (alarm?.operational_event_id === eventId) {
         count += 1;

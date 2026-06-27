@@ -4,6 +4,7 @@ import {
   allocateOperationalEventNumber,
   mapOperationalEventRow,
   operationalEventScopeKey,
+  reclaimOperationalEventNumber,
   type OperationalEventRow,
   type OperationalEventSummary,
 } from "@/lib/operational-events";
@@ -136,11 +137,13 @@ export async function openOperationalEventFromSquadAlarm(
 
   if (linkErr && !/operational_event_id|column/i.test(linkErr.message)) {
     await admin.from("operational_events").delete().eq("id", event.id);
+    await reclaimOperationalEventNumber(admin, scopeKey, event.displayNumber);
     return { created: false, skipped: false, event: null, error: linkErr.message };
   }
 
   if (!linkedRows?.length) {
     await admin.from("operational_events").delete().eq("id", event.id);
+    await reclaimOperationalEventNumber(admin, scopeKey, event.displayNumber);
     const { data: relinked } = await admin
       .from("squad_alarms")
       .select("operational_event_id")
@@ -174,6 +177,7 @@ export async function openOperationalEventFromSquadAlarm(
         : null;
     if (linkedId && linkedId !== event.id) {
       await admin.from("operational_events").delete().eq("id", event.id);
+      await reclaimOperationalEventNumber(admin, scopeKey, event.displayNumber);
       const winner = await fetchExistingOperationalEvent(admin, linkedId);
       return { created: false, skipped: false, event: winner, error: null };
     }

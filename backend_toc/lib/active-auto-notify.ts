@@ -199,9 +199,9 @@ function mapRowsToDeliveries(
     }
 
     const currentSessionId = sessionByCode.get(recipient) ?? null;
-    if (!currentSessionId) {
-      continue;
-    }
+    const sessionId =
+      currentSessionId ??
+      (row.recipient_session_id ? String(row.recipient_session_id) : null);
 
     const eventMeta = eventMetaByAlarmId.get(row.alarm_id);
 
@@ -212,7 +212,7 @@ function mapRowsToDeliveries(
       sourceSquadCode: row.squad_code,
       sourceSquadName: row.squad_name,
       recipientSquadCode: recipient,
-      recipientSessionId: String(currentSessionId),
+      recipientSessionId: sessionId,
       pushTitle: row.push_title ?? null,
       pushBody: row.push_body ?? null,
       requestTypes: row.request_types,
