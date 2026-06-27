@@ -190,7 +190,7 @@ class SquadViewModel(
         _uiState.update { it.copy(bannerMessage = message, bannerAlert = true) }
         bannerClearJob =
             viewModelScope.launch {
-                delay(15_000)
+                delay(10_000)
                 _uiState.update { state ->
                     if (state.bannerMessage == message) {
                         state.copy(bannerMessage = null, bannerAlert = false)
