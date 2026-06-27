@@ -9,4 +9,4 @@ create index if not exists squad_alarms_operational_event_idx
   where operational_event_id is not null;
 
 comment on column squad_alarms.operational_event_id is
-  'Evento operativo aperto automaticamente se la squadra è attivatore (01_TOC, 01_RR).';
+  'Evento operativo aperto automaticamente se la squadra è attivatore (01_AN, 01_EN, 01_RR, 01_TOC, 01_UN).';

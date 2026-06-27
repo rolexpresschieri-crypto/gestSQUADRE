@@ -80,4 +80,10 @@ class GestSquadreFacade(
 
     suspend fun clearActiveRouteAssignment(sessionId: String) =
         mapRepository.clearActiveRouteAssignment(sessionId)
+
+    fun isOperationalEventActivatorSquad(squadCode: String): Boolean =
+        OperationalEventActivator.isActivator(squadCode)
+
+    fun operationalEventUnauthorizedMessage(): String =
+        OperationalEventActivator.UNAUTHORIZED_MESSAGE
 }

@@ -104,7 +104,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Gli eventi operativi si aprono solo dalle squadre attivatore (01_TOC, 01_RR) inviando allarme dal campo.",
+          "Gli eventi operativi si aprono solo dalle squadre attivatore (01_AN, 01_EN, 01_RR, 01_TOC, 01_UN) inviando allarme dal campo.",
       },
       { status: 403 },
     );

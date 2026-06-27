@@ -459,7 +459,13 @@ fun HomeScreen(
                     backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
                     foregroundColor = if (isLogged) Color.White else TacticalMuted,
                     fontWeight = FontWeight.Black,
-                    onClick = if (isLogged) { { showAlarmDialog = true } } else null,
+                    onClick = if (isLogged) {
+                        {
+                            if (viewModel.tryBeginOperationalEventAlarm()) {
+                                showAlarmDialog = true
+                            }
+                        }
+                    } else null,
                 )
                 Spacer(modifier = Modifier.height(18.dp))
 

@@ -22,6 +22,7 @@ import com.ansmi.gestsquadre.kmp.push.FcmSessionRegistry
 import com.ansmi.gestsquadre.shared.GestSquadreException
 import com.ansmi.gestsquadre.shared.GestSquadreFacade
 import com.ansmi.gestsquadre.shared.NetworkErrorMessages
+import com.ansmi.gestsquadre.shared.OperationalEventActivator
 import com.ansmi.gestsquadre.shared.location.GpsPublishPolicy
 import com.ansmi.gestsquadre.shared.location.LocationTracker
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
@@ -170,6 +171,33 @@ class SquadViewModel(
                 onResult(e.message ?: "Logout fallito.")
             }
         }
+    }
+
+    private var bannerClearJob: Job? = null
+
+    fun tryBeginOperationalEventAlarm(): Boolean {
+        val session = _uiState.value.session ?: return false
+        if (!OperationalEventActivator.isActivator(session.squadCode)) {
+            showTemporaryBanner(OperationalEventActivator.UNAUTHORIZED_MESSAGE)
+            return false
+        }
+        return true
+    }
+
+    private fun showTemporaryBanner(message: String) {
+        bannerClearJob?.cancel()
+        _uiState.update { it.copy(bannerMessage = message) }
+        bannerClearJob =
+            viewModelScope.launch {
+                delay(30_000)
+                _uiState.update { state ->
+                    if (state.bannerMessage == message) {
+                        state.copy(bannerMessage = null)
+                    } else {
+                        state
+                    }
+                }
+            }
     }
 
     fun sendAlarm(

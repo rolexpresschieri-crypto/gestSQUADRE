@@ -39,6 +39,7 @@ final class SquadViewModel: ObservableObject {
     private var lastPublishedAtMs: Int64?
     private var sessionWatchTimer: Timer?
     private var pushWatchTimer: Timer?
+    private var bannerClearWorkItem: DispatchWorkItem?
 
     init() {
         guard let url = supabaseUrl, let key = supabaseAnonKey else {
@@ -340,6 +341,28 @@ final class SquadViewModel: ObservableObject {
                 onComplete(message)
             }
         }
+    }
+
+    func tryBeginOperationalEventAlarm() -> Bool {
+        guard let session, let facade else { return false }
+        if !facade.isOperationalEventActivatorSquad(squadCode: session.squadCode) {
+            showTemporaryBanner(facade.operationalEventUnauthorizedMessage())
+            return false
+        }
+        return true
+    }
+
+    private func showTemporaryBanner(_ message: String) {
+        bannerClearWorkItem?.cancel()
+        bannerMessage = message
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            if self.bannerMessage == message {
+                self.bannerMessage = nil
+            }
+        }
+        bannerClearWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 30, execute: work)
     }
 
     func sendAlarm(

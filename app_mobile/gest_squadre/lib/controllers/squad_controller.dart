@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../constants/operational_event_activator.dart';
 import '../constants/toc_push_text.dart';
 import '../models/squad_session.dart';
 import '../services/fcm_service.dart';
@@ -33,6 +34,7 @@ class SquadController extends ChangeNotifier {
   StreamSubscription<Position>? _positionSub;
   Position? _lastPublishedPosition;
   DateTime? _lastPublishedAt;
+  Timer? _bannerTimer;
 
   bool get backendConfigured => _configured;
   String? get gpsStatusLabel => gpsAccuracyLabel(lastGpsAccuracyM);
@@ -174,11 +176,36 @@ class SquadController extends ChangeNotifier {
     }
   }
 
+  bool tryBeginOperationalEventAlarm() {
+    final squadCode = currentSession?.squadCode ?? '';
+    if (!isOperationalEventActivatorSquad(squadCode)) {
+      showTemporaryBanner(operationalEventUnauthorizedMessage);
+      return false;
+    }
+    return true;
+  }
+
+  void showTemporaryBanner(String message, {Duration duration = const Duration(seconds: 30)}) {
+    _bannerTimer?.cancel();
+    bannerMessage = message;
+    notifyListeners();
+    _bannerTimer = Timer(duration, () {
+      if (bannerMessage == message) {
+        bannerMessage = null;
+        notifyListeners();
+      }
+    });
+  }
+
   Future<String?> sendAlarm() async {
     final s = currentSession;
     final api = _api;
     if (s == null || api == null) {
       return 'Devi effettuare il login squadra.';
+    }
+    if (!isOperationalEventActivatorSquad(s.squadCode)) {
+      showTemporaryBanner(operationalEventUnauthorizedMessage);
+      return null;
     }
     isBusy = true;
     notifyListeners();

@@ -26,6 +26,9 @@ class HomeScreen extends StatelessWidget {
   final SquadController controller;
 
   Future<void> _confirmAndSendAlarm(BuildContext context) async {
+    if (!controller.tryBeginOperationalEventAlarm()) {
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(

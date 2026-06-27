@@ -92,7 +92,11 @@ struct HomeView: View {
                             backgroundColor: viewModel.isLoggedIn ? TacticalColors.red : TacticalColors.disabled,
                             foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
                             enabled: viewModel.isLoggedIn && !viewModel.isBusy,
-                            action: { showAlarmSheet = true }
+                            action: {
+                                if viewModel.tryBeginOperationalEventAlarm() {
+                                    showAlarmSheet = true
+                                }
+                            }
                         )
                         .padding(.top, 18)
 
