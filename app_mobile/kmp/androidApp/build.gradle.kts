@@ -35,8 +35,8 @@ android {
         applicationId = "com.ansmi.gest_squadre"
         minSdk = 24
         targetSdk = 35
-        versionCode = 31
-        versionName = "1.0.31"
+        versionCode = 32
+        versionName = "1.0.32"
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
         buildConfigField("String", "FIREBASE_ANDROID_API_KEY", "\"$firebaseApiKey\"")
