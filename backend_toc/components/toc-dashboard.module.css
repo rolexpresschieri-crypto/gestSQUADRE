@@ -245,6 +245,12 @@
   color: #fff;
 }
 
+.btnNavy {
+  background: #0a1223;
+  color: #fff;
+  text-decoration: none;
+}
+
 .btnAlarm {
   background: #c62828;
   color: #fff;

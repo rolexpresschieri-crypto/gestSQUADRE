@@ -1726,6 +1726,15 @@ export default function TocDashboard() {
               Destinatari allarme
             </Link>
           ) : null}
+          <a
+            className={`${styles.btn} ${styles.btnNavy}`}
+            href="https://www.ilmeteo.net/mappe-meteorologiche/fulmini.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Mappa densità fulmini Meteored (nuova scheda)"
+          >
+            Situazione fulmini
+          </a>
           <button className={`${styles.btn} ${styles.btnDanger}`} type="button" onClick={handleLogout}>
             Logout TOC
           </button>
