@@ -374,6 +374,29 @@
   margin-bottom: 6px;
 }
 
+.opsEventTypeLine {
+  margin: 6px 0 8px;
+  font-size: 0.95rem;
+  color: #e8edf2;
+  line-height: 1.45;
+}
+
+.opsEventTypeMissing {
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 183, 77, 0.15);
+  border: 1px solid #ffb74d;
+  color: #ffe0b2;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.opsEventTypeMissing code {
+  font-size: 0.82rem;
+  color: #fff;
+}
+
 .opsRowSelected {
   box-shadow: 0 0 0 2px #e0be3a;
 }

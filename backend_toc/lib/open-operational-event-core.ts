@@ -3,6 +3,8 @@ import {
   allocateOperationalEventNumber,
   mapOperationalEventRow,
   operationalEventScopeKey,
+  isMissingRequestTypesColumn,
+  OPERATIONAL_EVENT_BASE_SELECT,
   OPERATIONAL_EVENT_SELECT,
   type OperationalEventRow,
   type OperationalEventSummary,
@@ -67,20 +69,36 @@ export async function openOperationalEvent(
     return { event: null, created: false, error: allocErr };
   }
 
-  const { data: inserted, error: insertErr } = await admin
+  const insertBase = {
+    display_number: number,
+    status: "aperto" as const,
+    golf_course_id: params.golfCourseId,
+    opened_by_admin_code: openedByCode,
+    target_squad_id: params.targetSquadId,
+    target_session_id: targetSessionId,
+  };
+
+  let { data: inserted, error: insertErr } = await admin
     .from("operational_events")
     .insert({
-      display_number: number,
-      status: "aperto",
-      golf_course_id: params.golfCourseId,
-      opened_by_admin_code: openedByCode,
-      target_squad_id: params.targetSquadId,
-      target_session_id: targetSessionId,
+      ...insertBase,
       request_types: requestTypes,
       other_detail: otherDetail,
     })
     .select(OPERATIONAL_EVENT_SELECT)
     .single();
+
+  if (
+    (insertErr || !inserted) &&
+    insertErr &&
+    isMissingRequestTypesColumn(insertErr.message)
+  ) {
+    ({ data: inserted, error: insertErr } = await admin
+      .from("operational_events")
+      .insert(insertBase)
+      .select(OPERATIONAL_EVENT_BASE_SELECT)
+      .single());
+  }
 
   if (insertErr || !inserted) {
     return {

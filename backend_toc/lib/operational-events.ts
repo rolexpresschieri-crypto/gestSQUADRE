@@ -32,11 +32,48 @@ export type OperationalEventSummary = {
   otherDetail: string | null;
 };
 
-export const OPERATIONAL_EVENT_SELECT =
-  "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id, request_types, other_detail";
+export const OPERATIONAL_EVENT_BASE_SELECT =
+  "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id";
+
+export const OPERATIONAL_EVENT_SELECT = `${OPERATIONAL_EVENT_BASE_SELECT}, request_types, other_detail`;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isMissingRequestTypesColumn(message: string): boolean {
+  return /request_types|other_detail/i.test(message);
+}
+
+export async function fetchOperationalEventById(
+  admin: SupabaseClient,
+  operationalEventId: string,
+): Promise<{ row: OperationalEventRow | null; error: string | null }> {
+  if (!UUID_RE.test(operationalEventId)) {
+    return { row: null, error: "Evento operativo non valido." };
+  }
+
+  let { data, error } = await admin
+    .from("operational_events")
+    .select(OPERATIONAL_EVENT_SELECT)
+    .eq("id", operationalEventId)
+    .maybeSingle();
+
+  if (error && isMissingRequestTypesColumn(error.message)) {
+    ({ data, error } = await admin
+      .from("operational_events")
+      .select(OPERATIONAL_EVENT_BASE_SELECT)
+      .eq("id", operationalEventId)
+      .maybeSingle());
+  }
+
+  if (error) {
+    return { row: null, error: error.message };
+  }
+  if (!data) {
+    return { row: null, error: "Evento operativo non trovato." };
+  }
+  return { row: data as OperationalEventRow, error: null };
+}
 
 export function operationalEventScopeKey(
   golfCourseId: string | null | undefined,
@@ -159,10 +196,19 @@ export async function fetchOperationalEventsByIds(
     return out;
   }
 
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("operational_events")
     .select(OPERATIONAL_EVENT_SELECT)
     .in("id", unique);
+
+  if (error && isMissingRequestTypesColumn(error.message)) {
+    const fallback = await admin
+      .from("operational_events")
+      .select(OPERATIONAL_EVENT_BASE_SELECT)
+      .in("id", unique);
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
 
   if (error || !data) {
     return out;
@@ -183,25 +229,17 @@ export async function validateOpenOperationalEvent(
     return { row: null, error: "Evento operativo non valido." };
   }
 
-  const { data, error } = await admin
-    .from("operational_events")
-    .select(OPERATIONAL_EVENT_SELECT)
-    .eq("id", operationalEventId)
-    .maybeSingle();
-
-  if (error) {
-    return { row: null, error: error.message };
-  }
-  if (!data) {
-    return { row: null, error: "Evento operativo non trovato." };
+  const { row: data, error } = await fetchOperationalEventById(admin, operationalEventId);
+  if (error || !data) {
+    return { row: null, error: error ?? "Evento operativo non trovato." };
   }
 
-  const row = mapOperationalEventRow(data as OperationalEventRow);
+  const row = mapOperationalEventRow(data);
   if (row.status !== "aperto") {
     return { row: null, error: "L'evento operativo non è aperto." };
   }
 
-  const eventCourseId = (data as OperationalEventRow).golf_course_id;
+  const eventCourseId = data.golf_course_id;
   if (golfCourseId && eventCourseId && eventCourseId !== golfCourseId) {
     return { row: null, error: "Evento operativo di un altro campo." };
   }

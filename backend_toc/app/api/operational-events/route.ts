@@ -4,6 +4,9 @@ import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
 import {
   mapOperationalEventRow,
   OPERATIONAL_EVENT_SELECT,
+  OPERATIONAL_EVENT_BASE_SELECT,
+  fetchOperationalEventById,
+  isMissingRequestTypesColumn,
   type OperationalEventRow,
 } from "@/lib/operational-events";
 import { openOperationalEvent } from "@/lib/open-operational-event-core";
@@ -48,7 +51,24 @@ export async function GET(request: Request) {
     query = query.eq("golf_course_id", golfCourseId);
   }
 
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error && isMissingRequestTypesColumn(error.message)) {
+    let fallbackQuery = admin
+      .from("operational_events")
+      .select(OPERATIONAL_EVENT_BASE_SELECT)
+      .order("display_number", { ascending: true });
+    if (status === "aperto") {
+      fallbackQuery = fallbackQuery.eq("status", "aperto");
+    } else if (status === "chiuso") {
+      fallbackQuery = fallbackQuery.eq("status", "chiuso");
+    }
+    if (golfCourseId) {
+      fallbackQuery = fallbackQuery.eq("golf_course_id", golfCourseId);
+    }
+    const fallback = await fallbackQuery;
+    data = fallback.data as typeof data;
+    error = fallback.error;
+  }
   if (error) {
     if (error.message.includes("operational_events")) {
       return NextResponse.json({
@@ -291,21 +311,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data, error } = await admin
+    const { error: updateErr } = await admin
       .from("operational_events")
       .update({ intervention_ref: interventionRef })
       .eq("id", operationalEventId)
-      .eq("status", "aperto")
-      .select(OPERATIONAL_EVENT_SELECT)
-      .single();
+      .eq("status", "aperto");
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    const { row, error: fetchErr } = await fetchOperationalEventById(
+      admin,
+      operationalEventId,
+    );
+    if (fetchErr || !row) {
+      return NextResponse.json(
+        { error: fetchErr ?? "Evento non trovato dopo aggiornamento." },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({
       ok: true,
-      event: mapOperationalEventRow(data as OperationalEventRow),
+      event: mapOperationalEventRow(row),
     });
   }
 

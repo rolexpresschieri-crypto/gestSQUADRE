@@ -113,6 +113,29 @@ function resolveAlarmOperationalNumber(
   return openEvents.find((event) => event.id === eventId)?.displayNumber ?? null;
 }
 
+function OperationalEventTypeLine({ event }: { event: OperationalEventSummary }) {
+  if (event.requestTypes.length === 0) {
+    return (
+      <p className={styles.opsEventTypeMissing}>
+        <strong>Tipologia intervento:</strong> non registrata. Esegui{" "}
+        <code>sql/operational_events_request_types.sql</code> su Supabase, chiudi
+        questo evento e riaprilo scegliendo Sanitario / Security / VVF / …
+      </p>
+    );
+  }
+  return (
+    <p className={styles.opsEventTypeLine}>
+      <strong>Tipologia intervento:</strong>{" "}
+      <SquadAlarmRequestDetail
+        row={{
+          request_types: event.requestTypes,
+          other_detail: event.otherDetail,
+        }}
+      />
+    </p>
+  );
+}
+
 type FieldPhotoLogRow = {
   id: string;
   squad_code: string;
@@ -594,7 +617,9 @@ export default function TocDashboard() {
         acknowledgedSessionIds?: string[];
       };
       if (!res.ok) {
-        setStatusMessage(payload.error ?? "Chiusura evento fallita.");
+        const msg = payload.error ?? "Chiusura evento fallita.";
+        setStatusMessage(msg);
+        window.alert(msg);
         return;
       }
       const sessionIds = new Set(payload.acknowledgedSessionIds ?? []);
@@ -2090,19 +2115,6 @@ export default function TocDashboard() {
                         ? `${styles.opsActiveEventItem} ${styles.opsRowSelected}`
                         : styles.opsActiveEventItem
                     }
-                    onClick={() => {
-                      if (event.targetSessionId) {
-                        setSelectedSessionId(event.targetSessionId);
-                        const squad = squads.find(
-                          (s) => s.sessionId === event.targetSessionId,
-                        );
-                        if (squad) {
-                          handleSquadRowSelect(squad);
-                        }
-                      }
-                    }}
-                    role={event.targetSessionId ? "button" : undefined}
-                    tabIndex={event.targetSessionId ? 0 : undefined}
                   >
                     <div className={styles.opsActiveEventDot} aria-hidden>
                       {event.displayNumber}
@@ -2119,14 +2131,19 @@ export default function TocDashboard() {
                           <> · target offline</>
                         ) : null}
                       </p>
-                      <p className={styles.alarmMessage}>
-                        <SquadAlarmRequestDetail
-                          row={{
-                            request_types: event.requestTypes,
-                            other_detail: event.otherDetail,
+                      <OperationalEventTypeLine event={event} />
+                      {event.targetSessionId && targetSquad ? (
+                        <button
+                          type="button"
+                          className={styles.btnSmall}
+                          onClick={() => {
+                            setSelectedSessionId(event.targetSessionId);
+                            handleSquadRowSelect(targetSquad);
                           }}
-                        />
-                      </p>
+                        >
+                          Evidenzia squadra sulla mappa
+                        </button>
+                      ) : null}
                       <label
                         className={styles.operationalInterventionField}
                         onClick={(e) => e.stopPropagation()}
