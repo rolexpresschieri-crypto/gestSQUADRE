@@ -36,6 +36,7 @@ object SessionCache {
                 squadCode = parts[3],
                 squadName = parts[4],
                 loginAt = Instant.parse(parts[5]),
+                canOpenOperationalEvent = parts.getOrNull(6) == "1",
             )
         }.getOrNull()
     }
@@ -121,6 +122,19 @@ fun GestSquadreFacade.sendAlarmSafe(
             onComplete(null)
         } catch (e: Throwable) {
             onComplete(iosCallbackErrorMessage(e))
+        }
+    }
+}
+
+fun GestSquadreFacade.openOperationalEventFromFieldSafe(
+    session: SquadSession,
+    onComplete: (Int?, String?) -> Unit,
+) {
+    iosScope.launch {
+        try {
+            onComplete(openOperationalEventFromField(session), null)
+        } catch (e: Throwable) {
+            onComplete(null, iosCallbackErrorMessage(e))
         }
     }
 }

@@ -83,8 +83,6 @@ export async function POST(request: Request) {
     id: String(alarm.id),
     squad_id: String(alarm.squad_id),
     squad_code: String(alarm.squad_code ?? ""),
-    operational_event_id:
-      typeof alarm.operational_event_id === "string" ? alarm.operational_event_id : null,
   });
 
   if (result.error) {

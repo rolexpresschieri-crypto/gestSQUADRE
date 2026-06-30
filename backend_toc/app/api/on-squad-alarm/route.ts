@@ -5,7 +5,6 @@ import {
   forwardVolunteerAlarmToOperators,
   type SquadAlarmNotifyRow,
 } from "@/lib/forward-volunteer-alarm";
-import { openOperationalEventFromSquadAlarm } from "@/lib/open-operational-event-from-squad-alarm";
 
 export const runtime = "nodejs";
 
@@ -148,18 +147,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const operationalOpen = await openOperationalEventFromSquadAlarm(admin, {
-      id: alarm.id,
-      squad_id: alarm.squad_id,
-      squad_code: alarm.squad_code,
-    });
-
     const result = await forwardVolunteerAlarmToOperators(admin, alarm);
     return NextResponse.json({
       ok: true,
       ...result,
-      operationalEvent: operationalOpen.event,
-      operationalEventCreated: operationalOpen.created,
     });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "Errore inoltro allarme";

@@ -6,6 +6,7 @@ import kotlinx.datetime.Instant
 
 /**
  * Stesso formato di [gest_squadre_session_json] nell'app Flutter 1.0.12.
+ * Parti: sessionId|eventId|squadId|squadCode|squadName|loginAt|canOpenOperationalEvent
  */
 class SessionStorage(
     context: Context,
@@ -27,6 +28,7 @@ class SessionStorage(
                     session.squadCode,
                     session.squadName,
                     session.loginAt.toString(),
+                    if (session.canOpenOperationalEvent) "1" else "0",
                 ).joinToString("|"),
             ).apply()
     }
@@ -51,6 +53,7 @@ class SessionStorage(
                 squadCode = parts[3],
                 squadName = parts[4],
                 loginAt = Instant.parse(parts[5]),
+                canOpenOperationalEvent = parts.getOrNull(6) == "1",
             )
         } catch (_: Exception) {
             null

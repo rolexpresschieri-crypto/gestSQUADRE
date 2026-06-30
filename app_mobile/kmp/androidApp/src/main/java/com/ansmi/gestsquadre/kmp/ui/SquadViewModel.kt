@@ -180,11 +180,34 @@ class SquadViewModel(
 
     fun tryBeginOperationalEventAlarm(): Boolean {
         val session = _uiState.value.session ?: return false
-        if (!OperationalEventActivator.isActivator(session.squadCode)) {
+        if (!session.canOpenOperationalEvent) {
             showTemporaryBanner(OperationalEventActivator.UNAUTHORIZED_MESSAGE)
             return false
         }
         return true
+    }
+
+    fun openOperationalEvent(onResult: (String?) -> Unit) {
+        val session = _uiState.value.session ?: return
+        if (!session.canOpenOperationalEvent) {
+            showTemporaryBanner(OperationalEventActivator.UNAUTHORIZED_MESSAGE)
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(isBusy = true) }
+            try {
+                val number = facade.openOperationalEventFromField(session)
+                _uiState.update { it.copy(isBusy = false) }
+                showTemporaryBanner("EVENTO OPERATIVO n° $number aperto.")
+                onResult(null)
+            } catch (e: GestSquadreException) {
+                _uiState.update { it.copy(isBusy = false) }
+                onResult(e.message)
+            } catch (e: Exception) {
+                _uiState.update { it.copy(isBusy = false) }
+                onResult(NetworkErrorMessages.format(e))
+            }
+        }
     }
 
     private fun showTemporaryBanner(message: String) {

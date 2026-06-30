@@ -6,6 +6,7 @@ class SquadSession {
     required this.squadCode,
     required this.squadName,
     required this.loginAt,
+    this.canOpenOperationalEvent = false,
   });
 
   final String sessionId;
@@ -14,6 +15,7 @@ class SquadSession {
   final String squadCode;
   final String squadName;
   final DateTime loginAt;
+  final bool canOpenOperationalEvent;
 }
 
 class EventInfo {

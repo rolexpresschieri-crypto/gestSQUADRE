@@ -8,6 +8,7 @@ import 'services/fcm_service.dart';
 
 const _supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const _supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+const _tocBackendUrl = String.fromEnvironment('TOC_BACKEND_URL');
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +34,10 @@ Future<void> main() async {
         'Pragma': 'no-cache',
       },
     );
-    controller = SquadController(backendConfigured: true);
+    controller = SquadController(
+      backendConfigured: true,
+      tocBackendUrl: _tocBackendUrl,
+    );
     if (firebaseReady) {
       try {
         await setupGestFcm(

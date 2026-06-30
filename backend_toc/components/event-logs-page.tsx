@@ -566,7 +566,7 @@ export default function EventLogsPage() {
     if (
       !window.confirm(
         "Resettare TUTTI i log eventi e azzerare il progressivo N° evento operativo?\n" +
-          "Verranno eliminati allarmi, push, missioni, login/logout e foto campo. Operazione irreversibile.",
+          "Verranno eliminati allarmi, push, notifiche, login/logout e foto campo. Operazione irreversibile.",
       )
     ) {
       return;
@@ -650,7 +650,7 @@ export default function EventLogsPage() {
               checked={exportAllLogs}
               onChange={(e) => toggleExportAll(e.target.checked)}
             />
-            Tutti i log eventi (login, push, missioni, allarmi…)
+            Tutti i log eventi (login, push, notifiche, allarmi…)
           </label>
           <p className={styles.filterHint}>Oppure solo righe legate a tipologia allarme:</p>
           <div className={styles.filterGrid} role="group" aria-label="Tipologia allarme">

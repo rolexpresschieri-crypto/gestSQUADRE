@@ -100,16 +100,27 @@ struct HomeView: View {
                         )
                         .padding(.top, 18)
 
+                        if viewModel.isLoggedIn && viewModel.canOpenOperationalEvent {
+                            MainButton(
+                                label: "APERTURA EVENTO",
+                                backgroundColor: TacticalColors.navy,
+                                foregroundColor: .white,
+                                enabled: !viewModel.isBusy,
+                                action: {
+                                    viewModel.openOperationalEvent { err in
+                                        if let err { onShowMessage(err) }
+                                    }
+                                }
+                            )
+                            .padding(.top, 18)
+                        }
+
                         MainButton(
-                            label: "INVIA ALLARME A TOC",
+                            label: "INVIA NOTIFICA A TOC",
                             backgroundColor: viewModel.isLoggedIn ? TacticalColors.red : TacticalColors.disabled,
                             foregroundColor: viewModel.isLoggedIn ? .white : TacticalColors.muted,
                             enabled: viewModel.isLoggedIn && !viewModel.isBusy,
-                            action: {
-                                if viewModel.tryBeginOperationalEventAlarm() {
-                                    showAlarmSheet = true
-                                }
-                            }
+                            action: { showAlarmSheet = true }
                         )
                         .padding(.top, 18)
 

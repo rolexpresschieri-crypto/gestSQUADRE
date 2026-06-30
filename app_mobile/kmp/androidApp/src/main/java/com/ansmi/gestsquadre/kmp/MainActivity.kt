@@ -22,6 +22,7 @@ class MainActivity : ComponentActivity() {
         val config = GestSquadreConfig(
             supabaseUrl = BuildConfig.SUPABASE_URL.ifBlank { "https://placeholder.invalid" },
             supabaseAnonKey = BuildConfig.SUPABASE_ANON_KEY.ifBlank { "missing" },
+            tocBackendUrl = BuildConfig.TOC_BACKEND_URL,
         )
         val facade = GestSquadreFacade(config)
 

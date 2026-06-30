@@ -12,6 +12,8 @@ export type OperationalEventRow = {
   closed_at: string | null;
   opened_by_admin_code: string;
   closed_by_admin_code: string | null;
+  target_squad_id?: string | null;
+  target_session_id?: string | null;
 };
 
 export type OperationalEventSummary = {
@@ -21,6 +23,9 @@ export type OperationalEventSummary = {
   status: OperationalEventStatus;
   openedAt: string;
   closedAt: string | null;
+  targetSquadId: string | null;
+  targetSessionId: string | null;
+  openedByCode: string;
 };
 
 const UUID_RE =
@@ -57,6 +62,13 @@ export function mapOperationalEventRow(
     status: row.status,
     openedAt: row.opened_at,
     closedAt: row.closed_at,
+    targetSquadId:
+      typeof row.target_squad_id === "string" ? row.target_squad_id.trim() || null : null,
+    targetSessionId:
+      typeof row.target_session_id === "string"
+        ? row.target_session_id.trim() || null
+        : null,
+    openedByCode: row.opened_by_admin_code?.trim() || "",
   };
 }
 
@@ -103,7 +115,7 @@ export async function fetchOpenOperationalEvents(
   let query = admin
     .from("operational_events")
     .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
     )
     .eq("status", "aperto")
     .order("display_number", { ascending: true });

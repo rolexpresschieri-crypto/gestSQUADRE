@@ -50,6 +50,12 @@ import {
 } from "@/lib/squad-map-points-feed";
 import { formatAlarmRequestDetail } from "@/lib/squad-alarms";
 import { SquadAlarmRequestDetail } from "@/components/squad-alarm-detail";
+import {
+  SquadAlarmRequestForm,
+  emptySquadAlarmRequestForm,
+  squadAlarmRequestTypesFromForm,
+  type SquadAlarmRequestFormValue,
+} from "@/components/squad-alarm-request-form";
 import { type SquadWaypoint, waypointDisplayName } from "@/lib/waypoints";
 import type { OperationalEventSummary } from "@/lib/operational-events";
 import {
@@ -57,9 +63,10 @@ import {
   type OperationalEventRow,
 } from "@/lib/operational-events";
 import {
-  isOperationalEventActivatorSquad,
-  OPERATIONAL_EVENT_ACTIVATOR_LABEL,
-} from "@/lib/operational-event-activators";
+  fetchOperationalEventOpenerCodes,
+  isOperationalEventOpenerCode,
+  OPERATIONAL_EVENT_OPENER_LABEL,
+} from "@/lib/operational-event-openers";
 import {
   fetchAutomaticNotifyRecipientCodes,
   isAutomaticNotifyRecipientCode,
@@ -187,6 +194,17 @@ export default function TocDashboard() {
   const [autoNotifyRecipientCodes, setAutoNotifyRecipientCodes] = useState<
     Set<string>
   >(new Set());
+  const [eventOpenerCodes, setEventOpenerCodes] = useState<Set<string>>(new Set());
+  const [openEventModalOpen, setOpenEventModalOpen] = useState(false);
+  const [openEventTargetSessionId, setOpenEventTargetSessionId] = useState("");
+  const [openEventBusy, setOpenEventBusy] = useState(false);
+  const [fieldNotifyOpen, setFieldNotifyOpen] = useState(false);
+  const [fieldNotifySessionId, setFieldNotifySessionId] = useState("");
+  const [fieldNotifyForm, setFieldNotifyForm] = useState<SquadAlarmRequestFormValue>(
+    emptySquadAlarmRequestForm(),
+  );
+  const [fieldNotifyBusy, setFieldNotifyBusy] = useState(false);
+  const [fieldNotifyAlert, setFieldNotifyAlert] = useState<string | null>(null);
 
   const canForceSquadLogout = session?.role === "admin";
   const canOpenEventLogs = session ? canViewEventLogs(session.role) : false;
@@ -212,6 +230,9 @@ export default function TocDashboard() {
 
   const alarmsRef = useRef(alarms);
   alarmsRef.current = alarms;
+
+  const eventOpenerCodesRef = useRef(eventOpenerCodes);
+  eventOpenerCodesRef.current = eventOpenerCodes;
 
   const activeAutoNotifyFetchSeq = useRef(0);
   const dashboardOpenedAtRef = useRef(new Date().toISOString());
@@ -314,6 +335,24 @@ export default function TocDashboard() {
     return ids;
   }, [alarmingSessionIds, onlineSessionIds]);
 
+  const eventTargetSessionIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const ev of openOperationalEvents) {
+      if (ev.targetSessionId) {
+        ids.add(ev.targetSessionId);
+      }
+    }
+    return ids;
+  }, [openOperationalEvents]);
+
+  const squadBySessionId = useMemo(() => {
+    const map = new Map<string, LiveSquad>();
+    for (const s of squads) {
+      map.set(s.sessionId, s);
+    }
+    return map;
+  }, [squads]);
+
   const activeTocMissions = useMemo(
     () =>
       Array.from(routeAssignmentsBySession.values())
@@ -394,7 +433,7 @@ export default function TocDashboard() {
       let query = supabase
         .from("operational_events")
         .select(
-          "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+          "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
         )
         .eq("status", "aperto")
         .order("display_number", { ascending: false });
@@ -503,8 +542,8 @@ export default function TocDashboard() {
     const openMissions = countOpenMissionsForEvent(event.id);
     if (openMissions > 0) {
       setStatusMessage(
-        `Missioni collegate all'evento n° ${event.displayNumber} ancora aperte (${openMissions}). ` +
-          "Chiudile dalla colonna «Missioni TOC attive» o usa Reset forzato TOC.",
+        `Notifiche collegate all'evento n° ${event.displayNumber} ancora aperte (${openMissions}). ` +
+          "Chiudile dalla colonna «Notifiche TOC attive» o usa Reset forzato TOC.",
       );
       return;
     }
@@ -512,7 +551,7 @@ export default function TocDashboard() {
       !window.confirm(
         `Chiudere evento operativo n° ${event.displayNumber}?\n` +
           "Chiude anche gli allarmi volontario collegati.\n" +
-          "Non sarà più selezionabile per nuove missioni.",
+          "Non sarà più selezionabile per nuove notifiche.",
       )
     ) {
       return;
@@ -615,6 +654,19 @@ export default function TocDashboard() {
     const squadCountLabel = `${rows.length} squadre online`;
     setStatusMessage((prev) => (prev === squadCountLabel ? prev : squadCountLabel));
   }, [supabase, golfCourseId]);
+
+  const loadEventOpenerCodes = useCallback(async () => {
+    if (!supabase || !session) {
+      setEventOpenerCodes(new Set());
+      return;
+    }
+    try {
+      const codes = await fetchOperationalEventOpenerCodes(supabase, golfCourseId);
+      setEventOpenerCodes(codes);
+    } catch {
+      setEventOpenerCodes(new Set());
+    }
+  }, [supabase, session, golfCourseId]);
 
   const loadOnlineSessionsForLogout = useCallback(async () => {
     if (!supabase) {
@@ -823,7 +875,7 @@ export default function TocDashboard() {
         return;
       }
       if (!res.ok) {
-        setStatusMessage(`Missioni GT: errore HTTP ${res.status}`);
+        setStatusMessage(`Notifiche GT: errore HTTP ${res.status}`);
         return;
       }
       const body = (await res.json()) as {
@@ -849,7 +901,7 @@ export default function TocDashboard() {
       if (seq !== activeAutoNotifyFetchSeq.current) {
         return;
       }
-      setStatusMessage("Missioni GT: impossibile caricare gli inoltri automatici.");
+      setStatusMessage("Notifiche GT: impossibile caricare gli inoltri automatici.");
     }
   }, [session, activeEventId, golfCourseId]);
 
@@ -873,10 +925,13 @@ export default function TocDashboard() {
       }
       processedAlarmForwardRef.current.add(row.id);
 
-      const isActivator = isOperationalEventActivatorSquad(row.squad_code);
+      const isActivator = isOperationalEventOpenerCode(
+        row.squad_code,
+        eventOpenerCodesRef.current,
+      );
       if (isActivator) {
         setStatusMessage(
-          `ALLARME ATTIVATORE ${row.squad_code} — ${formatAlarmRequestDetail(row)} (inoltro automatico…)`,
+          `NOTIFICA ${row.squad_code} — ${formatAlarmRequestDetail(row)} (inoltro automatico…)`,
         );
       }
 
@@ -905,28 +960,18 @@ export default function TocDashboard() {
 
         debouncedLoadActiveAutoNotifies();
 
-        if (payload.operationalEvent) {
-          await loadOpenOperationalEvents();
-          setInterventionDrafts((prev) => ({
-            ...prev,
-            [payload.operationalEvent!.id]:
-              payload.operationalEvent!.interventionRef ?? "",
-          }));
-          if (isActivator) {
-            setStatusMessage(
-              payload.operationalEventCreated
-                ? `EVENTO OPERATIVO n° ${payload.operationalEvent.displayNumber} aperto da ${row.squad_code}.`
-                : `EVENTO OPERATIVO n° ${payload.operationalEvent.displayNumber} attivo (${row.squad_code}).`,
-            );
-          }
-        } else if (!isActivator) {
+        if (!isActivator) {
           const total =
             (payload.sent ?? 0) + (payload.skipped ?? 0) + (payload.failed ?? 0);
           if (total > 0 || payload.alreadyForwarded) {
             setStatusMessage(
-              `ALLARME ${row.squad_code} — inoltro automatico verso squadre GT.`,
+              `NOTIFICA ${row.squad_code} — inoltro automatico verso squadre GT.`,
             );
           }
+        } else {
+          setStatusMessage(
+            `NOTIFICA ${row.squad_code} — ${formatAlarmRequestDetail(row)} (inoltro GT…).`,
+          );
         }
 
         await loadAlarms();
@@ -1040,6 +1085,7 @@ export default function TocDashboard() {
     void loadSquads();
     void loadAlarms();
     void loadActiveEventAndWaypoints();
+    void loadEventOpenerCodes();
 
     const squadChannel = supabase
       .channel("gest-squad-sessions")
@@ -1063,7 +1109,12 @@ export default function TocDashboard() {
             const row = payload.new as AlarmRow;
             setAlarms((prev) => [row, ...prev].slice(0, 40));
             const detail = formatAlarmRequestDetail(row);
-            if (isOperationalEventActivatorSquad(row.squad_code)) {
+            if (
+              isOperationalEventOpenerCode(
+                row.squad_code,
+                eventOpenerCodesRef.current,
+              )
+            ) {
               setStatusMessage(
                 `ALLARME ATTIVATORE ${row.squad_code} — ${detail} (inoltro automatico…)`,
               );
@@ -1151,11 +1202,26 @@ export default function TocDashboard() {
       )
       .subscribe();
 
-    const timer = window.setInterval(() => void loadSquads(), MAP_SQUAD_POLL_MS);
+    const timer = window.setInterval(() => {
+      void loadSquads();
+      void loadEventOpenerCodes();
+    }, MAP_SQUAD_POLL_MS);
+
+    const squadMetaChannel = supabase
+      .channel("gest-squads-meta")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "squads" },
+        () => {
+          void loadEventOpenerCodes();
+        },
+      )
+      .subscribe();
 
     return () => {
       window.clearInterval(timer);
       void supabase.removeChannel(squadChannel);
+      void supabase.removeChannel(squadMetaChannel);
       void supabase.removeChannel(alarmChannel);
       void supabase.removeChannel(operationalEventsChannel);
       void supabase.removeChannel(wpChannel);
@@ -1165,7 +1231,7 @@ export default function TocDashboard() {
       void supabase.removeChannel(tocPushChannel);
       void supabase.removeChannel(fieldPhotoChannel);
     };
-  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents, ensureVolunteerAlarmProcessed]);
+  }, [session, supabase, loadSquads, loadAlarms, loadActiveEventAndWaypoints, loadEventOpenerCodes, loadSelectedRouteAssignment, debouncedLoadActiveAutoNotifies, applyFieldPhotoNotification, loadOpenOperationalEvents, ensureVolunteerAlarmProcessed]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1396,6 +1462,98 @@ export default function TocDashboard() {
     );
   }
 
+  function openOperationalEventModal() {
+    const preselect =
+      (selectedSessionId && squads.some((s) => s.sessionId === selectedSessionId)
+        ? selectedSessionId
+        : null) ?? squads[0]?.sessionId ?? "";
+    setOpenEventTargetSessionId(preselect);
+    setOpenEventModalOpen(true);
+  }
+
+  async function confirmOpenOperationalEvent() {
+    if (!session || !openEventTargetSessionId.trim()) {
+      return;
+    }
+    setOpenEventBusy(true);
+    try {
+      const res = await fetch("/api/operational-events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session,
+          action: "open",
+          targetSessionId: openEventTargetSessionId.trim(),
+        }),
+      });
+      const body = (await res.json()) as {
+        error?: string;
+        event?: OperationalEventSummary;
+      };
+      if (!res.ok || !body.event) {
+        setStatusMessage(body.error ?? "Apertura evento fallita.");
+        return;
+      }
+      setOpenEventModalOpen(false);
+      await loadOpenOperationalEvents();
+      const target = squadBySessionId.get(openEventTargetSessionId.trim());
+      setStatusMessage(
+        `EVENTO OPERATIVO n° ${body.event.displayNumber} aperto` +
+          (target ? ` — target ${target.squadCode}.` : "."),
+      );
+    } catch {
+      setStatusMessage("Apertura evento: errore di rete.");
+    } finally {
+      setOpenEventBusy(false);
+    }
+  }
+
+  function openFieldNotifyModal() {
+    const preselect =
+      (selectedSessionId && squads.some((s) => s.sessionId === selectedSessionId)
+        ? selectedSessionId
+        : null) ?? squads[0]?.sessionId ?? "";
+    setFieldNotifySessionId(preselect);
+    setFieldNotifyForm(emptySquadAlarmRequestForm());
+    setFieldNotifyAlert(null);
+    setFieldNotifyOpen(true);
+  }
+
+  async function submitFieldNotification() {
+    if (!session || !fieldNotifySessionId.trim()) {
+      return;
+    }
+    setFieldNotifyBusy(true);
+    setFieldNotifyAlert(null);
+    try {
+      const res = await fetch("/api/squad-field-notification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session,
+          sessionId: fieldNotifySessionId.trim(),
+          requestTypes: squadAlarmRequestTypesFromForm(fieldNotifyForm),
+          otherDetail: fieldNotifyForm.otherDetail,
+        }),
+      });
+      const body = (await res.json()) as { error?: string; detail?: string };
+      if (!res.ok) {
+        setFieldNotifyAlert(body.error ?? "Invio notifica fallito.");
+        return;
+      }
+      setFieldNotifyOpen(false);
+      await loadAlarms();
+      debouncedLoadActiveAutoNotifies();
+      setStatusMessage(
+        `Notifica campo registrata — ${body.detail ?? "OK"}.`,
+      );
+    } catch {
+      setFieldNotifyAlert("Errore di rete.");
+    } finally {
+      setFieldNotifyBusy(false);
+    }
+  }
+
   function openPushModal() {
     setPushTitle(tocPushTextUpper(readStoredPushTitle(TOC_PUSH_TITLE)));
     setPushBody(tocPushTextUpper(readStoredPushBody(TOC_PUSH_BODY)));
@@ -1493,7 +1651,7 @@ export default function TocDashboard() {
       const proceedWithoutEvent = window.confirm(
         "Evento di riferimento: NESSUNO.\n\n" +
           `Eventi operativi aperti: ${eventList}.\n\n` +
-          "Senza evento la missione non sarà collegata alla chiusura dell'evento operativo.\n\n" +
+          "Senza evento la notifica non sarà collegata alla chiusura dell'evento operativo.\n\n" +
           "Annulla per tornare indietro e selezionare l'evento, oppure OK per inviare comunque.",
       );
       if (!proceedWithoutEvent) {
@@ -1691,11 +1849,19 @@ export default function TocDashboard() {
             </button>
           ) : null}
           <button
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            type="button"
+            onClick={openFieldNotifyModal}
+            disabled={squads.length === 0}
+          >
+            Notifica campo (come app)
+          </button>
+          <button
             className={`${styles.btn} ${styles.btnAlarm}`}
             type="button"
             onClick={openPushModal}
           >
-            Invia MISSIONI a squadre (push)
+            Invia NOTIFICHE a squadre (push)
           </button>
           <button
             className={`${styles.btn} ${styles.btnYellow}`}
@@ -1744,6 +1910,14 @@ export default function TocDashboard() {
       <section className={styles.operationalEventsPanel}>
         <div className={styles.operationalEventsHeader}>
           <h2 className={styles.operationalEventsTitle}>Eventi operativi</h2>
+          <button
+            className={`${styles.btn} ${styles.btnPrimary}`}
+            type="button"
+            disabled={openEventBusy || squads.length === 0}
+            onClick={openOperationalEventModal}
+          >
+            APERTURA EVENTO
+          </button>
           {openOperationalEvents.length > 0 ? (
             <span className={styles.operationalEventsActiveBadge}>
               Attivi:{" "}
@@ -1755,8 +1929,8 @@ export default function TocDashboard() {
         </div>
         {openOperationalEvents.length === 0 ? (
           <p className={styles.operationalEventsEmpty}>
-            Nessun evento operativo aperto. In attesa di allarme da{" "}
-            {OPERATIONAL_EVENT_ACTIVATOR_LABEL}.
+            Nessun evento operativo aperto. Usa <strong>APERTURA EVENTO</strong> o
+            l&apos;app mobile ({OPERATIONAL_EVENT_OPENER_LABEL}).
             {operationalEventsLoadError ? (
               <>
                 {" "}
@@ -1769,6 +1943,13 @@ export default function TocDashboard() {
             {openOperationalEvents.map((event) => (
               <li key={event.id} className={styles.operationalEventRow}>
                 <span className={styles.operationalEventNumber}>N° {event.displayNumber}</span>
+                {event.targetSessionId ? (
+                  <span className={styles.operationalEventTarget}>
+                    Target:{" "}
+                    {squadBySessionId.get(event.targetSessionId)?.squadCode ??
+                      event.targetSessionId.slice(0, 8)}
+                  </span>
+                ) : null}
                 <label className={styles.operationalInterventionField}>
                   N° intervento
                   <input
@@ -1818,6 +1999,7 @@ export default function TocDashboard() {
               ) : (
                 squads.map((s) => {
                   const alarming = mapAlarmingSessionIds.has(s.sessionId);
+                  const eventTarget = eventTargetSessionIds.has(s.sessionId);
                   const selected = selectedSessionId === s.sessionId;
                   return (
                     <li
@@ -1841,15 +2023,21 @@ export default function TocDashboard() {
                         className={
                           alarming
                             ? `${styles.squadBadge} ${styles.squadBadgeAlarm}`
-                            : styles.squadBadge
+                            : eventTarget
+                              ? `${styles.squadBadge} ${styles.squadBadgeEvent}`
+                              : styles.squadBadge
                         }
                       />
                       <span
                         className={
-                          alarming ? styles.squadLabelAlarm : styles.squadLabel
+                          alarming
+                            ? styles.squadLabelAlarm
+                            : eventTarget
+                              ? styles.squadLabelEvent
+                              : styles.squadLabel
                         }
                       >
-                        {alarming ? "ALLARME — " : ""}
+                        {alarming ? "ALLARME — " : eventTarget ? "EVENTO — " : ""}
                         {s.squadCode} — {s.squadName}
                       </span>
                       {canForceSquadLogout ? (
@@ -1876,12 +2064,12 @@ export default function TocDashboard() {
 
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>
-            Allarmi volontario ({pendingAlarms.length} aperti)
+            Eventi attivi ({pendingAlarms.length})
           </h2>
           <p className={styles.opsColumnHint}>
-            Segnalazioni dalla squadra sul campo. Nessuna push verso il TOC.
-            Se l&apos;allarme ha un Ev. N, chiudilo con <strong>CHIUDI EVENTO</strong> in alto
-            (dopo aver chiuso le missioni collegate).
+            Segnalazioni dal campo (stesso modulo dell&apos;app mobile). Nessuna push verso il TOC.
+            Se collegate a un Ev. N, chiudi con <strong>CHIUDI EVENTO</strong> in alto
+            (dopo aver chiuso le notifiche collegate).
           </p>
           <div className={styles.opsColumnBody}>
             {pendingAlarms.length === 0 ? (
@@ -1955,7 +2143,7 @@ export default function TocDashboard() {
 
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>
-            Missioni TOC attive ({activeMissionCount})
+            Notifiche TOC attive ({activeMissionCount})
           </h2>
           <p className={styles.opsColumnHint}>
             Via TRK + target, push allarme inviata dal TOC, oppure inoltro automatico
@@ -1965,7 +2153,7 @@ export default function TocDashboard() {
           <div className={styles.opsColumnBody}>
             {activeMissionCount === 0 ? (
               <p className={styles.opsEmpty}>
-                Nessuna missione attiva, push TOC in attesa, né inoltro GT.
+                Nessuna notifica attiva, push TOC in attesa, né inoltro GT.
               </p>
             ) : (
               <>
@@ -2014,7 +2202,7 @@ export default function TocDashboard() {
                           void endTocMission(assignment, squad);
                         }}
                       >
-                        Fine missione
+                        Fine notifica
                       </button>
                     </div>
                   </div>
@@ -2406,7 +2594,7 @@ export default function TocDashboard() {
               </p>
             ) : null}
             <label className={styles.pushField}>
-              Evento operativo (missione)
+              Evento operativo (notifica)
               <select
                 className={styles.pushInput}
                 value={pushOperationalEventId}
@@ -2424,7 +2612,7 @@ export default function TocDashboard() {
             {openOperationalEvents.length === 0 ? (
               <p className={styles.pushHint} style={{ color: "#ffb74d" }}>
                 Nessun evento operativo aperto. Si apre automaticamente con l&apos;allarme
-                dalle squadre attivatore ({OPERATIONAL_EVENT_ACTIVATOR_LABEL}). Per push generica
+                dalle squadre con flag apertura evento ({OPERATIONAL_EVENT_OPENER_LABEL}). Per push generica
                 usa <strong>Nessuno</strong>.
               </p>
             ) : null}
@@ -2470,10 +2658,101 @@ export default function TocDashboard() {
                 disabled={pushSending}
                 onClick={() => void sendPush()}
               >
-                {pushSending ? "Invio in corso…" : "Invia missione (push)"}
+                {pushSending ? "Invio in corso…" : "Invia notifica (push)"}
               </button>
               <button className={styles.btn} type="button" onClick={() => setPushOpen(false)}>
                 Chiudi
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {openEventModalOpen ? (
+        <div className={styles.modalBackdrop}>
+          <div className={styles.modal}>
+            <h2>APERTURA EVENTO</h2>
+            <p className={styles.pushHint}>
+              Scegli la squadra su cui pesa l&apos;evento (lampeggia in elenco). Nessuna push
+              all&apos;apertura.
+            </p>
+            <div className={styles.squadLogoutList}>
+              {squads.map((s) => (
+                <label key={s.sessionId} className={styles.squadLogoutOption}>
+                  <input
+                    type="radio"
+                    name="open-event-target"
+                    checked={openEventTargetSessionId === s.sessionId}
+                    onChange={() => setOpenEventTargetSessionId(s.sessionId)}
+                  />
+                  {s.squadCode} — {s.squadName}
+                </label>
+              ))}
+            </div>
+            <div className={styles.actions} style={{ marginTop: 12 }}>
+              <button
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                type="button"
+                disabled={openEventBusy || !openEventTargetSessionId}
+                onClick={() => void confirmOpenOperationalEvent()}
+              >
+                {openEventBusy ? "Apertura…" : "Apri evento"}
+              </button>
+              <button
+                className={styles.btn}
+                type="button"
+                onClick={() => setOpenEventModalOpen(false)}
+              >
+                Annulla
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {fieldNotifyOpen ? (
+        <div className={styles.modalBackdrop}>
+          <div className={styles.modal}>
+            <h2>Notifica campo (come app mobile)</h2>
+            <label className={styles.pushField}>
+              Squadra
+              <select
+                className={styles.pushInput}
+                value={fieldNotifySessionId}
+                onChange={(e) => setFieldNotifySessionId(e.target.value)}
+              >
+                {squads.map((s) => (
+                  <option key={s.sessionId} value={s.sessionId}>
+                    {s.squadCode} — {s.squadName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <SquadAlarmRequestForm
+              value={fieldNotifyForm}
+              onChange={setFieldNotifyForm}
+              disabled={fieldNotifyBusy}
+            />
+            {fieldNotifyAlert ? (
+              <p className={styles.pushAlert} role="alert">
+                {fieldNotifyAlert}
+              </p>
+            ) : null}
+            <div className={styles.actions} style={{ marginTop: 12 }}>
+              <button
+                className={`${styles.btn} ${styles.btnPrimary}`}
+                type="button"
+                disabled={fieldNotifyBusy}
+                onClick={() => void submitFieldNotification()}
+              >
+                {fieldNotifyBusy ? "Invio…" : "Invia notifica"}
+              </button>
+              <button
+                className={styles.btn}
+                type="button"
+                onClick={() => setFieldNotifyOpen(false)}
+              >
+                Annulla
               </button>
             </div>
           </div>

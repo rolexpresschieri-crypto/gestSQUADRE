@@ -570,6 +570,25 @@
   animation: pulse 1.1s ease-in-out infinite;
 }
 
+.squadBadgeEvent {
+  background: #1e5f9e;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+.squadLabelEvent {
+  background: #1e5f9e;
+  color: #fff;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-weight: 800;
+}
+
+.operationalEventTarget {
+  font-size: 0.9rem;
+  color: #8ec8ff;
+  font-weight: 700;
+}
+
 .squadLabel {
   font-weight: 600;
 }
@@ -597,7 +616,10 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   z-index: 1000;
-  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
 }
 
 .modal {

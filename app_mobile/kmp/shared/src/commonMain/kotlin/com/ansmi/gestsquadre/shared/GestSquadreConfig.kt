@@ -6,6 +6,7 @@ package com.ansmi.gestsquadre.shared
 data class GestSquadreConfig(
     val supabaseUrl: String,
     val supabaseAnonKey: String,
+    val tocBackendUrl: String = "",
 ) {
     init {
         require(supabaseUrl.isNotBlank()) { "supabaseUrl obbligatorio" }

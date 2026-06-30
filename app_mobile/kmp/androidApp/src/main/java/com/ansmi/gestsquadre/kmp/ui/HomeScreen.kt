@@ -85,7 +85,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.snapshotFlow
 import java.io.File
 
-private const val SquadAlarmDialogTitle = "Segnala allarme su mappa TOC"
+private const val SquadAlarmDialogTitle = "Invia notifica a TOC"
 private const val SquadAlarmDialogBody =
     "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
 private const val SquadAlarmSentOk =
@@ -488,17 +488,28 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(18.dp))
 
+                if (isLogged && session!!.canOpenOperationalEvent) {
+                    MainButton(
+                        label = "APERTURA EVENTO",
+                        backgroundColor = TacticalNavy,
+                        foregroundColor = Color.White,
+                        fontWeight = FontWeight.Black,
+                        onClick = {
+                            viewModel.openOperationalEvent { err ->
+                                err?.let(onShowMessage)
+                            }
+                        },
+                    )
+                    Spacer(modifier = Modifier.height(18.dp))
+                }
+
                 MainButton(
-                    label = "INVIA ALLARME A TOC",
+                    label = "INVIA NOTIFICA A TOC",
                     backgroundColor = if (isLogged) TacticalRed else TacticalDisabled,
                     foregroundColor = if (isLogged) Color.White else TacticalMuted,
                     fontWeight = FontWeight.Black,
                     onClick = if (isLogged) {
-                        {
-                            if (viewModel.tryBeginOperationalEventAlarm()) {
-                                showAlarmDialog = true
-                            }
-                        }
+                        { showAlarmDialog = true }
                     } else null,
                 )
                 Spacer(modifier = Modifier.height(18.dp))

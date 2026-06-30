@@ -49,7 +49,8 @@ final class SquadViewModel: ObservableObject {
             isInitializing = false
             return
         }
-        let config = GestSquadreConfig(supabaseUrl: url, supabaseAnonKey: key)
+        let tocUrl = tocBackendUrl ?? ""
+        let config = GestSquadreConfig(supabaseUrl: url, supabaseAnonKey: key, tocBackendUrl: tocUrl)
         facade = GestSquadreFacade(config: config)
         tocOperatorAdminCode = tocOperatorStorage.registeredAdminCode()
         observePushBus()
@@ -374,13 +375,35 @@ final class SquadViewModel: ObservableObject {
         }
     }
 
-    func tryBeginOperationalEventAlarm() -> Bool {
-        guard let session, let facade else { return false }
-        if !facade.isOperationalEventActivatorSquad(squadCode: session.squadCode) {
-            showTemporaryBanner(facade.operationalEventUnauthorizedMessage())
-            return false
+    var canOpenOperationalEvent: Bool {
+        session?.canOpenOperationalEvent ?? false
+    }
+
+    func openOperationalEvent(onComplete: @escaping (String?) -> Void) {
+        guard let session, let facade else {
+            onComplete("Sessione non attiva.")
+            return
         }
-        return true
+        if !facade.canOpenOperationalEvent(session: session) {
+            showTemporaryBanner(facade.operationalEventUnauthorizedMessage())
+            onComplete(facade.operationalEventUnauthorizedMessage())
+            return
+        }
+        isBusy = true
+        facade.openOperationalEventFromFieldSafe(session: session) { [weak self] number, err in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isBusy = false
+                if let err {
+                    onComplete(err)
+                    return
+                }
+                if let number {
+                    self.showTemporaryBanner("EVENTO OPERATIVO n° \(number) aperto.")
+                }
+                onComplete(nil)
+            }
+        }
     }
 
     private func showTemporaryBanner(_ message: String) {
@@ -846,10 +869,12 @@ final class SquadViewModel: ObservableObject {
     private struct SupabaseBundleConfig: Decodable {
         let supabaseUrl: String
         let supabaseAnonKey: String
+        let tocBackendUrl: String?
 
         enum CodingKeys: String, CodingKey {
             case supabaseUrl = "SUPABASE_URL"
             case supabaseAnonKey = "SUPABASE_ANON_KEY"
+            case tocBackendUrl = "TOC_BACKEND_URL"
         }
     }
 
@@ -886,6 +911,19 @@ final class SquadViewModel: ObservableObject {
         return value
     }
 
+    private var tocBackendUrl: String? {
+        if let bundled = bundledSupabaseConfig,
+           let raw = bundled.tocBackendUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !raw.isEmpty,
+           !raw.hasPrefix("$(") {
+            return raw
+        }
+        guard let raw = Bundle.main.object(forInfoDictionaryKey: "TOC_BACKEND_URL") as? String else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+        guard !value.isEmpty, !value.hasPrefix("$(") else { return nil }
+        return value
+    }
+
     private static func missingConfigMessage() -> String {
         "Manca dart-defines.json sul Mac. Copialo in gest_squadre/ poi: bash iosApp/sync-config.sh e rebuild."
     }
@@ -908,9 +946,9 @@ final class SquadViewModel: ObservableObject {
 
 enum SquadAlarmCopy {
     static let hint =
-        "Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push."
-    static let dialogTitle = "Segnala allarme su mappa TOC"
+        "Notifica al TOC con le stesse categorie dell'app (Sanitario, Security, VVF, Strutture, Altro)."
+    static let dialogTitle = "Invia notifica a TOC"
     static let dialogBody =
-        "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
-    static let sentOk = "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
+        "Confermi l'invio della notifica al TOC? La squadra può apparire evidenziata sulla mappa."
+    static let sentOk = "Notifica inviata al TOC."
 }

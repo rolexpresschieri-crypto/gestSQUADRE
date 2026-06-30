@@ -312,6 +312,32 @@
   cursor: not-allowed;
 }
 
+.statusEventOpener,
+.statusEventOpenerOff {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.statusEventOpener {
+  background: #1e5f9e;
+  color: #fff;
+}
+
+.statusEventOpenerOff {
+  background: #2a2a2a;
+  color: #bbb;
+  border: 1px solid #555;
+}
+
+.statusEventOpener:disabled,
+.statusEventOpenerOff:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .error {
   margin: 12px 18px 0;
   color: #ff8a80;

@@ -16,6 +16,7 @@ internal data class SquadRow(
     @SerialName("squad_name") val squadName: String,
     @SerialName("password_hash") val passwordHash: String,
     @SerialName("is_enabled") val isEnabled: Boolean = true,
+    @SerialName("can_open_operational_event") val canOpenOperationalEvent: Boolean = false,
 )
 
 @Serializable
@@ -32,6 +33,7 @@ internal data class SessionRestoreRow(
 internal data class SquadCodeNameRow(
     @SerialName("squad_code") val squadCode: String,
     @SerialName("squad_name") val squadName: String,
+    @SerialName("can_open_operational_event") val canOpenOperationalEvent: Boolean = false,
 )
 
 @Serializable

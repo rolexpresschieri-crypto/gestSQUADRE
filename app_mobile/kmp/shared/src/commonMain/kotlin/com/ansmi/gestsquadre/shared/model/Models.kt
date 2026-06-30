@@ -16,6 +16,7 @@ data class SquadSession(
     val squadCode: String,
     val squadName: String,
     val loginAt: Instant,
+    val canOpenOperationalEvent: Boolean = false,
 )
 
 data class GpsPosition(

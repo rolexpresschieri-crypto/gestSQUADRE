@@ -30,6 +30,7 @@ type SquadRow = {
   map_color: string | null;
   map_icon_key: string | null;
   is_enabled: boolean;
+  can_open_operational_event: boolean;
   created_at: string;
 };
 
@@ -51,6 +52,7 @@ export default function CampoSquadsPage() {
   const [mapColor, setMapColor] = useState(DEFAULT_COLORS[0]);
   const [mapIconKey, setMapIconKey] = useState<SquadIconKey>(DEFAULT_SQUAD_ICON_KEY);
   const [isEnabled, setIsEnabled] = useState(true);
+  const [canOpenOperationalEvent, setCanOpenOperationalEvent] = useState(false);
 
   useEffect(() => {
     setSupabase(getSupabaseBrowserClient());
@@ -78,7 +80,14 @@ export default function CampoSquadsPage() {
       .order("squad_code", { ascending: true });
 
     if (!error && data) {
-      setSquads(data as SquadRow[]);
+      setSquads(
+        (data as SquadRow[]).map((row) => ({
+          ...row,
+          can_open_operational_event: Boolean(row.can_open_operational_event),
+        })),
+      );
+    } else if (error?.message.includes("can_open_operational_event")) {
+      setFormError("Esegui sql/squads_can_open_operational_event.sql su Supabase.");
     }
   }, [supabase, session?.golfCourseId]);
 
@@ -105,6 +114,7 @@ export default function CampoSquadsPage() {
         DEFAULT_SQUAD_ICON_KEY,
     );
     setIsEnabled(true);
+    setCanOpenOperationalEvent(false);
     setFormError(null);
   }
 
@@ -116,6 +126,7 @@ export default function CampoSquadsPage() {
     setMapColor(row.map_color?.trim() || DEFAULT_COLORS[0]);
     setMapIconKey(normalizeSquadIconKey(row.map_icon_key));
     setIsEnabled(row.is_enabled);
+    setCanOpenOperationalEvent(row.can_open_operational_event);
     setFormError(null);
   }
 
@@ -146,6 +157,7 @@ export default function CampoSquadsPage() {
             map_color: mapColor,
             map_icon_key: mapIconKey,
             is_enabled: isEnabled,
+            can_open_operational_event: canOpenOperationalEvent,
           })
           .eq("id", editingId)
           .eq("golf_course_id", golfCourseId);
@@ -162,6 +174,7 @@ export default function CampoSquadsPage() {
           map_color: mapColor,
           map_icon_key: mapIconKey,
           is_enabled: isEnabled,
+          can_open_operational_event: canOpenOperationalEvent,
           golf_course_id: golfCourseId,
         });
 
@@ -240,6 +253,54 @@ export default function CampoSquadsPage() {
       await refreshSquads();
     } catch (err) {
       setFormError(err instanceof Error ? err.message : `Errore: impossibile ${label} la squadra.`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleToggleEventOpener(row: SquadRow) {
+    const golfCourseId = session?.golfCourseId;
+    if (!supabase || !golfCourseId) {
+      return;
+    }
+
+    const next = !row.can_open_operational_event;
+    const label = next ? "abilitare" : "disabilitare";
+    if (
+      !window.confirm(
+        `${next ? "Abilitare" : "Disabilitare"} l'apertura evento per ${row.squad_code} — ${row.squad_name}?`,
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setFormError(null);
+    try {
+      const { error } = await supabase
+        .from("squads")
+        .update({ can_open_operational_event: next })
+        .eq("id", row.id)
+        .eq("golf_course_id", golfCourseId);
+
+      if (error) {
+        throw error;
+      }
+      if (editingId === row.id) {
+        setCanOpenOperationalEvent(next);
+      }
+      setToast(
+        next
+          ? `${row.squad_code} può aprire eventi operativi.`
+          : `${row.squad_code} non può più aprire eventi.`,
+      );
+      await refreshSquads();
+    } catch (err) {
+      setFormError(
+        err instanceof Error
+          ? err.message
+          : `Errore: impossibile ${label} l'apertura evento.`,
+      );
     } finally {
       setBusy(false);
     }
@@ -422,6 +483,15 @@ export default function CampoSquadsPage() {
                 />
                 Stato: abilitata al login (se disabilitata, l&apos;app rifiuta il login)
               </label>
+              <label className={styles.checkLabel}>
+                <input
+                  type="checkbox"
+                  checked={canOpenOperationalEvent}
+                  onChange={(e) => setCanOpenOperationalEvent(e.target.checked)}
+                  disabled={busy}
+                />
+                Può aprire evento operativo (dal campo o in futuro da TOC per questa squadra)
+              </label>
               <div className={styles.formActions}>
                 <button type="submit" className={styles.btnPrimary} disabled={busy}>
                   {editingId ? "Salva modifiche" : "Aggiungi squadra"}
@@ -450,7 +520,8 @@ export default function CampoSquadsPage() {
                     <th>Codice</th>
                     <th>Nome</th>
                     <th>Password</th>
-                    <th>Stato</th>
+                    <th>Login</th>
+                    <th>Apre evento</th>
                     <th />
                   </tr>
                 </thead>
@@ -482,6 +553,21 @@ export default function CampoSquadsPage() {
                           title="Clicca per attivare o disabilitare il login"
                         >
                           {row.is_enabled ? "Attiva" : "Disabilitata"}
+                        </button>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={
+                            row.can_open_operational_event
+                              ? styles.statusEventOpener
+                              : styles.statusEventOpenerOff
+                          }
+                          onClick={() => void handleToggleEventOpener(row)}
+                          disabled={busy}
+                          title="Clicca per abilitare o disabilitare l'apertura evento"
+                        >
+                          {row.can_open_operational_event ? "Sì" : "No"}
                         </button>
                       </td>
                       <td className={styles.rowActions}>

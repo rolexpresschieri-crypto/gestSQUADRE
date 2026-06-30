@@ -698,7 +698,7 @@ export function eventLogsPrintHtml(
 </head>
 <body>
   <h1>Log eventi: ${escapeHtml(eventTitle)}</h1>
-  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Login/logout · allarmi · missioni · push</p>
+  <p class="meta">Esportato: ${escapeHtml(exportedAt)} · Login/logout · allarmi · notifiche · push</p>
   ${filterMeta}
   <table>
     <thead>

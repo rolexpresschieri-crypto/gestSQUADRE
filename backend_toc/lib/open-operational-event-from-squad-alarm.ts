@@ -1,23 +1,14 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isOperationalEventActivatorSquad } from "@/lib/operational-event-activators";
 import {
-  allocateOperationalEventNumber,
   mapOperationalEventRow,
   operationalEventScopeKey,
-  reclaimOperationalEventNumber,
-  type OperationalEventRow,
   type OperationalEventSummary,
 } from "@/lib/operational-events";
+import { openOperationalEvent } from "@/lib/open-operational-event-core";
+import { isSquadOperationalEventOpener } from "@/lib/operational-event-openers";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-export type SquadAlarmOperationalOpenRow = {
-  id: string;
-  squad_id: string;
-  squad_code: string;
-  operational_event_id?: string | null;
-};
 
 export type OpenOperationalEventFromSquadAlarmResult = {
   created: boolean;
@@ -26,162 +17,75 @@ export type OpenOperationalEventFromSquadAlarmResult = {
   error: string | null;
 };
 
-async function fetchExistingOperationalEvent(
-  admin: SupabaseClient,
-  operationalEventId: string,
-): Promise<OperationalEventSummary | null> {
-  const { data, error } = await admin
-    .from("operational_events")
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
-    )
-    .eq("id", operationalEventId)
-    .maybeSingle();
-
-  if (error || !data) {
-    return null;
-  }
-  return mapOperationalEventRow(data as OperationalEventRow);
+/** @deprecated Gli eventi non si aprono più automaticamente dall'allarme. */
+export async function openOperationalEventFromSquadAlarm(
+  _admin: SupabaseClient,
+  _alarm: { id: string; squad_id: string; squad_code: string },
+): Promise<OpenOperationalEventFromSquadAlarmResult> {
+  return { created: false, skipped: true, event: null, error: null };
 }
 
-export async function openOperationalEventFromSquadAlarm(
+export async function openOperationalEventFromFieldSession(
   admin: SupabaseClient,
-  alarm: SquadAlarmOperationalOpenRow,
+  sessionId: string,
 ): Promise<OpenOperationalEventFromSquadAlarmResult> {
-  const squadCode = alarm.squad_code.trim().toUpperCase();
-  if (!isOperationalEventActivatorSquad(squadCode)) {
+  if (!UUID_RE.test(sessionId)) {
+    return { created: false, skipped: false, event: null, error: "Sessione non valida." };
+  }
+
+  const { data: row, error } = await admin
+    .from("squad_sessions")
+    .select(
+      "id, is_online, squad_id, squads(squad_code, golf_course_id, can_open_operational_event)",
+    )
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) {
+    return { created: false, skipped: false, event: null, error: error.message };
+  }
+  if (!row?.is_online) {
+    return { created: false, skipped: false, event: null, error: "Sessione non online." };
+  }
+
+  const squadId = String(row.squad_id ?? "");
+  const squad = row.squads as
+    | {
+        squad_code?: string;
+        golf_course_id?: string | null;
+        can_open_operational_event?: boolean;
+      }
+    | null
+    | undefined;
+
+  if (!squad?.can_open_operational_event) {
     return { created: false, skipped: true, event: null, error: null };
   }
 
-  if (!UUID_RE.test(alarm.id)) {
-    return { created: false, skipped: false, event: null, error: "Allarme non valido." };
+  const canOpen = await isSquadOperationalEventOpener(admin, squadId);
+  if (!canOpen) {
+    return { created: false, skipped: true, event: null, error: null };
   }
 
-  const { data: freshAlarm, error: freshErr } = await admin
-    .from("squad_alarms")
-    .select("id, squad_id, squad_code, operational_event_id")
-    .eq("id", alarm.id)
-    .maybeSingle();
-
-  if (freshErr) {
-    return { created: false, skipped: false, event: null, error: freshErr.message };
-  }
-  if (!freshAlarm) {
-    return { created: false, skipped: false, event: null, error: "Allarme non trovato." };
-  }
-
-  const existingId =
-    typeof freshAlarm.operational_event_id === "string"
-      ? freshAlarm.operational_event_id.trim()
-      : "";
-  if (existingId && UUID_RE.test(existingId)) {
-    const existing = await fetchExistingOperationalEvent(admin, existingId);
-    return {
-      created: false,
-      skipped: false,
-      event: existing,
-      error: existing ? null : "Evento operativo collegato all'allarme non trovato.",
-    };
-  }
-
-  const squadId = String(freshAlarm.squad_id ?? alarm.squad_id);
-
-  const { data: squadRow, error: squadErr } = await admin
-    .from("squads")
-    .select("golf_course_id")
-    .eq("id", squadId)
-    .maybeSingle();
-
-  if (squadErr) {
-    return { created: false, skipped: false, event: null, error: squadErr.message };
-  }
-
+  const openedByCode = String(squad.squad_code ?? "").trim().toUpperCase();
   const golfCourseId =
-    typeof squadRow?.golf_course_id === "string" ? squadRow.golf_course_id : null;
-  const scopeKey = operationalEventScopeKey(golfCourseId);
-  const { number, error: allocErr } = await allocateOperationalEventNumber(admin, scopeKey);
-  if (allocErr) {
-    return { created: false, skipped: false, event: null, error: allocErr };
-  }
+    typeof squad.golf_course_id === "string" ? squad.golf_course_id : null;
 
-  const { data: inserted, error: insertErr } = await admin
-    .from("operational_events")
-    .insert({
-      display_number: number,
-      status: "aperto",
-      golf_course_id: golfCourseId,
-      opened_by_admin_code: squadCode,
-    })
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
-    )
-    .single();
+  const result = await openOperationalEvent(admin, {
+    golfCourseId,
+    openedByCode,
+    targetSquadId: squadId,
+    targetSessionId: sessionId,
+  });
 
-  if (insertErr || !inserted) {
+  if (result.error || !result.event) {
     return {
       created: false,
       skipped: false,
       event: null,
-      error: insertErr?.message ?? "Inserimento evento operativo fallito.",
+      error: result.error ?? "Apertura evento fallita.",
     };
   }
 
-  const event = mapOperationalEventRow(inserted as OperationalEventRow);
-
-  const { data: linkedRows, error: linkErr } = await admin
-    .from("squad_alarms")
-    .update({ operational_event_id: event.id })
-    .eq("id", alarm.id)
-    .is("operational_event_id", null)
-    .select("operational_event_id");
-
-  if (linkErr && !/operational_event_id|column/i.test(linkErr.message)) {
-    await admin.from("operational_events").delete().eq("id", event.id);
-    await reclaimOperationalEventNumber(admin, scopeKey, event.displayNumber);
-    return { created: false, skipped: false, event: null, error: linkErr.message };
-  }
-
-  if (!linkedRows?.length) {
-    await admin.from("operational_events").delete().eq("id", event.id);
-    await reclaimOperationalEventNumber(admin, scopeKey, event.displayNumber);
-    const { data: relinked } = await admin
-      .from("squad_alarms")
-      .select("operational_event_id")
-      .eq("id", alarm.id)
-      .maybeSingle();
-    const linkedId =
-      typeof relinked?.operational_event_id === "string"
-        ? relinked.operational_event_id.trim()
-        : "";
-    if (linkedId && UUID_RE.test(linkedId)) {
-      const winner = await fetchExistingOperationalEvent(admin, linkedId);
-      return { created: false, skipped: false, event: winner, error: null };
-    }
-    return {
-      created: false,
-      skipped: false,
-      event: null,
-      error: "Collegamento evento all'allarme non riuscito.",
-    };
-  }
-
-  if (linkErr) {
-    const { data: relinked } = await admin
-      .from("squad_alarms")
-      .select("operational_event_id")
-      .eq("id", alarm.id)
-      .maybeSingle();
-    const linkedId =
-      typeof relinked?.operational_event_id === "string"
-        ? relinked.operational_event_id
-        : null;
-    if (linkedId && linkedId !== event.id) {
-      await admin.from("operational_events").delete().eq("id", event.id);
-      await reclaimOperationalEventNumber(admin, scopeKey, event.displayNumber);
-      const winner = await fetchExistingOperationalEvent(admin, linkedId);
-      return { created: false, skipped: false, event: winner, error: null };
-    }
-  }
-
-  return { created: true, skipped: false, event, error: null };
+  return { created: true, skipped: false, event: result.event, error: null };
 }

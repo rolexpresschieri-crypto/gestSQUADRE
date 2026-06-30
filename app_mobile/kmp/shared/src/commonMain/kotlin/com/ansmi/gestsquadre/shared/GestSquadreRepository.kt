@@ -58,7 +58,7 @@ class GestSquadreRepository(
         val squad =
             rest.getMaybeSingle(
                 table = "squads",
-                select = "id,squad_code,squad_name,password_hash,is_enabled",
+                select = "id,squad_code,squad_name,password_hash,is_enabled,can_open_operational_event",
                 filters = listOf(
                     "squad_code" to normalizedCode,
                     "is_enabled" to "true",
@@ -99,6 +99,7 @@ class GestSquadreRepository(
                 squadCode = squad.squadCode.uppercase(),
                 squadName = squad.squadName,
                 loginAt = Instant.parse(inserted.loginAt),
+                canOpenOperationalEvent = squad.canOpenOperationalEvent,
             )
         insertSessionAuthLog(session, ACTION_LOGIN)
         return session
@@ -108,7 +109,7 @@ class GestSquadreRepository(
         val row =
             rest.getMaybeSingle(
                 table = "squad_sessions",
-                select = "id,is_online,event_id,squad_id,login_at,squads(squad_code,squad_name)",
+                select = "id,is_online,event_id,squad_id,login_at,squads(squad_code,squad_name,can_open_operational_event)",
                 filters = listOf("id" to sessionId),
             ) { body ->
                 json.decodeFromString<SessionRestoreRow>(body)
@@ -125,6 +126,7 @@ class GestSquadreRepository(
             squadCode = row.squads.squadCode.uppercase(),
             squadName = row.squads.squadName,
             loginAt = Instant.parse(row.loginAt),
+            canOpenOperationalEvent = row.squads.canOpenOperationalEvent,
         )
     }
 

@@ -14,13 +14,17 @@ import '../services/gest_api.dart';
 import '../services/gps_tracker.dart';
 
 class SquadController extends ChangeNotifier {
-  SquadController({required bool backendConfigured})
-      : _configured = backendConfigured,
+  SquadController({
+    required bool backendConfigured,
+    String tocBackendUrl = '',
+  })  : _configured = backendConfigured,
+        _tocBackendUrl = tocBackendUrl.trim(),
         _api = backendConfigured ? GestApi(Supabase.instance.client) : null;
 
   static const _sessionKey = 'gest_squadre_session_json';
 
   final bool _configured;
+  final String _tocBackendUrl;
   final GestApi? _api;
 
   bool isInitializing = true;
@@ -89,7 +93,7 @@ class SquadController extends ChangeNotifier {
       }
       final squad = await Supabase.instance.client
           .from('squads')
-          .select('squad_code, squad_name')
+          .select('squad_code, squad_name, can_open_operational_event')
           .eq('id', row['squad_id'])
           .single();
       currentSession = SquadSession(
@@ -99,6 +103,7 @@ class SquadController extends ChangeNotifier {
         squadCode: squad['squad_code'] as String,
         squadName: squad['squad_name'] as String,
         loginAt: DateTime.parse(row['login_at'] as String).toLocal(),
+        canOpenOperationalEvent: squad['can_open_operational_event'] == true,
       );
     } catch (_) {
       await prefs.remove(_sessionKey);
@@ -114,7 +119,7 @@ class SquadController extends ChangeNotifier {
     }
     await prefs.setString(
       _sessionKey,
-      '${s.sessionId}|${s.eventId}|${s.squadId}|${s.squadCode}|${s.squadName}|${s.loginAt.toIso8601String()}',
+      '${s.sessionId}|${s.eventId}|${s.squadId}|${s.squadCode}|${s.squadName}|${s.loginAt.toIso8601String()}|${s.canOpenOperationalEvent ? 1 : 0}',
     );
   }
 
@@ -178,12 +183,39 @@ class SquadController extends ChangeNotifier {
   }
 
   bool tryBeginOperationalEventAlarm() {
-    final squadCode = currentSession?.squadCode ?? '';
-    if (!isOperationalEventActivatorSquad(squadCode)) {
+    final session = currentSession;
+    if (session == null || !session.canOpenOperationalEvent) {
       showTemporaryBanner(operationalEventUnauthorizedMessage);
       return false;
     }
     return true;
+  }
+
+  Future<String?> openOperationalEvent() async {
+    final session = currentSession;
+    final api = _api;
+    if (session == null || api == null) {
+      return 'Devi effettuare il login squadra.';
+    }
+    if (!session.canOpenOperationalEvent) {
+      showTemporaryBanner(operationalEventUnauthorizedMessage);
+      return operationalEventUnauthorizedMessage;
+    }
+    isBusy = true;
+    notifyListeners();
+    try {
+      final number = await api.openOperationalEventFromField(
+        session: session,
+        tocBackendUrl: _tocBackendUrl,
+      );
+      showTemporaryBanner('EVENTO OPERATIVO n° $number aperto.');
+      return null;
+    } catch (e) {
+      return 'Errore apertura evento: $e';
+    } finally {
+      isBusy = false;
+      notifyListeners();
+    }
   }
 
   void showTemporaryBanner(String message, {Duration duration = const Duration(seconds: 10)}) {
@@ -205,10 +237,6 @@ class SquadController extends ChangeNotifier {
     final api = _api;
     if (s == null || api == null) {
       return 'Devi effettuare il login squadra.';
-    }
-    if (!isOperationalEventActivatorSquad(s.squadCode)) {
-      showTemporaryBanner(operationalEventUnauthorizedMessage);
-      return null;
     }
     isBusy = true;
     notifyListeners();

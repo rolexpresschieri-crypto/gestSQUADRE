@@ -36,6 +36,7 @@ import { waypointIconMapUrl } from "@/lib/waypoint-icons";
 import { squadIconMapUrl } from "@/lib/squad-icons";
 
 const defaultCenter: LatLngExpression = [45.0703, 7.6869];
+const EVENT_BLUE = "#1e5f9e";
 const ROUTE_HALO_WEIGHT = 5;
 const ROUTE_LINE_WEIGHT = 3;
 const MAP_SYNC_MS = MAP_SQUAD_POLL_MS;
@@ -52,6 +53,7 @@ type MapLiveData = {
   routes: DrawnRoute[];
   waypoints: SquadWaypoint[];
   alarmingSessionIds: ReadonlySet<string>;
+  eventTargetSessionIds: ReadonlySet<string>;
   selectedSessionId: string | null;
   recenterNonce: number;
   onSelect: (squad: LiveSquad) => void;
@@ -184,16 +186,22 @@ function squadDivIcon(
   squad: LiveSquad,
   selected: boolean,
   isAlarming: boolean,
+  isEventTarget: boolean,
 ): L.DivIcon {
   const chip = escapeHtml(squadMapChipLabel(squad));
   const sel = selected ? " gs-squad-icon-wrap--selected" : "";
   const alarm = isAlarming ? " gs-squad-icon-wrap--alarm" : "";
+  const event = !isAlarming && isEventTarget ? " gs-squad-icon-wrap--event" : "";
   const iconUrl = squadIconMapUrl(squad.mapIconKey);
-  const chipClass = isAlarming ? "gs-chip gs-chip--alarm" : "gs-chip";
+  const chipClass = isAlarming
+    ? "gs-chip gs-chip--alarm"
+    : isEventTarget
+      ? "gs-chip gs-chip--event"
+      : "gs-chip";
   const markerWidth = squadMarkerWidth(chip);
   return L.divIcon({
     className: "gs-squad-divicon",
-    html: `<div class="gs-pin"><div class="gs-squad-icon-wrap${sel}${alarm}"><img class="gs-squad-icon" src="${iconUrl}" width="28" height="28" alt="" /></div><div class="${chipClass}">${chip}</div></div>`,
+    html: `<div class="gs-pin"><div class="gs-squad-icon-wrap${sel}${alarm}${event}"><img class="gs-squad-icon" src="${iconUrl}" width="28" height="28" alt="" /></div><div class="${chipClass}">${chip}</div></div>`,
     iconSize: [markerWidth, 46],
     iconAnchor: [markerWidth / 2, 14],
     popupAnchor: [0, -18],
@@ -204,14 +212,23 @@ function squadMarkerIconKey(
   squad: LiveSquad,
   selected: boolean,
   isAlarming: boolean,
+  isEventTarget: boolean,
 ): string {
-  return `${squad.sessionId}:${selected}:${isAlarming}:${squad.mapColor}:${squad.mapIconKey}:${squad.squadCode}:${squad.squadName}`;
+  return `${squad.sessionId}:${selected}:${isAlarming}:${isEventTarget}:${squad.mapColor}:${squad.mapIconKey}:${squad.squadCode}:${squad.squadName}`;
 }
 
-function squadMarkerPopupHtml(squad: LiveSquad, isAlarming: boolean): string {
+function squadMarkerPopupHtml(
+  squad: LiveSquad,
+  isAlarming: boolean,
+  isEventTarget: boolean,
+): string {
   const accLabel = formatGpsAccuracyMeters(squad.lastAccuracy);
-  const title = isAlarming ? `ALLARME — ${squad.squadCode}` : squad.squadCode;
-  const titleColor = isAlarming ? ALARM_RED : "inherit";
+  const title = isAlarming
+    ? `ALLARME — ${squad.squadCode}`
+    : isEventTarget
+      ? `EVENTO — ${squad.squadCode}`
+      : squad.squadCode;
+  const titleColor = isAlarming ? ALARM_RED : isEventTarget ? EVENT_BLUE : "inherit";
   let html =
     `<strong style="color:${titleColor}">${escapeHtml(title)}</strong>` +
     `<br/>${escapeHtml(squad.squadName)}`;
@@ -238,7 +255,7 @@ function waypointsSig(waypoints: SquadWaypoint[]): string {
     .join("|");
 }
 
-function alarmingSig(ids: ReadonlySet<string>): string {
+function sessionIdSetSig(ids: ReadonlySet<string>): string {
   return [...ids].sort().join(",");
 }
 
@@ -309,15 +326,17 @@ function MapImperativeLayers({ dataRef }: { dataRef: RefObject<MapLiveData> }) {
           squad.lastLongitude!,
         ];
         const isAlarming = data.alarmingSessionIds.has(squad.sessionId);
+        const isEventTarget =
+          !isAlarming && data.eventTargetSessionIds.has(squad.sessionId);
         const selected = data.selectedSessionId === squad.sessionId;
-        const iconKey = squadMarkerIconKey(squad, selected, isAlarming);
+        const iconKey = squadMarkerIconKey(squad, selected, isAlarming, isEventTarget);
         let entry = markers.get(squad.sessionId);
 
         if (!entry) {
           const marker = L.marker(position, {
-            icon: squadDivIcon(squad, selected, isAlarming),
+            icon: squadDivIcon(squad, selected, isAlarming, isEventTarget),
           });
-          marker.bindPopup(squadMarkerPopupHtml(squad, isAlarming));
+          marker.bindPopup(squadMarkerPopupHtml(squad, isAlarming, isEventTarget));
           marker.on("click", () => {
             const current = dataRef.current?.squads.find(
               (row) => row.sessionId === squad.sessionId,
@@ -335,16 +354,22 @@ function MapImperativeLayers({ dataRef }: { dataRef: RefObject<MapLiveData> }) {
             entry.marker.setLatLng(nextLatLng);
           }
           if (entry.iconKey !== iconKey) {
-            entry.marker.setIcon(squadDivIcon(squad, selected, isAlarming));
+            entry.marker.setIcon(squadDivIcon(squad, selected, isAlarming, isEventTarget));
             entry.iconKey = iconKey;
-            entry.marker.setPopupContent(squadMarkerPopupHtml(squad, isAlarming));
+            entry.marker.setPopupContent(
+              squadMarkerPopupHtml(squad, isAlarming, isEventTarget),
+            );
           }
         }
 
         const acc = squad.lastAccuracy;
         const showAccuracyCircle =
           acc != null && Number.isFinite(acc) && acc > 0 && acc <= 120;
-        const circleColor = isAlarming ? ALARM_RED : squad.mapColor;
+        const circleColor = isAlarming
+          ? ALARM_RED
+          : isEventTarget
+            ? EVENT_BLUE
+            : squad.mapColor;
 
         if (showAccuracyCircle) {
           if (!entry.circle) {
@@ -492,7 +517,7 @@ function MapImperativeLayers({ dataRef }: { dataRef: RefObject<MapLiveData> }) {
     const stableRoutes = getStableRoutes();
     const withCoords = data.squads.filter(hasCoordinates);
     const posSig = liveSquadsPollSig(withCoords);
-    const metaSig = `${posSig}|${data.selectedSessionId ?? ""}|${alarmingSig(data.alarmingSessionIds)}`;
+    const metaSig = `${posSig}|${data.selectedSessionId ?? ""}|${sessionIdSetSig(data.alarmingSessionIds)}|${sessionIdSetSig(data.eventTargetSessionIds)}`;
     const routesSig = routesDrawSig(stableRoutes);
     const wpSig = waypointsSig(data.waypoints);
 
@@ -698,6 +723,7 @@ type SquadLiveMapProps = {
     highlighted?: boolean;
   }>;
   alarmingSessionIds: ReadonlySet<string>;
+  eventTargetSessionIds?: ReadonlySet<string>;
   selectedSessionId: string | null;
   onSelect: (squad: LiveSquad) => void;
   canManageWaypoints?: boolean;
@@ -714,6 +740,7 @@ export default function SquadLiveMap({
   activeRoute = null,
   activeRoutes = [],
   alarmingSessionIds,
+  eventTargetSessionIds = new Set(),
   selectedSessionId,
   onSelect,
   height = "100%",
@@ -724,6 +751,7 @@ export default function SquadLiveMap({
     routes: [],
     waypoints: [],
     alarmingSessionIds: new Set(),
+    eventTargetSessionIds: new Set(),
     selectedSessionId: null,
     recenterNonce: 0,
     onSelect,
@@ -744,6 +772,7 @@ export default function SquadLiveMap({
     routes,
     waypoints,
     alarmingSessionIds,
+    eventTargetSessionIds,
     selectedSessionId,
     recenterNonce,
     onSelect,

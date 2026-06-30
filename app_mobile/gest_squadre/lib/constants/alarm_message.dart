@@ -4,9 +4,8 @@ const String squadAlarmBackendLabel = 'ALLARME';
 const String squadAlarmHint =
     'Segnalazione solo per la mappa TOC: cerchio rosso con nome squadra. Nessun SMS né notifica push.';
 
-const String squadAlarmDialogTitle = 'Segnala allarme su mappa TOC';
+const String squadAlarmDialogTitle = 'Invia notifica a TOC';
 const String squadAlarmDialogBody =
-    'Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Preso in carico».';
+    'Confermi l\'invio della notifica al TOC? La squadra può apparire evidenziata sulla mappa.';
 
-const String squadAlarmSentOk =
-    'Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa.';
+const String squadAlarmSentOk = 'Notifica inviata al TOC.';

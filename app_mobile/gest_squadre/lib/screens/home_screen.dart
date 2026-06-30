@@ -26,9 +26,6 @@ class HomeScreen extends StatelessWidget {
   final SquadController controller;
 
   Future<void> _confirmAndSendAlarm(BuildContext context) async {
-    if (!controller.tryBeginOperationalEventAlarm()) {
-      return;
-    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -53,7 +50,7 @@ class HomeScreen extends StatelessWidget {
             style: FilledButton.styleFrom(backgroundColor: tacticalRed),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text(
-              'INVIA ALLARME',
+              'INVIA NOTIFICA',
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w900,
@@ -221,8 +218,25 @@ class HomeScreen extends StatelessWidget {
                       : null,
                 ),
                 const SizedBox(height: 18),
+                if (isLogged && session.canOpenOperationalEvent) ...[
+                  MainButton(
+                    label: 'APERTURA EVENTO',
+                    backgroundColor: tacticalNavy,
+                    foregroundColor: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    onTap: () async {
+                      final err = await controller.openOperationalEvent();
+                      if (context.mounted && err != null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(err)),
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 18),
+                ],
                 MainButton(
-                  label: 'INVIA ALLARME A TOC',
+                  label: 'INVIA NOTIFICA A TOC',
                   backgroundColor: isLogged ? tacticalRed : tacticalDisabled,
                   foregroundColor: isLogged ? Colors.white : tacticalMuted,
                   fontWeight: FontWeight.w900,

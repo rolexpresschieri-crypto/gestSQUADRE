@@ -5,6 +5,7 @@ import {
   mapOperationalEventRow,
   type OperationalEventRow,
 } from "@/lib/operational-events";
+import { openOperationalEvent } from "@/lib/open-operational-event-core";
 
 export const runtime = "nodejs";
 
@@ -34,7 +35,7 @@ export async function GET(request: Request) {
   let query = admin
     .from("operational_events")
     .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
     )
     .order("display_number", { ascending: true });
 
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
     action?: string;
     operationalEventId?: string;
     interventionRef?: string;
+    targetSessionId?: string;
   };
 
   const session = payload.session;
@@ -101,13 +103,65 @@ export async function POST(request: Request) {
   const golfCourseId = session.golfCourseId ?? null;
 
   if (action === "open") {
-    return NextResponse.json(
-      {
-        error:
-          "Gli eventi operativi si aprono solo dalle squadre attivatore (01_AN, 01_EN, 01_RR, 01_TOC, 01_UN) inviando allarme dal campo.",
-      },
-      { status: 403 },
-    );
+    const targetSessionId =
+      typeof payload.targetSessionId === "string"
+        ? payload.targetSessionId.trim()
+        : "";
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(targetSessionId)) {
+      return NextResponse.json(
+        { error: "Seleziona una squadra target online." },
+        { status: 400 },
+      );
+    }
+
+    const { data: sessionRow, error: sessionErr } = await admin
+      .from("squad_sessions")
+      .select("id, is_online, squad_id, squads(golf_course_id)")
+      .eq("id", targetSessionId)
+      .maybeSingle();
+
+    if (sessionErr) {
+      return NextResponse.json({ error: sessionErr.message }, { status: 500 });
+    }
+    if (!sessionRow?.is_online) {
+      return NextResponse.json(
+        { error: "La squadra target non è online." },
+        { status: 409 },
+      );
+    }
+
+    const squadId = String(sessionRow.squad_id ?? "");
+    const squadGolfCourseId =
+      (sessionRow.squads as { golf_course_id?: string | null } | null)?.golf_course_id ??
+      null;
+    if (golfCourseId && squadGolfCourseId && golfCourseId !== squadGolfCourseId) {
+      return NextResponse.json(
+        { error: "La squadra target non appartiene al tuo campo." },
+        { status: 403 },
+      );
+    }
+
+    const result = await openOperationalEvent(admin, {
+      golfCourseId: golfCourseId ?? squadGolfCourseId,
+      openedByCode: session.code,
+      targetSquadId: squadId,
+      targetSessionId,
+    });
+
+    if (result.error || !result.event) {
+      return NextResponse.json(
+        { error: result.error ?? "Apertura evento fallita." },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      event: result.event,
+      created: result.created,
+    });
   }
 
   if (action === "close") {
@@ -144,7 +198,7 @@ export async function POST(request: Request) {
     if (count > 0) {
       return NextResponse.json(
         {
-          error: `Missioni collegate all'evento n° ${row.displayNumber} ancora aperte (${count}). Chiudile dalla colonna «Missioni TOC attive» o usa Reset forzato TOC.`,
+          error: `Notifiche collegate all'evento n° ${row.displayNumber} ancora aperte (${count}). Chiudile dalla colonna «Notifiche TOC attive» o usa Reset forzato TOC.`,
         },
         { status: 409 },
       );
@@ -237,7 +291,7 @@ export async function POST(request: Request) {
       .eq("id", operationalEventId)
       .eq("status", "aperto")
       .select(
-        "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+        "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
       )
       .single();
 

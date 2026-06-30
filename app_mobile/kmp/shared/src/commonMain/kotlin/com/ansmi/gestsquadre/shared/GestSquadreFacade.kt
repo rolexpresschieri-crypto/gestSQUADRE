@@ -8,12 +8,13 @@ import com.ansmi.gestsquadre.shared.model.LiveSquadPin
 import com.ansmi.gestsquadre.shared.model.MapWaypointPin
 import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import com.ansmi.gestsquadre.shared.model.SquadSession
+import com.ansmi.gestsquadre.shared.network.TocOperationalEventClient
 
 /**
  * API pubblica del modulo KMP per Android (Compose) e iOS (SwiftUI).
  */
 class GestSquadreFacade(
-    config: GestSquadreConfig,
+    private val config: GestSquadreConfig,
 ) {
     private val repository = GestSquadreRepository(config)
     private val mapRepository = TocMapRepository(config)
@@ -69,6 +70,9 @@ class GestSquadreFacade(
     suspend fun fetchActivePanelMessage(session: SquadSession): String? =
         repository.fetchActivePanelMessage(session)
 
+    suspend fun openOperationalEventFromField(session: SquadSession): Int =
+        TocOperationalEventClient.openFromField(config, session.sessionId)
+
     suspend fun loadMapSquads(): List<LiveSquadPin> = mapRepository.loadLiveSquads()
 
     suspend fun loadMapWaypoints(): List<MapWaypointPin> = mapRepository.loadWaypoints()
@@ -81,8 +85,11 @@ class GestSquadreFacade(
     suspend fun clearActiveRouteAssignment(sessionId: String) =
         mapRepository.clearActiveRouteAssignment(sessionId)
 
-    fun isOperationalEventActivatorSquad(squadCode: String): Boolean =
-        OperationalEventActivator.isActivator(squadCode)
+    fun canOpenOperationalEvent(session: SquadSession): Boolean =
+        session.canOpenOperationalEvent
+
+    /** @deprecated Usare [canOpenOperationalEvent] con la sessione. */
+    fun isOperationalEventActivatorSquad(squadCode: String): Boolean = false
 
     fun operationalEventUnauthorizedMessage(): String =
         OperationalEventActivator.UNAUTHORIZED_MESSAGE

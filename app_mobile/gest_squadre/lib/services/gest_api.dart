@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -37,7 +40,7 @@ class GestApi {
   }) async {
     final squad = await _client
         .from('squads')
-        .select('id, squad_code, squad_name, password_hash, is_enabled')
+        .select('id, squad_code, squad_name, password_hash, is_enabled, can_open_operational_event')
         .eq('squad_code', squadCode.trim().toUpperCase())
         .eq('is_enabled', true)
         .maybeSingle();
@@ -82,6 +85,7 @@ class GestApi {
       squadCode: (squad['squad_code'] as String).toUpperCase(),
       squadName: squad['squad_name'] as String,
       loginAt: DateTime.parse(inserted['login_at'] as String).toLocal(),
+      canOpenOperationalEvent: squad['can_open_operational_event'] == true,
     );
     await _insertSessionAuthLog(
       eventId: session.eventId,
@@ -179,6 +183,41 @@ class GestApi {
       'squad_name': session.squadName,
       'message': squadAlarmBackendLabel,
     });
+  }
+
+  Future<int> openOperationalEventFromField({
+    required SquadSession session,
+    required String tocBackendUrl,
+  }) async {
+    final base = tocBackendUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    if (base.isEmpty) {
+      throw StateError('TOC_BACKEND_URL non configurato.');
+    }
+    final uri = Uri.parse('$base/api/operational-events/open-from-field');
+    final client = HttpClient();
+    try {
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({'sessionId': session.sessionId}));
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final parsed = jsonDecode(body) as Map<String, dynamic>?;
+        throw StateError(
+          parsed?['error']?.toString() ??
+              'Apertura evento fallita (HTTP ${response.statusCode}).',
+        );
+      }
+      final parsed = jsonDecode(body) as Map<String, dynamic>;
+      final event = parsed['event'] as Map<String, dynamic>?;
+      final number = event?['displayNumber'] as int? ?? 0;
+      if (number < 1) {
+        throw StateError('Risposta apertura evento non valida.');
+      }
+      return number;
+    } finally {
+      client.close(force: true);
+    }
   }
 
 }
