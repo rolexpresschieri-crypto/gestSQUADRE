@@ -256,14 +256,7 @@ function resolveOperationalLogFields(
 }
 
 export function sortUnifiedEventLogs(rows: UnifiedEventLog[]): UnifiedEventLog[] {
-  return [...rows].sort((a, b) => {
-    const an = a.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
-    const bn = b.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
-    if (an !== bn) {
-      return an - bn;
-    }
-    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-  });
+  return sortUnifiedEventLogsByColumn(rows, "operationalEventNumber", "asc");
 }
 
 export type EventLogSortColumn =
@@ -316,8 +309,15 @@ export function sortUnifiedEventLogsByColumn(
   const mul = direction === "asc" ? 1 : -1;
   return [...rows].sort((a, b) => {
     let cmp = compareUnifiedEventLogColumn(a, b, column);
-    if (cmp === 0 && column !== "createdAt") {
-      cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    if (cmp === 0) {
+      if (column !== "createdAt") {
+        cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      }
+      if (cmp === 0 && column !== "operationalEventNumber") {
+        const an = a.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
+        const bn = b.operationalEventNumber ?? Number.MAX_SAFE_INTEGER;
+        cmp = an - bn;
+      }
     }
     return cmp * mul;
   });

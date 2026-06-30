@@ -20,7 +20,6 @@ import {
   filterUnifiedEventLogsByAlarmTypes,
   mergeEventLogs,
   printEventLogsAsPdf,
-  sortUnifiedEventLogs,
   sortUnifiedEventLogsByColumn,
   type AlarmAutoNotifyLogRow,
   type EventLogAlarmFilterCode,
@@ -73,7 +72,7 @@ export default function EventLogsPage() {
     vvf: false,
     strutture: false,
   });
-  const [sortColumn, setSortColumn] = useState<EventLogSortColumn | null>(null);
+  const [sortColumn, setSortColumn] = useState<EventLogSortColumn>("operationalEventNumber");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
 
   const isAdmin = session ? canManageEventLogs(session.role) : false;
@@ -421,12 +420,10 @@ export default function EventLogsPage() {
     [unified, selectedAlarmFilterCodes],
   );
 
-  const displayedUnified = useMemo(() => {
-    if (!sortColumn) {
-      return sortUnifiedEventLogs(filteredUnified);
-    }
-    return sortUnifiedEventLogsByColumn(filteredUnified, sortColumn, sortDirection);
-  }, [filteredUnified, sortColumn, sortDirection]);
+  const displayedUnified = useMemo(
+    () => sortUnifiedEventLogsByColumn(filteredUnified, sortColumn, sortDirection),
+    [filteredUnified, sortColumn, sortDirection],
+  );
 
   function toggleSortColumn(column: EventLogSortColumn) {
     if (sortColumn === column) {
@@ -438,9 +435,12 @@ export default function EventLogsPage() {
   }
 
   function resetSortOrder() {
-    setSortColumn(null);
+    setSortColumn("operationalEventNumber");
     setSortDirection("asc");
   }
+
+  const isDefaultSort =
+    sortColumn === "operationalEventNumber" && sortDirection === "asc";
 
   function renderSortIndicator(column: EventLogSortColumn) {
     if (sortColumn !== column) {
@@ -711,11 +711,11 @@ export default function EventLogsPage() {
           <div className={styles.tableArea}>
             <div className={styles.tableToolbar}>
               <p className={styles.tableSortHint}>
-                {sortColumn
-                  ? `Ordinamento manuale: ${sortColumn} (${sortDirection === "asc" ? "crescente" : "decrescente"})`
-                  : "Ordinamento predefinito attivo"}
+                {isDefaultSort
+                  ? "Ordinamento: N° evento crescente, poi data/ora crescente"
+                  : `Ordinamento manuale: ${sortColumn} (${sortDirection === "asc" ? "crescente" : "decrescente"})`}
               </p>
-              {sortColumn ? (
+              {!isDefaultSort ? (
                 <button
                   type="button"
                   className={styles.btnSortReset}
