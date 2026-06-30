@@ -129,6 +129,14 @@ internal data class AlarmInsertBody(
     val message: String,
     @SerialName("request_types") val requestTypes: List<String> = emptyList(),
     @SerialName("other_detail") val otherDetail: String? = null,
+    @SerialName("operational_event_id") val operationalEventId: String? = null,
+)
+
+@Serializable
+internal data class OperationalEventTargetRow(
+    val id: String,
+    @SerialName("target_squad_id") val targetSquadId: String? = null,
+    @SerialName("target_session_id") val targetSessionId: String? = null,
 )
 
 @Serializable

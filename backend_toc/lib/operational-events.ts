@@ -120,6 +120,101 @@ export function mapOperationalEventRow(
   };
 }
 
+export type OperationalEventTargetRow = {
+  id: string;
+  status: string;
+  opened_at: string;
+  closed_at?: string | null;
+  target_squad_id?: string | null;
+  target_session_id?: string | null;
+};
+
+export function operationalEventTargetsSquad(
+  row: Pick<OperationalEventTargetRow, "target_squad_id" | "target_session_id">,
+  sessionId: string,
+  squadId: string,
+): boolean {
+  const targetSession = row.target_session_id?.trim() || null;
+  const targetSquad = row.target_squad_id?.trim() || null;
+  if (targetSession && targetSession === sessionId) {
+    return true;
+  }
+  if (targetSquad && targetSquad === squadId) {
+    if (targetSession && targetSession !== sessionId) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+}
+
+export function operationalEventActiveAt(
+  row: Pick<OperationalEventTargetRow, "status" | "opened_at" | "closed_at">,
+  atIso: string,
+): boolean {
+  const at = new Date(atIso).getTime();
+  const opened = new Date(row.opened_at).getTime();
+  if (Number.isNaN(at) || Number.isNaN(opened) || at < opened) {
+    return false;
+  }
+  if (row.status === "chiuso" && row.closed_at) {
+    const closed = new Date(row.closed_at).getTime();
+    if (!Number.isNaN(closed) && at > closed) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/** Un solo evento operativo aperto/assegnato alla squadra al momento indicato. */
+export function inferUniqueOperationalEventId(
+  events: OperationalEventTargetRow[],
+  sessionId: string,
+  squadId: string,
+  atIso: string,
+): string | null {
+  if (!sessionId && !squadId) {
+    return null;
+  }
+  const matches = events.filter(
+    (ev) =>
+      operationalEventActiveAt(ev, atIso) &&
+      operationalEventTargetsSquad(ev, sessionId, squadId),
+  );
+  if (matches.length !== 1) {
+    return null;
+  }
+  return matches[0].id;
+}
+
+export async function resolveUniqueOpenOperationalEventForSquad(
+  admin: SupabaseClient,
+  params: { sessionId: string; squadId: string; golfCourseId?: string | null },
+): Promise<string | null> {
+  let query = admin
+    .from("operational_events")
+    .select("id, target_squad_id, target_session_id")
+    .eq("status", "aperto");
+  if (params.golfCourseId?.trim()) {
+    query = query.eq("golf_course_id", params.golfCourseId.trim());
+  }
+  const { data, error } = await query;
+  if (error || !data) {
+    return null;
+  }
+  const matches = data.filter((row) =>
+    operationalEventTargetsSquad(
+      row as OperationalEventTargetRow,
+      params.sessionId,
+      params.squadId,
+    ),
+  );
+  if (matches.length !== 1) {
+    return null;
+  }
+  return String(matches[0].id);
+}
+
 export async function allocateOperationalEventNumber(
   admin: SupabaseClient,
   scopeKey: string,

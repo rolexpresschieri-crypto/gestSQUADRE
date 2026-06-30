@@ -1,5 +1,9 @@
 import { formatAlarmRequestDetail, parseAlarmRequestTypes } from "@/lib/squad-alarms";
 import { formatPhotoGpsDetail } from "@/lib/squad-field-photos";
+import {
+  inferUniqueOperationalEventId,
+  type OperationalEventTargetRow,
+} from "@/lib/operational-events";
 
 export type SquadAlarmLogRow = {
   id: string;
@@ -182,6 +186,8 @@ export type OperationalEventLogSourceRow = {
   closed_by_admin_code?: string | null;
   request_types?: string[] | null;
   other_detail?: string | null;
+  target_squad_id?: string | null;
+  target_session_id?: string | null;
 };
 
 export type UnifiedEventLog = {
@@ -227,6 +233,26 @@ function operationalLogFields(
     operationalEventNumber: meta?.displayNumber ?? null,
     interventionRef: meta?.interventionRef ?? null,
   };
+}
+
+function resolveOperationalLogFields(
+  explicitOperationalEventId: string | null | undefined,
+  sessionId: string | null | undefined,
+  squadId: string | null | undefined,
+  createdAt: string,
+  operationalEvents: OperationalEventTargetRow[],
+  metaById: Map<string, OperationalEventLogMeta>,
+): Pick<UnifiedEventLog, "operationalEventNumber" | "interventionRef"> {
+  const explicit = explicitOperationalEventId?.trim() || null;
+  const inferred =
+    explicit ??
+    inferUniqueOperationalEventId(
+      operationalEvents,
+      sessionId?.trim() ?? "",
+      squadId?.trim() ?? "",
+      createdAt,
+    );
+  return operationalLogFields(inferred, metaById);
 }
 
 export function sortUnifiedEventLogs(rows: UnifiedEventLog[]): UnifiedEventLog[] {
@@ -359,8 +385,12 @@ export function mergeEventLogs(
   const alarmRows: UnifiedEventLog[] = [];
   for (const a of alarms) {
     const typeCodes = parseAlarmRequestTypes(a.request_types);
-    const opFields = operationalLogFields(
+    const opFields = resolveOperationalLogFields(
       a.operational_event_id,
+      a.session_id,
+      a.squad_id,
+      a.created_at,
+      operationalEvents,
       operationalEventMetaById,
     );
     alarmRows.push({
@@ -406,7 +436,14 @@ export function mergeEventLogs(
     const detail = formatTocPushDetail(p);
     const actor = p.admin_code;
 
-    const opFields = operationalLogFields(p.operational_event_id, operationalEventMetaById);
+    const opFields = resolveOperationalLogFields(
+      p.operational_event_id,
+      p.session_id,
+      p.squad_id,
+      p.created_at,
+      operationalEvents,
+      operationalEventMetaById,
+    );
 
     if (failed) {
       pushRows.push({
@@ -459,8 +496,12 @@ export function mergeEventLogs(
     const recipient = autoNotifyRecipientCode(n);
     const typeCodes = parseAlarmRequestTypes(n.request_types);
     const sourceAlarm = alarms.find((a) => a.id === n.alarm_id);
-    const opFields = operationalLogFields(
+    const opFields = resolveOperationalLogFields(
       sourceAlarm?.operational_event_id,
+      sourceAlarm?.session_id,
+      sourceAlarm?.squad_id,
+      n.created_at,
+      operationalEvents,
       operationalEventMetaById,
     );
     return {
@@ -499,7 +540,14 @@ export function mergeEventLogs(
         "Pannello TOC azzerato dal telefono della squadra destinatario.",
       status: "notifica chiusa" as const,
       actor: d.squad_code,
-      ...emptyOp,
+      ...resolveOperationalLogFields(
+        null,
+        d.session_id,
+        d.squad_id,
+        d.created_at,
+        operationalEvents,
+        operationalEventMetaById,
+      ),
     })),
     ...fieldPhotos.map((p) => ({
       id: p.id,

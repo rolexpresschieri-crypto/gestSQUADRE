@@ -1,5 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  resolveUniqueOpenOperationalEventForSquad,
+} from "@/lib/operational-events";
+import {
   formatAlarmRequestDetail,
   parseAlarmRequestTypes,
   SQUAD_ALARM_REQUEST_ORDER,
@@ -85,20 +88,43 @@ export async function insertSquadFieldNotification(
     other_detail: otherDetail,
   });
 
-  const { data: inserted, error: insertErr } = await admin
+  const operationalEventId = await resolveUniqueOpenOperationalEventForSquad(admin, {
+    sessionId: String(sessionRow.id),
+    squadId: String(sessionRow.squad_id),
+  });
+
+  const insertBase: Record<string, unknown> = {
+    event_id: sessionRow.event_id,
+    session_id: sessionRow.id,
+    squad_id: sessionRow.squad_id,
+    squad_code: squadCode,
+    squad_name: squadName,
+    message: `${SQUAD_ALARM_BACKEND_LABEL} — ${detail}`,
+    request_types: requestTypes,
+    other_detail: otherDetail,
+  };
+  if (operationalEventId) {
+    insertBase.operational_event_id = operationalEventId;
+  }
+
+  let { data: inserted, error: insertErr } = await admin
     .from("squad_alarms")
-    .insert({
-      event_id: sessionRow.event_id,
-      session_id: sessionRow.id,
-      squad_id: sessionRow.squad_id,
-      squad_code: squadCode,
-      squad_name: squadName,
-      message: `${SQUAD_ALARM_BACKEND_LABEL} — ${detail}`,
-      request_types: requestTypes,
-      other_detail: otherDetail,
-    })
+    .insert(insertBase)
     .select("id")
     .single();
+
+  if (
+    insertErr &&
+    operationalEventId &&
+    /operational_event_id|column/i.test(insertErr.message)
+  ) {
+    delete insertBase.operational_event_id;
+    ({ data: inserted, error: insertErr } = await admin
+      .from("squad_alarms")
+      .insert(insertBase)
+      .select("id")
+      .single());
+  }
 
   if (insertErr || !inserted?.id) {
     return {

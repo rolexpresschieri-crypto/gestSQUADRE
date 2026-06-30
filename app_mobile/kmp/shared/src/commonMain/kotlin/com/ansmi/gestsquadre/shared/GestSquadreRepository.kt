@@ -10,7 +10,7 @@ import com.ansmi.gestsquadre.shared.network.AutoNotifyPanelRow
 import com.ansmi.gestsquadre.shared.network.EventRow
 import com.ansmi.gestsquadre.shared.network.FcmTokenUpsertBody
 import com.ansmi.gestsquadre.shared.network.LogoutPatchBody
-import com.ansmi.gestsquadre.shared.network.MobileDismissInsertBody
+import com.ansmi.gestsquadre.shared.network.OperationalEventTargetRow
 import com.ansmi.gestsquadre.shared.network.MobileDismissedAtPatch
 import com.ansmi.gestsquadre.shared.network.PositionPatchBody
 import com.ansmi.gestsquadre.shared.network.TocPushClosedRow
@@ -329,6 +329,7 @@ class GestSquadreRepository(
     ) {
         request.validate()?.let { throw GestSquadreException(it) }
         val detail = request.toLogMessage()
+        val operationalEventId = resolveUniqueOpenOperationalEventId(session)
         rest.insert(
             table = "squad_alarms",
             body =
@@ -341,8 +342,32 @@ class GestSquadreRepository(
                     message = "${SQUAD_ALARM_BACKEND_LABEL} — $detail",
                     requestTypes = request.typeCodes(),
                     otherDetail = request.otherDetail?.trim()?.takeIf { it.isNotEmpty() },
+                    operationalEventId = operationalEventId,
                 ),
         )
+    }
+
+    private suspend fun resolveUniqueOpenOperationalEventId(session: SquadSession): String? {
+        val rows =
+            runCatching {
+                rest.getList<OperationalEventTargetRow>(
+                    table = "operational_events",
+                    select = "id,target_squad_id,target_session_id",
+                    eqFilters = listOf("status" to "aperto"),
+                )
+            }.getOrElse { emptyList() }
+        val matches =
+            rows.filter { row ->
+                val targetSession = row.targetSessionId?.trim().orEmpty()
+                val targetSquad = row.targetSquadId?.trim().orEmpty()
+                when {
+                    targetSession.isNotEmpty() && targetSession == session.sessionId -> true
+                    targetSquad.isNotEmpty() && targetSquad == session.squadId ->
+                        targetSession.isEmpty() || targetSession == session.sessionId
+                    else -> false
+                }
+            }
+        return matches.singleOrNull()?.id
     }
 
     private suspend fun insertSessionAuthLog(

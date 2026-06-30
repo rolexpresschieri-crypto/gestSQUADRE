@@ -174,7 +174,7 @@ export default function EventLogsPage() {
     let opEventsQuery = supabase
       .from("operational_events")
       .select(
-        "id, display_number, intervention_ref, status, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, request_types, other_detail",
+        "id, display_number, intervention_ref, status, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, request_types, other_detail, target_squad_id, target_session_id",
       )
       .order("display_number", { ascending: true });
     if (golfCourseId) {
@@ -198,6 +198,8 @@ export default function EventLogsPage() {
         closed_at: (row.closed_at as string | null) ?? null,
         opened_by_admin_code: String(row.opened_by_admin_code ?? "—"),
         closed_by_admin_code: (row.closed_by_admin_code as string | null) ?? null,
+        target_squad_id: (row.target_squad_id as string | null) ?? null,
+        target_session_id: (row.target_session_id as string | null) ?? null,
       });
     }
     setOperationalEventMetaById(metaById);
