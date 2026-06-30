@@ -1,3 +1,4 @@
+import { formatEventLogActor } from "@/lib/admin-auth";
 import { formatAlarmRequestDetail, parseAlarmRequestTypes } from "@/lib/squad-alarms";
 import { formatPhotoGpsDetail } from "@/lib/squad-field-photos";
 import {
@@ -362,7 +363,7 @@ export function mergeEventLogs(
           ? `${baseDetail} · Evento n° ${displayNumber} · N° intervento ${interventionRef}`
           : `${baseDetail} · Evento operativo n° ${displayNumber}`,
       status: ev.status === "chiuso" ? "chiuso" : "aperto",
-      actor: openedBy,
+      actor: formatEventLogActor(openedBy),
       operationalEventNumber: displayNumber,
       interventionRef,
     });
@@ -376,7 +377,9 @@ export function mergeEventLogs(
         summary: "Chiusura evento operativo",
         detail: `Evento operativo n° ${displayNumber} chiuso`,
         status: "chiuso",
-        actor: ev.closed_by_admin_code?.trim() || "TOC",
+        actor: ev.closed_by_admin_code?.trim()
+          ? formatEventLogActor(ev.closed_by_admin_code)
+          : "TOC",
         operationalEventNumber: displayNumber,
         interventionRef,
       });
@@ -424,7 +427,7 @@ export function mergeEventLogs(
         summary: "Fine evento (TOC)",
         detail: formatAlarmRequestDetail(a),
         status: "chiuso",
-        actor: a.acknowledged_by?.trim() || "—",
+        actor: formatEventLogActor(a.acknowledged_by),
         ...opFieldsFine,
         alarmTypeCodes: typeCodes,
       });
@@ -442,7 +445,7 @@ export function mergeEventLogs(
         ? "Allarme TOC → volontario"
         : "Messaggio TOC → volontario";
     const detail = formatTocPushDetail(p);
-    const actor = p.admin_code;
+    const actor = formatEventLogActor(p.admin_code);
 
     const opFields = resolveOperationalLogFields(
       p.operational_event_id,
@@ -492,7 +495,7 @@ export function mergeEventLogs(
         summary: "Fine evento messaggio TOC",
         detail,
         status: "chiuso",
-        actor: p.closed_by?.trim() || "—",
+        actor: formatEventLogActor(p.closed_by),
         ...opFields,
       });
     }
@@ -587,7 +590,7 @@ export function mergeEventLogs(
           : "Reset forzato da TOC — push",
       detail: f.detail?.trim() || "Chiusura missione dall'operatore in dashboard TOC.",
       status: "forzato" as const,
-      actor: f.admin_code,
+      actor: formatEventLogActor(f.admin_code),
       ...operationalLogFields(f.operational_event_id, operationalEventMetaById),
     })),
     ...missionCloses.map((m) => ({
@@ -599,7 +602,7 @@ export function mergeEventLogs(
       summary: "Fine evento missione TOC",
       detail: formatMissionDetail(m.route_code, m.target_waypoint_label),
       status: "chiuso",
-      actor: m.admin_code,
+      actor: formatEventLogActor(m.admin_code),
       ...operationalLogFields(m.operational_event_id, operationalEventMetaById),
     })),
     ...sessionAuthLogs.map((entry) => {

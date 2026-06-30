@@ -15,6 +15,19 @@ export type AdminSessionData = {
 /** Unico login TOC globale (tutte le squadre / waypoint). */
 export const GLOBAL_TOC_ADMIN_CODES = new Set(["TOC01"]);
 
+/** Etichetta operatore nei log: codici login TOC → «TOC», squadre invariate. */
+export function formatEventLogActor(code: string | null | undefined): string {
+  const trimmed = code?.trim();
+  if (!trimmed) {
+    return "—";
+  }
+  const upper = trimmed.toUpperCase();
+  if (GLOBAL_TOC_ADMIN_CODES.has(upper) || upper.startsWith("GOLF_")) {
+    return "TOC";
+  }
+  return trimmed;
+}
+
 export function isGlobalTocAdmin(session: AdminSessionData | null): boolean {
   const code = session?.code?.trim().toUpperCase();
   return Boolean(code && GLOBAL_TOC_ADMIN_CODES.has(code));
