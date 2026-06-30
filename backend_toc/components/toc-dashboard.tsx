@@ -197,6 +197,10 @@ export default function TocDashboard() {
   const [eventOpenerCodes, setEventOpenerCodes] = useState<Set<string>>(new Set());
   const [openEventModalOpen, setOpenEventModalOpen] = useState(false);
   const [openEventTargetSessionId, setOpenEventTargetSessionId] = useState("");
+  const [openEventForm, setOpenEventForm] = useState<SquadAlarmRequestFormValue>(
+    emptySquadAlarmRequestForm(),
+  );
+  const [openEventAlert, setOpenEventAlert] = useState<string | null>(null);
   const [openEventBusy, setOpenEventBusy] = useState(false);
   const [fieldNotifyOpen, setFieldNotifyOpen] = useState(false);
   const [fieldNotifySessionId, setFieldNotifySessionId] = useState("");
@@ -433,7 +437,7 @@ export default function TocDashboard() {
       let query = supabase
         .from("operational_events")
         .select(
-          "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
+          "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id, request_types, other_detail",
         )
         .eq("status", "aperto")
         .order("display_number", { ascending: false });
@@ -1468,6 +1472,8 @@ export default function TocDashboard() {
         ? selectedSessionId
         : null) ?? squads[0]?.sessionId ?? "";
     setOpenEventTargetSessionId(preselect);
+    setOpenEventForm(emptySquadAlarmRequestForm());
+    setOpenEventAlert(null);
     setOpenEventModalOpen(true);
   }
 
@@ -1475,7 +1481,17 @@ export default function TocDashboard() {
     if (!session || !openEventTargetSessionId.trim()) {
       return;
     }
+    const requestTypes = squadAlarmRequestTypesFromForm(openEventForm);
+    if (requestTypes.length === 0) {
+      setOpenEventAlert("Seleziona almeno una tipologia (Sanitario, Security, …).");
+      return;
+    }
+    if (requestTypes.includes("altro") && openEventForm.otherDetail.trim().length < 2) {
+      setOpenEventAlert("Descrivi brevemente la richiesta «Altro».");
+      return;
+    }
     setOpenEventBusy(true);
+    setOpenEventAlert(null);
     try {
       const res = await fetch("/api/operational-events", {
         method: "POST",
@@ -1484,6 +1500,8 @@ export default function TocDashboard() {
           session,
           action: "open",
           targetSessionId: openEventTargetSessionId.trim(),
+          requestTypes,
+          otherDetail: openEventForm.otherDetail,
         }),
       });
       const body = (await res.json()) as {
@@ -1943,6 +1961,14 @@ export default function TocDashboard() {
             {openOperationalEvents.map((event) => (
               <li key={event.id} className={styles.operationalEventRow}>
                 <span className={styles.operationalEventNumber}>N° {event.displayNumber}</span>
+                <span className={styles.operationalEventTypes}>
+                  <SquadAlarmRequestDetail
+                    row={{
+                      request_types: event.requestTypes,
+                      other_detail: event.otherDetail,
+                    }}
+                  />
+                </span>
                 {event.targetSessionId ? (
                   <span className={styles.operationalEventTarget}>
                     Target:{" "}
@@ -2117,6 +2143,14 @@ export default function TocDashboard() {
                         ) : event.targetSessionId ? (
                           <> · target offline</>
                         ) : null}
+                      </p>
+                      <p className={styles.alarmMessage}>
+                        <SquadAlarmRequestDetail
+                          row={{
+                            request_types: event.requestTypes,
+                            other_detail: event.otherDetail,
+                          }}
+                        />
                       </p>
                       {event.interventionRef ? (
                         <p className={styles.alarmMessage}>
@@ -2742,8 +2776,8 @@ export default function TocDashboard() {
           <div className={styles.modal}>
             <h2>APERTURA EVENTO</h2>
             <p className={styles.pushHint}>
-              Scegli la squadra su cui pesa l&apos;evento (lampeggia in elenco). Nessuna push
-              all&apos;apertura.
+              Squadra target (lampeggia in blu) e tipologia intervento — come prima
+              dall&apos;app. Nessuna push all&apos;apertura.
             </p>
             <div className={styles.squadLogoutList}>
               {squads.map((s) => (
@@ -2758,6 +2792,16 @@ export default function TocDashboard() {
                 </label>
               ))}
             </div>
+            <SquadAlarmRequestForm
+              value={openEventForm}
+              onChange={setOpenEventForm}
+              disabled={openEventBusy}
+            />
+            {openEventAlert ? (
+              <p className={styles.pushAlert} role="alert">
+                {openEventAlert}
+              </p>
+            ) : null}
             <div className={styles.actions} style={{ marginTop: 12 }}>
               <button
                 className={`${styles.btn} ${styles.btnPrimary}`}

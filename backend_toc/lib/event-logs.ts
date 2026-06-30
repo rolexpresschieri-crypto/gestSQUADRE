@@ -180,6 +180,8 @@ export type OperationalEventLogSourceRow = {
   closed_at?: string | null;
   opened_by_admin_code: string;
   closed_by_admin_code?: string | null;
+  request_types?: string[] | null;
+  other_detail?: string | null;
 };
 
 export type UnifiedEventLog = {
@@ -314,6 +316,14 @@ export function mergeEventLogs(
     const displayNumber = Number(ev.display_number);
     const interventionRef = ev.intervention_ref?.trim() || null;
     const openedBy = ev.opened_by_admin_code?.trim() || "—";
+    const typeLabel = formatAlarmRequestDetail({
+      request_types: ev.request_types,
+      other_detail: ev.other_detail,
+    });
+    const baseDetail =
+      typeLabel && typeLabel !== "Richiesta intervento TOC da squadra"
+        ? typeLabel
+        : "Evento operativo";
     operationalLifecycleRows.push({
       id: `${ev.id}-open`,
       kind: "operational_event_open",
@@ -323,8 +333,8 @@ export function mergeEventLogs(
       summary: "Apertura evento operativo",
       detail:
         interventionRef != null
-          ? `Evento operativo n° ${displayNumber} · N° intervento ${interventionRef}`
-          : `Evento operativo n° ${displayNumber}`,
+          ? `${baseDetail} · Evento n° ${displayNumber} · N° intervento ${interventionRef}`
+          : `${baseDetail} · Evento operativo n° ${displayNumber}`,
       status: ev.status === "chiuso" ? "chiuso" : "aperto",
       actor: openedBy,
       operationalEventNumber: displayNumber,

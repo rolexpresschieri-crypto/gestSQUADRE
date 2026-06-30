@@ -3,9 +3,14 @@ import {
   allocateOperationalEventNumber,
   mapOperationalEventRow,
   operationalEventScopeKey,
+  OPERATIONAL_EVENT_SELECT,
   type OperationalEventRow,
   type OperationalEventSummary,
 } from "@/lib/operational-events";
+import {
+  normalizeSquadFieldNotificationTypes,
+  validateSquadFieldNotification,
+} from "@/lib/squad-field-notification";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,6 +20,8 @@ export type OpenOperationalEventParams = {
   openedByCode: string;
   targetSquadId: string;
   targetSessionId: string | null;
+  requestTypes: string[];
+  otherDetail?: string | null;
 };
 
 export type OpenOperationalEventResult = {
@@ -36,6 +43,19 @@ export async function openOperationalEvent(
     return { event: null, created: false, error: "Squadra target non valida." };
   }
 
+  const validationErr = validateSquadFieldNotification({
+    requestTypes: params.requestTypes,
+    otherDetail: params.otherDetail,
+  });
+  if (validationErr) {
+    return { event: null, created: false, error: validationErr };
+  }
+
+  const requestTypes = normalizeSquadFieldNotificationTypes(params.requestTypes);
+  const otherDetail = requestTypes.includes("altro")
+    ? (params.otherDetail ?? "").trim() || null
+    : null;
+
   const targetSessionId =
     params.targetSessionId && UUID_RE.test(params.targetSessionId)
       ? params.targetSessionId
@@ -56,10 +76,10 @@ export async function openOperationalEvent(
       opened_by_admin_code: openedByCode,
       target_squad_id: params.targetSquadId,
       target_session_id: targetSessionId,
+      request_types: requestTypes,
+      other_detail: otherDetail,
     })
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
-    )
+    .select(OPERATIONAL_EVENT_SELECT)
     .single();
 
   if (insertErr || !inserted) {

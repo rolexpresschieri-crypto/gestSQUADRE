@@ -174,7 +174,7 @@ export default function EventLogsPage() {
     let opEventsQuery = supabase
       .from("operational_events")
       .select(
-        "id, display_number, intervention_ref, status, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
+        "id, display_number, intervention_ref, status, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, request_types, other_detail",
       )
       .order("display_number", { ascending: true });
     if (golfCourseId) {

@@ -23,6 +23,7 @@ struct HomeView: View {
     let onShowMessage: (String) -> Void
 
     @State private var showAlarmSheet = false
+    @State private var showOpenEventSheet = false
     @State private var showFieldPhotoCamera = false
     @State private var showFieldPhotoNote = false
     @State private var capturedFieldPhotoData: Data?
@@ -106,11 +107,7 @@ struct HomeView: View {
                                 backgroundColor: TacticalColors.navy,
                                 foregroundColor: .white,
                                 enabled: !viewModel.isBusy,
-                                action: {
-                                    viewModel.openOperationalEvent { err in
-                                        if let err { onShowMessage(err) }
-                                    }
-                                }
+                                action: { showOpenEventSheet = true }
                             )
                             .padding(.top, 18)
                         }
@@ -207,7 +204,12 @@ struct HomeView: View {
             updateScrollHint(contentHeight: nil, viewportHeight: viewportHeight)
         }
         .sheet(isPresented: $showAlarmSheet) {
-            AlarmRequestSheet(viewModel: viewModel) { message in
+            AlarmRequestSheet(viewModel: viewModel, purpose: .notifyToc) { message in
+                onShowMessage(message)
+            }
+        }
+        .sheet(isPresented: $showOpenEventSheet) {
+            AlarmRequestSheet(viewModel: viewModel, purpose: .openEvent) { message in
                 onShowMessage(message)
             }
         }

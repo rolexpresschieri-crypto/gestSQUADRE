@@ -28,6 +28,8 @@ export async function openOperationalEventFromSquadAlarm(
 export async function openOperationalEventFromFieldSession(
   admin: SupabaseClient,
   sessionId: string,
+  requestTypes: string[],
+  otherDetail?: string | null,
 ): Promise<OpenOperationalEventFromSquadAlarmResult> {
   if (!UUID_RE.test(sessionId)) {
     return { created: false, skipped: false, event: null, error: "Sessione non valida." };
@@ -76,6 +78,8 @@ export async function openOperationalEventFromFieldSession(
     openedByCode,
     targetSquadId: squadId,
     targetSessionId: sessionId,
+    requestTypes,
+    otherDetail,
   });
 
   if (result.error || !result.event) {

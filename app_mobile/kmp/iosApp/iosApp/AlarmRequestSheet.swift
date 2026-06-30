@@ -1,7 +1,13 @@
 import SwiftUI
 
+enum AlarmRequestSheetPurpose {
+    case notifyToc
+    case openEvent
+}
+
 struct AlarmRequestSheet: View {
     @ObservedObject var viewModel: SquadViewModel
+    let purpose: AlarmRequestSheetPurpose
     let onShowMessage: (String) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -13,6 +19,18 @@ struct AlarmRequestSheet: View {
     @State private var otherDetail = ""
     @State private var validationError: String?
 
+    private var dialogTitle: String {
+        purpose == .openEvent ? SquadAlarmCopy.openEventTitle : SquadAlarmCopy.dialogTitle
+    }
+
+    private var dialogBody: String {
+        purpose == .openEvent ? SquadAlarmCopy.openEventBody : SquadAlarmCopy.dialogBody
+    }
+
+    private var confirmLabel: String {
+        purpose == .openEvent ? SquadAlarmCopy.openEventConfirm : "Invia"
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -20,7 +38,7 @@ struct AlarmRequestSheet: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text(SquadAlarmCopy.dialogBody)
+                            Text(dialogBody)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(.white)
                             Text("Cosa richiedi? (scelta multipla)")
@@ -60,16 +78,16 @@ struct AlarmRequestSheet: View {
                     }
                 }
             }
-            .navigationTitle(SquadAlarmCopy.dialogTitle)
+            .navigationTitle(dialogTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Annulla") { dismiss() }
-                        .disabled(viewModel.isAlarmBusy)
+                        .disabled(viewModel.isBusy)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Invia", action: submit)
-                        .disabled(viewModel.isAlarmBusy)
+                    Button(confirmLabel, action: submit)
+                        .disabled(viewModel.isBusy)
                 }
             }
         }
@@ -96,19 +114,37 @@ struct AlarmRequestSheet: View {
 
     private func submit() {
         validationError = nil
-        viewModel.sendAlarm(
-            sanitario: sanitario,
-            security: security,
-            vigiliFuoco: vigiliFuoco,
-            strutture: strutture,
-            altro: altro,
-            otherDetail: otherDetail
-        ) { errorMessage in
-            if let errorMessage {
-                validationError = errorMessage
-            } else {
-                dismiss()
-                onShowMessage(SquadAlarmCopy.sentOk)
+        switch purpose {
+        case .notifyToc:
+            viewModel.sendAlarm(
+                sanitario: sanitario,
+                security: security,
+                vigiliFuoco: vigiliFuoco,
+                strutture: strutture,
+                altro: altro,
+                otherDetail: otherDetail
+            ) { errorMessage in
+                if let errorMessage {
+                    validationError = errorMessage
+                } else {
+                    dismiss()
+                    onShowMessage(SquadAlarmCopy.sentOk)
+                }
+            }
+        case .openEvent:
+            viewModel.openOperationalEvent(
+                sanitario: sanitario,
+                security: security,
+                vigiliFuoco: vigiliFuoco,
+                strutture: strutture,
+                altro: altro,
+                otherDetail: otherDetail
+            ) { errorMessage in
+                if let errorMessage {
+                    validationError = errorMessage
+                } else {
+                    dismiss()
+                }
             }
         }
     }

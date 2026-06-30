@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { normalizeAdminRole, type AdminSessionData } from "@/lib/admin-auth";
 import {
   mapOperationalEventRow,
+  OPERATIONAL_EVENT_SELECT,
   type OperationalEventRow,
 } from "@/lib/operational-events";
 import { openOperationalEvent } from "@/lib/open-operational-event-core";
@@ -34,9 +35,7 @@ export async function GET(request: Request) {
 
   let query = admin
     .from("operational_events")
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
-    )
+    .select(OPERATIONAL_EVENT_SELECT)
     .order("display_number", { ascending: true });
 
   if (status === "aperto") {
@@ -87,6 +86,8 @@ export async function POST(request: Request) {
     operationalEventId?: string;
     interventionRef?: string;
     targetSessionId?: string;
+    requestTypes?: string[];
+    otherDetail?: string | null;
   };
 
   const session = payload.session;
@@ -148,6 +149,11 @@ export async function POST(request: Request) {
       openedByCode: session.code,
       targetSquadId: squadId,
       targetSessionId,
+      requestTypes: Array.isArray(payload.requestTypes)
+        ? payload.requestTypes.map((v) => String(v))
+        : [],
+      otherDetail:
+        typeof payload.otherDetail === "string" ? payload.otherDetail : null,
     });
 
     if (result.error || !result.event) {
@@ -290,9 +296,7 @@ export async function POST(request: Request) {
       .update({ intervention_ref: interventionRef })
       .eq("id", operationalEventId)
       .eq("status", "aperto")
-      .select(
-        "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
-      )
+      .select(OPERATIONAL_EVENT_SELECT)
       .single();
 
     if (error) {

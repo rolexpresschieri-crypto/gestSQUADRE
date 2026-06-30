@@ -128,11 +128,12 @@ fun GestSquadreFacade.sendAlarmSafe(
 
 fun GestSquadreFacade.openOperationalEventFromFieldSafe(
     session: SquadSession,
+    request: SquadAlarmRequest,
     onComplete: (Int?, String?) -> Unit,
 ) {
     iosScope.launch {
         try {
-            onComplete(openOperationalEventFromField(session), null)
+            onComplete(openOperationalEventFromField(session, request), null)
         } catch (e: Throwable) {
             onComplete(null, iosCallbackErrorMessage(e))
         }

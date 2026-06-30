@@ -30,11 +30,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Body JSON non valido" }, { status: 400 });
   }
 
-  const payload = body as { sessionId?: string };
+  const payload = body as {
+    sessionId?: string;
+    requestTypes?: string[];
+    otherDetail?: string | null;
+  };
   const sessionId =
     typeof payload.sessionId === "string" ? payload.sessionId.trim() : "";
+  const requestTypes = Array.isArray(payload.requestTypes)
+    ? payload.requestTypes.map((v) => String(v))
+    : [];
+  const otherDetail =
+    typeof payload.otherDetail === "string" ? payload.otherDetail : null;
 
-  const result = await openOperationalEventFromFieldSession(admin, sessionId);
+  const result = await openOperationalEventFromFieldSession(
+    admin,
+    sessionId,
+    requestTypes,
+    otherDetail,
+  );
   if (result.error) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }

@@ -70,8 +70,10 @@ class GestSquadreFacade(
     suspend fun fetchActivePanelMessage(session: SquadSession): String? =
         repository.fetchActivePanelMessage(session)
 
-    suspend fun openOperationalEventFromField(session: SquadSession): Int =
-        TocOperationalEventClient.openFromField(config, session.sessionId)
+    suspend fun openOperationalEventFromField(
+        session: SquadSession,
+        request: SquadAlarmRequest,
+    ): Int = TocOperationalEventClient.openFromField(config, session.sessionId, request)
 
     suspend fun loadMapSquads(): List<LiveSquadPin> = mapRepository.loadLiveSquads()
 

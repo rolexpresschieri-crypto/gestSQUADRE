@@ -187,16 +187,23 @@ class SquadViewModel(
         return true
     }
 
-    fun openOperationalEvent(onResult: (String?) -> Unit) {
+    fun openOperationalEvent(
+        request: SquadAlarmRequest,
+        onResult: (String?) -> Unit,
+    ) {
         val session = _uiState.value.session ?: return
         if (!session.canOpenOperationalEvent) {
             showTemporaryBanner(OperationalEventActivator.UNAUTHORIZED_MESSAGE)
             return
         }
+        request.validate()?.let {
+            onResult(it)
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isBusy = true) }
             try {
-                val number = facade.openOperationalEventFromField(session)
+                val number = facade.openOperationalEventFromField(session, request)
                 _uiState.update { it.copy(isBusy = false) }
                 showTemporaryBanner("EVENTO OPERATIVO n° $number aperto.")
                 onResult(null)

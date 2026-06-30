@@ -379,7 +379,15 @@ final class SquadViewModel: ObservableObject {
         session?.canOpenOperationalEvent ?? false
     }
 
-    func openOperationalEvent(onComplete: @escaping (String?) -> Void) {
+    func openOperationalEvent(
+        sanitario: Bool,
+        security: Bool,
+        vigiliFuoco: Bool,
+        strutture: Bool,
+        altro: Bool,
+        otherDetail: String,
+        onComplete: @escaping (String?) -> Void
+    ) {
         guard let session, let facade else {
             onComplete("Sessione non attiva.")
             return
@@ -389,8 +397,20 @@ final class SquadViewModel: ObservableObject {
             onComplete(facade.operationalEventUnauthorizedMessage())
             return
         }
+        let request = facade.makeSquadAlarmRequest(
+            sanitario: sanitario,
+            security: security,
+            vigiliFuoco: vigiliFuoco,
+            strutture: strutture,
+            altro: altro,
+            otherDetail: otherDetail
+        )
+        if let validationError = request.validate() {
+            onComplete(validationError)
+            return
+        }
         isBusy = true
-        facade.openOperationalEventFromFieldSafe(session: session) { [weak self] number, err in
+        facade.openOperationalEventFromFieldSafe(session: session, request: request) { [weak self] number, err in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isBusy = false
@@ -951,4 +971,8 @@ enum SquadAlarmCopy {
     static let dialogBody =
         "Confermi l'invio della notifica al TOC? La squadra può apparire evidenziata sulla mappa."
     static let sentOk = "Notifica inviata al TOC."
+    static let openEventTitle = "Apertura evento"
+    static let openEventBody =
+        "Scegli la tipologia intervento. Sul TOC si apre l'evento operativo (squadra in blu)."
+    static let openEventConfirm = "Apri evento"
 }

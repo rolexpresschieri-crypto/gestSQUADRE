@@ -88,6 +88,9 @@ import java.io.File
 private const val SquadAlarmDialogTitle = "Invia notifica a TOC"
 private const val SquadAlarmDialogBody =
     "Confermi? Sul backend TOC la squadra apparirà con cerchio rosso fino a «Fine evento»."
+private const val OpenEventDialogTitle = "Apertura evento"
+private const val OpenEventDialogBody =
+    "Scegli la tipologia intervento. Sul TOC si apre l'evento operativo (squadra in blu)."
 private const val SquadAlarmSentOk =
     "Segnalazione inviata. Il TOC vede la squadra in rosso sulla mappa."
 private const val FieldPhotoSentOk = "Foto inviata al TOC."
@@ -263,6 +266,7 @@ fun HomeScreen(
     val session = uiState.session
     val isLogged = session != null
     var showAlarmDialog by remember { mutableStateOf(false) }
+    var showOpenEventDialog by remember { mutableStateOf(false) }
     var showPhotoNoteDialog by remember { mutableStateOf(false) }
     var capturedPhotoBytes by remember { mutableStateOf<ByteArray?>(null) }
     var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -494,11 +498,7 @@ fun HomeScreen(
                         backgroundColor = TacticalNavy,
                         foregroundColor = Color.White,
                         fontWeight = FontWeight.Black,
-                        onClick = {
-                            viewModel.openOperationalEvent { err ->
-                                err?.let(onShowMessage)
-                            }
-                        },
+                        onClick = { showOpenEventDialog = true },
                     )
                     Spacer(modifier = Modifier.height(18.dp))
                 }
@@ -576,11 +576,29 @@ fun HomeScreen(
 
         if (showAlarmDialog) {
             SquadAlarmRequestOverlay(
+                title = SquadAlarmDialogTitle,
+                body = SquadAlarmDialogBody,
+                confirmLabel = "INVIA NOTIFICA",
                 onDismiss = { showAlarmDialog = false },
                 onConfirm = { request ->
                     showAlarmDialog = false
                     viewModel.sendAlarm(request) { err ->
                         onShowMessage(err ?: SquadAlarmSentOk)
+                    }
+                },
+            )
+        }
+
+        if (showOpenEventDialog) {
+            SquadAlarmRequestOverlay(
+                title = OpenEventDialogTitle,
+                body = OpenEventDialogBody,
+                confirmLabel = "APRI EVENTO",
+                onDismiss = { showOpenEventDialog = false },
+                onConfirm = { request ->
+                    showOpenEventDialog = false
+                    viewModel.openOperationalEvent(request) { err ->
+                        err?.let(onShowMessage)
                     }
                 },
             )
@@ -727,6 +745,9 @@ private fun FieldPhotoNoteOverlay(
 
 @Composable
 private fun SquadAlarmRequestOverlay(
+    title: String,
+    body: String,
+    confirmLabel: String,
     onDismiss: () -> Unit,
     onConfirm: (SquadAlarmRequest) -> Unit,
 ) {
@@ -813,14 +834,14 @@ private fun SquadAlarmRequestOverlay(
                         .padding(20.dp),
             ) {
                 Text(
-                    text = SquadAlarmDialogTitle,
+                    text = title,
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 20.sp,
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = SquadAlarmDialogBody,
+                    text = body,
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
@@ -930,7 +951,7 @@ private fun SquadAlarmRequestOverlay(
                         },
                     ) {
                         Text(
-                            text = "INVIA ALLARME",
+                            text = confirmLabel,
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                         )

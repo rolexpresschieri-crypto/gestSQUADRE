@@ -14,6 +14,8 @@ export type OperationalEventRow = {
   closed_by_admin_code: string | null;
   target_squad_id?: string | null;
   target_session_id?: string | null;
+  request_types?: string[] | null;
+  other_detail?: string | null;
 };
 
 export type OperationalEventSummary = {
@@ -26,7 +28,12 @@ export type OperationalEventSummary = {
   targetSquadId: string | null;
   targetSessionId: string | null;
   openedByCode: string;
+  requestTypes: string[];
+  otherDetail: string | null;
 };
+
+export const OPERATIONAL_EVENT_SELECT =
+  "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id, request_types, other_detail";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -69,6 +76,10 @@ export function mapOperationalEventRow(
         ? row.target_session_id.trim() || null
         : null,
     openedByCode: row.opened_by_admin_code?.trim() || "",
+    requestTypes: Array.isArray(row.request_types)
+      ? row.request_types.map((v) => String(v).trim().toLowerCase()).filter(Boolean)
+      : [],
+    otherDetail: row.other_detail?.trim() || null,
   };
 }
 
@@ -114,9 +125,7 @@ export async function fetchOpenOperationalEvents(
 ): Promise<{ rows: OperationalEventSummary[]; error: string | null }> {
   let query = admin
     .from("operational_events")
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id",
-    )
+    .select(OPERATIONAL_EVENT_SELECT)
     .eq("status", "aperto")
     .order("display_number", { ascending: true });
 
@@ -152,9 +161,7 @@ export async function fetchOperationalEventsByIds(
 
   const { data, error } = await admin
     .from("operational_events")
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
-    )
+    .select(OPERATIONAL_EVENT_SELECT)
     .in("id", unique);
 
   if (error || !data) {
@@ -178,9 +185,7 @@ export async function validateOpenOperationalEvent(
 
   const { data, error } = await admin
     .from("operational_events")
-    .select(
-      "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code",
-    )
+    .select(OPERATIONAL_EVENT_SELECT)
     .eq("id", operationalEventId)
     .maybeSingle();
 

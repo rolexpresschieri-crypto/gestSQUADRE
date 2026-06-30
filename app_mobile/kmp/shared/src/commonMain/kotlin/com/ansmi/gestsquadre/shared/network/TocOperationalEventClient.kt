@@ -2,6 +2,7 @@ package com.ansmi.gestsquadre.shared.network
 
 import com.ansmi.gestsquadre.shared.GestSquadreConfig
 import com.ansmi.gestsquadre.shared.GestSquadreException
+import com.ansmi.gestsquadre.shared.model.SquadAlarmRequest
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -24,13 +25,25 @@ private data class OpenEventRow(
     val displayNumber: Int = 0,
 )
 
+@Serializable
+private data class OpenEventRequest(
+    val sessionId: String,
+    val requestTypes: List<String>,
+    val otherDetail: String? = null,
+)
+
 object TocOperationalEventClient {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend fun openFromField(
         config: GestSquadreConfig,
         sessionId: String,
+        request: SquadAlarmRequest,
     ): Int {
+        request.validate()?.let { message ->
+            throw GestSquadreException(message)
+        }
+
         val base = config.tocBackendUrl.trim().removeSuffix("/")
         if (base.isBlank()) {
             throw GestSquadreException("TOC_BACKEND_URL non configurato nell'APK.")
@@ -40,7 +53,13 @@ object TocOperationalEventClient {
         val response =
             http.post("$base/api/operational-events/open-from-field") {
                 contentType(ContentType.Application.Json)
-                setBody(mapOf("sessionId" to sessionId))
+                setBody(
+                    OpenEventRequest(
+                        sessionId = sessionId,
+                        requestTypes = request.typeCodes(),
+                        otherDetail = request.otherDetail?.trim()?.takeIf { it.isNotEmpty() },
+                    ),
+                )
             }
 
         val body = response.bodyAsText()
@@ -51,7 +70,7 @@ object TocOperationalEventClient {
 
         val parsed = json.decodeFromString<OpenEventResponse>(body)
         val number = parsed.event?.displayNumber ?: 0
-        if (number == null || number < 1) {
+        if (number < 1) {
             throw GestSquadreException("Risposta apertura evento non valida.")
         }
         return number
