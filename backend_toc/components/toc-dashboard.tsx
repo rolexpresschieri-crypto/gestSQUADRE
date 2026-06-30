@@ -434,32 +434,50 @@ export default function TocDashboard() {
     }
 
     if (supabase) {
-      let query = supabase
-        .from("operational_events")
-        .select(
-          "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id, request_types, other_detail",
-        )
-        .eq("status", "aperto")
-        .order("display_number", { ascending: false });
+      const baseSelect =
+        "id, display_number, intervention_ref, status, golf_course_id, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, target_squad_id, target_session_id";
+      const fullSelect = `${baseSelect}, request_types, other_detail`;
 
-      if (golfCourseId) {
-        query = query.eq("golf_course_id", golfCourseId);
+      const runQuery = async (select: string) => {
+        let query = supabase
+          .from("operational_events")
+          .select(select)
+          .eq("status", "aperto")
+          .order("display_number", { ascending: false });
+        if (golfCourseId) {
+          query = query.eq("golf_course_id", golfCourseId);
+        }
+        return query;
+      };
+
+      let { data, error } = await runQuery(fullSelect);
+      if (
+        error &&
+        (error.message.includes("request_types") ||
+          error.message.includes("other_detail"))
+      ) {
+        ({ data, error } = await runQuery(baseSelect));
       }
 
-      const { data, error } = await query;
       if (error) {
-        const missing = error.message.includes("operational_events");
+        const missingTable = /relation.*operational_events|operational_events.*does not exist/i.test(
+          error.message,
+        );
         setOperationalEventsLoadError(
-          missing
+          missingTable
             ? "Esegui sql/operational_events.sql su Supabase."
-            : error.message,
+            : error.message.includes("target_session_id")
+              ? "Esegui sql/operational_events_target_squad.sql su Supabase."
+              : error.message,
         );
         setOpenOperationalEvents([]);
         return;
       }
 
       setOperationalEventsLoadError(null);
-      const rows = ((data ?? []) as OperationalEventRow[]).map(mapOperationalEventRow);
+      const rows = ((data ?? []) as unknown as OperationalEventRow[]).map(
+        mapOperationalEventRow,
+      );
       setOpenOperationalEvents(rows);
       setInterventionDrafts((prev) => {
         const next = { ...prev };
@@ -1949,7 +1967,8 @@ export default function TocDashboard() {
         {openOperationalEvents.length === 0 ? (
           <p className={styles.operationalEventsEmpty}>
             Nessun evento operativo aperto. Usa <strong>APERTURA EVENTO</strong> o
-            l&apos;app mobile ({OPERATIONAL_EVENT_OPENER_LABEL}).
+            l&apos;app mobile ({OPERATIONAL_EVENT_OPENER_LABEL}). Dettaglio e chiusura
+            nella colonna centrale <strong>Eventi attivi</strong>.
             {operationalEventsLoadError ? (
               <>
                 {" "}
@@ -1958,58 +1977,10 @@ export default function TocDashboard() {
             ) : null}
           </p>
         ) : (
-          <ul className={styles.operationalEventsList}>
-            {openOperationalEvents.map((event) => (
-              <li key={event.id} className={styles.operationalEventRow}>
-                <span className={styles.operationalEventNumber}>N° {event.displayNumber}</span>
-                <span className={styles.operationalEventTypes}>
-                  <SquadAlarmRequestDetail
-                    row={{
-                      request_types: event.requestTypes,
-                      other_detail: event.otherDetail,
-                    }}
-                  />
-                </span>
-                {event.targetSessionId ? (
-                  <span className={styles.operationalEventTarget}>
-                    Target:{" "}
-                    {squadBySessionId.get(event.targetSessionId)?.squadCode ??
-                      event.targetSessionId.slice(0, 8)}
-                  </span>
-                ) : null}
-                <label className={styles.operationalInterventionField}>
-                  N° intervento
-                  <input
-                    className={styles.operationalInterventionInput}
-                    value={interventionDrafts[event.id] ?? ""}
-                    maxLength={20}
-                    onChange={(e) =>
-                      setInterventionDrafts((prev) => ({
-                        ...prev,
-                        [event.id]: e.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <button
-                  className={`${styles.btn} ${styles.btnSmallInline}`}
-                  type="button"
-                  disabled={operationalBusy === `intervention-${event.id}`}
-                  onClick={() => void saveInterventionRef(event)}
-                >
-                  Salva
-                </button>
-                <button
-                  className={`${styles.btn} ${styles.btnDanger}`}
-                  type="button"
-                  disabled={operationalBusy === `close-${event.id}`}
-                  onClick={() => void closeOperationalEvent(event)}
-                >
-                  CHIUDI EVENTO
-                </button>
-              </li>
-            ))}
-          </ul>
+          <p className={styles.operationalEventsHint}>
+            {openOperationalEvents.length} evento/i aperto/i — gestione nella colonna{" "}
+            <strong>Eventi attivi</strong> (centro).
+          </p>
         )}
       </section>
 
@@ -2091,13 +2062,128 @@ export default function TocDashboard() {
 
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>
+            Eventi attivi ({openOperationalEvents.length})
+          </h2>
+          <p className={styles.opsColumnHint}>
+            Eventi operativi aperti. La squadra target lampeggia in <strong>blu</strong> a
+            sinistra. N° intervento e <strong>CHIUDI EVENTO</strong> qui sotto.
+          </p>
+          <div className={styles.opsColumnBody}>
+            {operationalEventsLoadError ? (
+              <p className={styles.opsEmpty}>
+                <strong style={{ color: "#ffb74d" }}>{operationalEventsLoadError}</strong>
+              </p>
+            ) : null}
+            {openOperationalEvents.length === 0 ? (
+              <p className={styles.opsEmpty}>Nessun evento operativo aperto.</p>
+            ) : (
+              openOperationalEvents.map((event) => {
+                const targetSquad = event.targetSessionId
+                  ? squadBySessionId.get(event.targetSessionId)
+                  : null;
+                return (
+                  <div
+                    key={event.id}
+                    className={
+                      event.targetSessionId &&
+                      selectedSessionId === event.targetSessionId
+                        ? `${styles.opsActiveEventItem} ${styles.opsRowSelected}`
+                        : styles.opsActiveEventItem
+                    }
+                    onClick={() => {
+                      if (event.targetSessionId) {
+                        setSelectedSessionId(event.targetSessionId);
+                        const squad = squads.find(
+                          (s) => s.sessionId === event.targetSessionId,
+                        );
+                        if (squad) {
+                          handleSquadRowSelect(squad);
+                        }
+                      }
+                    }}
+                    role={event.targetSessionId ? "button" : undefined}
+                    tabIndex={event.targetSessionId ? 0 : undefined}
+                  >
+                    <div className={styles.opsActiveEventDot} aria-hidden>
+                      {event.displayNumber}
+                    </div>
+                    <div className={styles.alarmBody}>
+                      <p className={styles.alarmTitle}>
+                        Evento N° {event.displayNumber}
+                        {targetSquad ? (
+                          <>
+                            {" "}
+                            · target <strong>{targetSquad.squadCode}</strong>
+                          </>
+                        ) : event.targetSessionId ? (
+                          <> · target offline</>
+                        ) : null}
+                      </p>
+                      <p className={styles.alarmMessage}>
+                        <SquadAlarmRequestDetail
+                          row={{
+                            request_types: event.requestTypes,
+                            other_detail: event.otherDetail,
+                          }}
+                        />
+                      </p>
+                      <label
+                        className={styles.operationalInterventionField}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        N° intervento
+                        <input
+                          className={styles.operationalInterventionInput}
+                          value={interventionDrafts[event.id] ?? ""}
+                          maxLength={20}
+                          onChange={(e) =>
+                            setInterventionDrafts((prev) => ({
+                              ...prev,
+                              [event.id]: e.target.value,
+                            }))
+                          }
+                        />
+                      </label>
+                      <div
+                        className={styles.opsActiveEventActions}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          className={`${styles.btn} ${styles.btnSmallInline}`}
+                          type="button"
+                          disabled={operationalBusy === `intervention-${event.id}`}
+                          onClick={() => void saveInterventionRef(event)}
+                        >
+                          Salva intervento
+                        </button>
+                        <button
+                          className={`${styles.btn} ${styles.btnDanger}`}
+                          type="button"
+                          disabled={operationalBusy === `close-${event.id}`}
+                          onClick={() => void closeOperationalEvent(event)}
+                        >
+                          CHIUDI EVENTO
+                        </button>
+                      </div>
+                      <p className={styles.alarmMeta}>
+                        Aperto {new Date(event.openedAt).toLocaleString("it-IT")}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+
+        <section className={styles.opsColumn}>
+          <h2 className={styles.opsColumnTitle}>
             Notifiche ({totalNotificationCount})
           </h2>
           <p className={styles.opsColumnHint}>
-            Tutto ciò che non è «evento operativo»: segnalazioni <strong>dal campo verso
-            il TOC</strong> e messaggi <strong>dal TOC verso le squadre</strong> (push, via
-            TRK, inoltro GT). Gli eventi restano nel pannello <strong>Eventi operativi</strong>{" "}
-            sopra.
+            Segnalazioni <strong>dal campo verso il TOC</strong> e messaggi{" "}
+            <strong>dal TOC verso le squadre</strong> (push, via TRK, inoltro GT). Gli
+            eventi operativi sono nella colonna <strong>Eventi attivi</strong>.
           </p>
           <div className={styles.opsColumnBody}>
             <h3 className={styles.opsSubTitle}>
@@ -2154,7 +2240,8 @@ export default function TocDashboard() {
                     </p>
                     {eventNumber != null ? (
                       <p className={styles.autoNotifyHint}>
-                        Chiudi con <strong>CHIUDI EVENTO</strong> (N° {eventNumber}) in alto.
+                        Chiudi con <strong>CHIUDI EVENTO</strong> (N° {eventNumber}) nella
+                        colonna Eventi attivi.
                       </p>
                     ) : (
                       <button
