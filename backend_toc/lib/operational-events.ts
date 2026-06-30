@@ -139,10 +139,7 @@ export function operationalEventTargetsSquad(
   if (targetSession && targetSession === sessionId) {
     return true;
   }
-  if (targetSquad && targetSquad === squadId) {
-    if (targetSession && targetSession !== sessionId) {
-      return false;
-    }
+  if (targetSquad && squadId && targetSquad === squadId) {
     return true;
   }
   return false;
@@ -166,7 +163,7 @@ export function operationalEventActiveAt(
   return true;
 }
 
-/** Un solo evento operativo aperto/assegnato alla squadra al momento indicato. */
+/** Un solo evento operativo assegnato alla squadra (o attivo in assenza di target) al momento indicato. */
 export function inferUniqueOperationalEventId(
   events: OperationalEventTargetRow[],
   sessionId: string,
@@ -176,15 +173,24 @@ export function inferUniqueOperationalEventId(
   if (!sessionId && !squadId) {
     return null;
   }
-  const matches = events.filter(
-    (ev) =>
-      operationalEventActiveAt(ev, atIso) &&
-      operationalEventTargetsSquad(ev, sessionId, squadId),
+  const activeAt = events.filter((ev) => operationalEventActiveAt(ev, atIso));
+  const targeted = activeAt.filter((ev) =>
+    operationalEventTargetsSquad(ev, sessionId, squadId),
   );
-  if (matches.length !== 1) {
+  if (targeted.length === 1) {
+    return targeted[0].id;
+  }
+  if (targeted.length > 1) {
     return null;
   }
-  return matches[0].id;
+  // Nessun target esplicito sull'evento: un solo evento attivo nel periodo.
+  const untargeted = activeAt.filter(
+    (ev) => !ev.target_squad_id?.trim() && !ev.target_session_id?.trim(),
+  );
+  if (untargeted.length === 1 && activeAt.length === 1) {
+    return untargeted[0].id;
+  }
+  return null;
 }
 
 export async function resolveUniqueOpenOperationalEventForSquad(

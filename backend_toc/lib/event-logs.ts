@@ -407,6 +407,14 @@ export function mergeEventLogs(
       alarmTypeCodes: typeCodes,
     });
     if (a.acknowledged_at) {
+      const opFieldsFine = resolveOperationalLogFields(
+        a.operational_event_id,
+        a.session_id,
+        a.squad_id,
+        a.acknowledged_at,
+        operationalEvents,
+        operationalEventMetaById,
+      );
       alarmRows.push({
         id: `${a.id}-fine-evento`,
         kind: "fine_evento",
@@ -417,7 +425,7 @@ export function mergeEventLogs(
         detail: formatAlarmRequestDetail(a),
         status: "chiuso",
         actor: a.acknowledged_by?.trim() || "—",
-        ...opFields,
+        ...opFieldsFine,
         alarmTypeCodes: typeCodes,
       });
     }

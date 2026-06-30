@@ -362,8 +362,7 @@ class GestSquadreRepository(
                 val targetSquad = row.targetSquadId?.trim().orEmpty()
                 when {
                     targetSession.isNotEmpty() && targetSession == session.sessionId -> true
-                    targetSquad.isNotEmpty() && targetSquad == session.squadId ->
-                        targetSession.isEmpty() || targetSession == session.sessionId
+                    targetSquad.isNotEmpty() && targetSquad == session.squadId -> true
                     else -> false
                 }
             }

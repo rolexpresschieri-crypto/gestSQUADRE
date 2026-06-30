@@ -179,7 +179,25 @@ export default function EventLogsPage() {
     if (golfCourseId) {
       opEventsQuery = opEventsQuery.eq("golf_course_id", golfCourseId);
     }
-    const { data: opEventRows } = await opEventsQuery;
+    let { data: opEventRows, error: opEventsErr } = await opEventsQuery;
+    if (
+      opEventsErr &&
+      (opEventsErr.message.includes("target_session_id") ||
+        opEventsErr.message.includes("target_squad_id"))
+    ) {
+      let fallbackQuery = supabase
+        .from("operational_events")
+        .select(
+          "id, display_number, intervention_ref, status, opened_at, closed_at, opened_by_admin_code, closed_by_admin_code, request_types, other_detail",
+        )
+        .order("display_number", { ascending: true });
+      if (golfCourseId) {
+        fallbackQuery = fallbackQuery.eq("golf_course_id", golfCourseId);
+      }
+      const fallback = await fallbackQuery;
+      opEventRows = fallback.data as typeof opEventRows;
+      opEventsErr = fallback.error;
+    }
     const metaById = new Map<string, OperationalEventLogMeta>();
     const opRows: OperationalEventLogSourceRow[] = [];
     for (const row of opEventRows ?? []) {
