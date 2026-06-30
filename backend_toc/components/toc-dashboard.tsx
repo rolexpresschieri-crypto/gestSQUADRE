@@ -1854,7 +1854,7 @@ export default function TocDashboard() {
             onClick={openFieldNotifyModal}
             disabled={squads.length === 0}
           >
-            Notifica campo (come app)
+            Notifica campo (simula app)
           </button>
           <button
             className={`${styles.btn} ${styles.btnAlarm}`}
@@ -2064,16 +2064,85 @@ export default function TocDashboard() {
 
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>
-            Eventi attivi ({pendingAlarms.length})
+            Eventi attivi ({openOperationalEvents.length})
           </h2>
           <p className={styles.opsColumnHint}>
-            Segnalazioni dal campo (stesso modulo dell&apos;app mobile). Nessuna push verso il TOC.
-            Se collegate a un Ev. N, chiudi con <strong>CHIUDI EVENTO</strong> in alto
-            (dopo aver chiuso le notifiche collegate).
+            Eventi operativi aperti (pulsante <strong>APERTURA EVENTO</strong> o app
+            mobile). La squadra target lampeggia in blu nella colonna a sinistra.
+            N° intervento e <strong>CHIUDI EVENTO</strong> nel pannello sopra.
           </p>
           <div className={styles.opsColumnBody}>
+            {openOperationalEvents.length === 0 ? (
+              <p className={styles.opsEmpty}>Nessun evento operativo aperto.</p>
+            ) : (
+              openOperationalEvents.map((event) => {
+                const targetSquad = event.targetSessionId
+                  ? squadBySessionId.get(event.targetSessionId)
+                  : null;
+                return (
+                  <div
+                    key={event.id}
+                    className={
+                      event.targetSessionId &&
+                      selectedSessionId === event.targetSessionId
+                        ? `${styles.opsActiveEventItem} ${styles.opsRowSelected}`
+                        : styles.opsActiveEventItem
+                    }
+                    onClick={() => {
+                      if (event.targetSessionId) {
+                        setSelectedSessionId(event.targetSessionId);
+                        const squad = squads.find(
+                          (s) => s.sessionId === event.targetSessionId,
+                        );
+                        if (squad) {
+                          handleSquadRowSelect(squad);
+                        }
+                      }
+                    }}
+                    role={event.targetSessionId ? "button" : undefined}
+                    tabIndex={event.targetSessionId ? 0 : undefined}
+                  >
+                    <div className={styles.opsActiveEventDot} aria-hidden>
+                      {event.displayNumber}
+                    </div>
+                    <div className={styles.alarmBody}>
+                      <p className={styles.alarmTitle}>
+                        Evento N° {event.displayNumber}
+                        {targetSquad ? (
+                          <>
+                            {" "}
+                            · target{" "}
+                            <strong>{targetSquad.squadCode}</strong>
+                          </>
+                        ) : event.targetSessionId ? (
+                          <> · target offline</>
+                        ) : null}
+                      </p>
+                      {event.interventionRef ? (
+                        <p className={styles.alarmMessage}>
+                          Intervento: {event.interventionRef}
+                        </p>
+                      ) : null}
+                      <p className={styles.alarmMeta}>
+                        Aperto{" "}
+                        {new Date(event.openedAt).toLocaleString("it-IT")}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            <h3 className={styles.opsSubTitle}>
+              Notifiche dal campo ({pendingAlarms.length})
+            </h3>
+            <p className={styles.opsColumnHint} style={{ marginBottom: 10 }}>
+              Segnalazioni inviate dall&apos;app (<strong>INVIA NOTIFICA A TOC</strong>)
+              o registrate dal TOC con <strong>Notifica campo</strong>. Appaiono in
+              rosso sulla mappa. Nessuna push automatica verso il TOC.
+            </p>
             {pendingAlarms.length === 0 ? (
-              <p className={styles.opsEmpty}>Nessun allarme attivo.</p>
+              <p className={styles.opsEmpty}>Nessuna notifica dal campo.</p>
             ) : (
               pendingAlarms.map((a) => {
                 const eventNumber = resolveAlarmOperationalNumber(
@@ -2713,7 +2782,12 @@ export default function TocDashboard() {
       {fieldNotifyOpen ? (
         <div className={styles.modalBackdrop}>
           <div className={styles.modal}>
-            <h2>Notifica campo (come app mobile)</h2>
+            <h2>Notifica campo — come se la squadra inviasse dall&apos;app</h2>
+            <p className={styles.operationalEventsHint}>
+              Registra una richiesta al TOC (Sanitario, Security, VVF, Strutture, Altro)
+              per una squadra online, senza usare il telefono. Compare in rosso sulla mappa
+              e in «Notifiche dal campo». Non apre un evento operativo e non invia push.
+            </p>
             <label className={styles.pushField}>
               Squadra
               <select
