@@ -547,7 +547,7 @@ export default function TocDashboard() {
     if (openMissions > 0) {
       setStatusMessage(
         `Notifiche collegate all'evento n° ${event.displayNumber} ancora aperte (${openMissions}). ` +
-          "Chiudile dalla colonna «Notifiche TOC attive» o usa Reset forzato TOC.",
+          "Chiudile dalla colonna «Notifiche» o usa Reset forzato TOC.",
       );
       return;
     }
@@ -1346,7 +1346,7 @@ export default function TocDashboard() {
     }
     if (
       !window.confirm(
-        `Chiudere la missione TOC per ${squad.squadCode}?\n` +
+        `Chiudere la notifica TOC (via TRK) per ${squad.squadCode}?\n` +
           `Via ${assignment.routeCode}` +
           (assignment.targetLabel ? ` → ${assignment.targetLabel}` : "") +
           " verrà rimossa dalla mappa.",
@@ -1381,15 +1381,15 @@ export default function TocDashboard() {
     if (logErr) {
       setStatusMessage(
         routeClear.error
-          ? `Fine evento missione (errore via: ${routeClear.error}; log: ${logErr.message}).`
-          : `Via rimossa; errore log missione: ${logErr.message}`,
+          ? `Fine notifica registrata (errore via: ${routeClear.error}; log: ${logErr.message}).`
+          : `Via rimossa; errore log notifica: ${logErr.message}`,
       );
       return;
     }
     setStatusMessage(
       routeClear.error
-        ? `Fine evento missione registrata (errore via: ${routeClear.error}).`
-        : `Fine evento missione registrata — ${squad.squadCode}.${routeHint}`,
+        ? `Fine notifica registrata (errore via: ${routeClear.error}).`
+        : `Fine notifica registrata — ${squad.squadCode}.${routeHint}`,
     );
   }
 
@@ -1404,7 +1404,7 @@ export default function TocDashboard() {
     if (
       !window.confirm(
         `Forzare reset notifica per ${label}?\n` +
-          "La missione sparisce dalla colonna (come se il destinatario avesse premuto Reset sull'app).",
+          "La notifica sparisce dalla colonna (come se il destinatario avesse premuto Reset sull'app).",
       )
     ) {
       return;
@@ -1419,7 +1419,7 @@ export default function TocDashboard() {
       });
       const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setStatusMessage(data.error ?? `Reset missione fallito (HTTP ${res.status}).`);
+        setStatusMessage(data.error ?? `Reset notifica fallito (HTTP ${res.status}).`);
         return;
       }
       setStatusMessage(`Reset forzato — ${label}`);
@@ -1429,7 +1429,7 @@ export default function TocDashboard() {
         loadSelectedRouteAssignment(),
       ]);
     } catch {
-      setStatusMessage("Reset missione: errore di rete.");
+      setStatusMessage("Reset notifica: errore di rete.");
     } finally {
       setMissionResetBusy(null);
     }
@@ -1805,6 +1805,7 @@ export default function TocDashboard() {
   }
 
   const pendingAlarms = alarms.filter((a) => !a.acknowledged_at);
+  const totalNotificationCount = pendingAlarms.length + activeMissionCount;
 
   return (
     <main className={styles.screen}>
@@ -2090,90 +2091,21 @@ export default function TocDashboard() {
 
         <section className={styles.opsColumn}>
           <h2 className={styles.opsColumnTitle}>
-            Eventi attivi ({openOperationalEvents.length})
+            Notifiche ({totalNotificationCount})
           </h2>
           <p className={styles.opsColumnHint}>
-            Eventi operativi aperti (pulsante <strong>APERTURA EVENTO</strong> o app
-            mobile). La squadra target lampeggia in blu nella colonna a sinistra.
-            N° intervento e <strong>CHIUDI EVENTO</strong> nel pannello sopra.
+            Tutto ciò che non è «evento operativo»: segnalazioni <strong>dal campo verso
+            il TOC</strong> e messaggi <strong>dal TOC verso le squadre</strong> (push, via
+            TRK, inoltro GT). Gli eventi restano nel pannello <strong>Eventi operativi</strong>{" "}
+            sopra.
           </p>
           <div className={styles.opsColumnBody}>
-            {openOperationalEvents.length === 0 ? (
-              <p className={styles.opsEmpty}>Nessun evento operativo aperto.</p>
-            ) : (
-              openOperationalEvents.map((event) => {
-                const targetSquad = event.targetSessionId
-                  ? squadBySessionId.get(event.targetSessionId)
-                  : null;
-                return (
-                  <div
-                    key={event.id}
-                    className={
-                      event.targetSessionId &&
-                      selectedSessionId === event.targetSessionId
-                        ? `${styles.opsActiveEventItem} ${styles.opsRowSelected}`
-                        : styles.opsActiveEventItem
-                    }
-                    onClick={() => {
-                      if (event.targetSessionId) {
-                        setSelectedSessionId(event.targetSessionId);
-                        const squad = squads.find(
-                          (s) => s.sessionId === event.targetSessionId,
-                        );
-                        if (squad) {
-                          handleSquadRowSelect(squad);
-                        }
-                      }
-                    }}
-                    role={event.targetSessionId ? "button" : undefined}
-                    tabIndex={event.targetSessionId ? 0 : undefined}
-                  >
-                    <div className={styles.opsActiveEventDot} aria-hidden>
-                      {event.displayNumber}
-                    </div>
-                    <div className={styles.alarmBody}>
-                      <p className={styles.alarmTitle}>
-                        Evento N° {event.displayNumber}
-                        {targetSquad ? (
-                          <>
-                            {" "}
-                            · target{" "}
-                            <strong>{targetSquad.squadCode}</strong>
-                          </>
-                        ) : event.targetSessionId ? (
-                          <> · target offline</>
-                        ) : null}
-                      </p>
-                      <p className={styles.alarmMessage}>
-                        <SquadAlarmRequestDetail
-                          row={{
-                            request_types: event.requestTypes,
-                            other_detail: event.otherDetail,
-                          }}
-                        />
-                      </p>
-                      {event.interventionRef ? (
-                        <p className={styles.alarmMessage}>
-                          Intervento: {event.interventionRef}
-                        </p>
-                      ) : null}
-                      <p className={styles.alarmMeta}>
-                        Aperto{" "}
-                        {new Date(event.openedAt).toLocaleString("it-IT")}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-
             <h3 className={styles.opsSubTitle}>
-              Notifiche dal campo ({pendingAlarms.length})
+              Dal campo → TOC ({pendingAlarms.length})
             </h3>
             <p className={styles.opsColumnHint} style={{ marginBottom: 10 }}>
-              Segnalazioni inviate dall&apos;app (<strong>INVIA NOTIFICA A TOC</strong>)
-              o registrate dal TOC con <strong>Notifica campo</strong>. Appaiono in
-              rosso sulla mappa. Nessuna push automatica verso il TOC.
+              App (<strong>INVIA NOTIFICA A TOC</strong>) o <strong>Notifica campo</strong>.
+              Rosso sulla mappa.
             </p>
             {pendingAlarms.length === 0 ? (
               <p className={styles.opsEmpty}>Nessuna notifica dal campo.</p>
@@ -2241,22 +2173,17 @@ export default function TocDashboard() {
                 );
               })
             )}
-          </div>
-        </section>
 
-        <section className={styles.opsColumn}>
-          <h2 className={styles.opsColumnTitle}>
-            Notifiche TOC attive ({activeMissionCount})
-          </h2>
-          <p className={styles.opsColumnHint}>
-            Via TRK + target, push allarme inviata dal TOC, oppure inoltro automatico
-            verso squadre GT (FIG/Sanitari). Sparisce con «Reset notifica» sull&apos;app
-            oppure con <strong>Reset forzato TOC</strong> qui sotto.
-          </p>
-          <div className={styles.opsColumnBody}>
+            <h3 className={styles.opsSubTitle}>
+              Dal TOC → squadre ({activeMissionCount})
+            </h3>
+            <p className={styles.opsColumnHint} style={{ marginBottom: 10 }}>
+              Push, via TRK + target, inoltro automatico GT. Si chiudono con Reset
+              sull&apos;app o <strong>Reset forzato TOC</strong>.
+            </p>
             {activeMissionCount === 0 ? (
               <p className={styles.opsEmpty}>
-                Nessuna notifica attiva, push TOC in attesa, né inoltro GT.
+                Nessuna notifica inviata dal TOC in attesa.
               </p>
             ) : (
               <>
@@ -2536,7 +2463,7 @@ export default function TocDashboard() {
               onPointerUp={onPushModalDragEnd}
               onPointerCancel={onPushModalDragEnd}
             >
-              Invia MISSIONI a squadre (push)
+              Invia NOTIFICHE a squadre (push)
             </h2>
             <p className={styles.pushHint}>
               Trascina dal titolo per spostare la finestra. Notifica con suono allarme sul
